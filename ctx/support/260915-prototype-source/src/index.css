@@ -1,0 +1,858 @@
+:root {
+  color-scheme: light;
+  /* Nord palette: Snow Storm (nord4-6) for light-mode surfaces, Polar
+     Night nord0 for ink. */
+  --paper: #e5e9f0; /* nord5 */
+  --ink: #2e3440; /* nord0 */
+  --line: #2e3440; /* nord0 */
+  --surface: #eceff4; /* nord6 */
+  --surface-hover: #d8dee9; /* nord4 */
+  --dot: rgba(46, 52, 64, 0.08);
+  --border-soft: rgba(46, 52, 64, 0.2);
+  --outline: rgba(46, 52, 64, 0.45);
+  /* Deliberately more washed-out than --outline — used to dim a done
+     task's text so it reads as settled/inert rather than drawing the eye. */
+  --ink-soft: rgba(46, 52, 64, 0.4);
+  /* Opaque equivalent of --border-soft — needed anywhere a translucent
+     border would otherwise blend with (and visibly reveal) whatever's
+     painted underneath it, like a swatch's own split-color fill. */
+  --border-static: #c7cbd2;
+  /* Fixed, not user-configurable (see EDGE_COLOR in board.js), and the same
+     in both themes — nord3, the same neutral used for the default "gray"
+     card/group color and for pattern tints. */
+  --edge-color: #4c566a;
+  --radius: 5px;
+  /* Matches .card's border width — used so .card__inner's own corner
+     radius can nest concentrically inside it instead of leaving a sliver
+     of .card's background visible at each corner. */
+  --card-border-width: 3px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-weight: 300;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  /* Polar Night (nord0-3) for dark-mode surfaces, Snow Storm nord6 for ink. */
+  --paper: #2e3440; /* nord0 */
+  --ink: #eceff4; /* nord6 */
+  --line: #eceff4; /* nord6 */
+  --surface: #3b4252; /* nord1 */
+  --surface-hover: #434c5e; /* nord2 */
+  --dot: rgba(236, 239, 244, 0.08);
+  --border-soft: rgba(236, 239, 244, 0.25);
+  --outline: rgba(236, 239, 244, 0.35);
+  --border-static: #5c6270;
+  --ink-soft: rgba(236, 239, 244, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- toolbar ---------- */
+
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--paper);
+  border-bottom: 2px solid var(--border-soft);
+}
+
+.toolbar__brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  margin-right: 8px;
+}
+
+.toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.toolbar__btn--icon {
+  padding: 6px 10px;
+}
+
+.toolbar__btn:hover {
+  background: var(--surface-hover);
+}
+
+.toolbar__view-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.toolbar__view-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 2px solid var(--outline);
+  border-radius: var(--radius);
+  z-index: 20;
+}
+
+.toolbar__view-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.toolbar__view-menu-item:hover {
+  background: var(--surface-hover);
+}
+
+.toolbar__view-menu-item--active {
+  background: var(--surface-hover);
+  font-weight: 600;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  /* A static (opaque) border rather than the usual translucent
+     --border-soft — the "gray" swatch's fill is a linear-gradient split,
+     and a translucent ring blends with (and visibly reveals) whatever's
+     under it, giving a striped rim instead of one consistent ring color. */
+  border: 2px solid var(--border-static);
+  cursor: pointer;
+  padding: 0;
+  background-clip: padding-box;
+}
+
+.swatch--active {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
+
+/* ---------- board ---------- */
+
+.board {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-height: 0;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  /* Without this, a fast click-drag anywhere on the canvas (not just over
+     a card) can pick up an incidental text selection instead of panning/
+     marqueeing, which some browsers then let you "drag out" as a ghost
+     snapshot of the whole board — the same way dragging a highlighted
+     selection on any other page would. Doesn't affect typing/selecting
+     inside a note's own textarea; form controls stay selectable/editable
+     regardless of an ancestor's user-select. */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.board--panning {
+  cursor: grabbing;
+}
+
+.board__layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.board__marquee {
+  position: absolute;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  border: 1px solid var(--outline);
+  pointer-events: none;
+}
+
+.board__group-preview {
+  position: absolute;
+  background: color-mix(in srgb, var(--outline) 12%, transparent);
+  border: 2px dashed var(--outline);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+.board__zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board__zoom-btn {
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 2px solid var(--border-soft);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.board__zoom-btn:hover {
+  background: var(--surface-hover);
+}
+
+.board__help {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+}
+
+.help-backdrop {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+.help-panel {
+  width: min(640px, 90%);
+  max-height: 80%;
+  overflow: auto;
+  padding: 24px 28px;
+  background: var(--surface);
+  border: 2px solid var(--outline);
+  border-radius: var(--radius);
+}
+
+.help-panel__title {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.help-panel__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.help-panel__table td {
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.help-panel__table tr:nth-child(even) {
+  background: var(--dot);
+}
+
+.help-panel__key {
+  white-space: nowrap;
+  padding-right: 24px;
+}
+
+.board__zoom-btn--reset {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.75rem;
+}
+
+/* ---------- card ---------- */
+
+.card {
+  position: absolute;
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--card-border-width) solid var(--line);
+  border-radius: var(--radius);
+  padding: 0;
+  cursor: grab;
+  user-select: none;
+  transition: background-color 0.1s ease;
+}
+
+/* Clipping lives here rather than on .card itself, so the connector dots
+   (siblings of this, direct children of .card) can sit outside the border
+   without being cut off. Its own radius is the outer radius *minus* the
+   border width it sits inset by, so its clipped corner (e.g. an image's)
+   nests flush against the border's curve instead of leaving a gap where
+   .card's background shows through. */
+.card__inner {
+  overflow: hidden;
+  border-radius: max(0px, calc(var(--radius) - var(--card-border-width)));
+}
+
+.card:hover {
+  background: var(--surface-hover);
+}
+
+.card--selected {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+  z-index: 5;
+}
+
+.card--dragging {
+  cursor: grabbing;
+  z-index: 10;
+}
+
+/* Shown on whichever node a connection drag is currently hovering, so it's
+   obvious exactly where releasing will attach. */
+.card--connect-target {
+  outline: 3px solid #8fbcbb;
+  outline-offset: 2px;
+}
+
+.card__bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 16px; /* matches GRID_SIZE in board.js */
+  padding: 1px 3px;
+  background: var(--dot);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Decorative only (see the comments where it's rendered, in Card.jsx and
+   Group.jsx) — not a pointer cursor, so it doesn't visually suggest it's
+   clickable on its own; status is only ever changed via the selection menu. */
+.task-status-icon {
+  pointer-events: none;
+}
+
+.card__media {
+  position: relative;
+}
+
+/* Only added when a caption is actually rendered below the media — with no
+   caption, it runs straight to the card's own border instead of leaving a
+   bare sliver of surface color between the two. */
+.card__media--divided {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* A duotone-style "grayscale, then tint" effect for a done task's image:
+   the image itself is desaturated (below), and this overlay recolors those
+   grays toward the current theme's ink tone rather than leaving them a
+   flat, theme-independent gray. */
+.card__media-tint {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  mix-blend-mode: color;
+  pointer-events: none;
+}
+
+.card__image {
+  display: block;
+  width: 100%;
+  height: auto; /* intrinsic aspect ratio, always — never cropped/stretched */
+  cursor: grab;
+  /* Belt-and-suspenders alongside the draggable={false} prop (Card.jsx) —
+     Safari in particular can still initiate its own native image-drag
+     ghost from an element despite that attribute in some cases. */
+  -webkit-user-drag: none;
+}
+
+/* Grayscale alone still lets a high-contrast image stand out — darkened in
+   dark mode and lightened in light mode (opposite directions, both toward
+   the theme's own background) so it actually recedes instead of just
+   losing its color. */
+[data-theme='dark'] .card--done .card__image,
+[data-theme='dark'] .card--done .card__link-image,
+[data-theme='dark'] .card--dimmed .card__image,
+[data-theme='dark'] .card--dimmed .card__link-image {
+  filter: grayscale(1) brightness(0.5) contrast(0.85);
+}
+
+[data-theme='light'] .card--done .card__image,
+[data-theme='light'] .card--done .card__link-image,
+[data-theme='light'] .card--dimmed .card__image,
+[data-theme='light'] .card--dimmed .card__link-image {
+  filter: grayscale(1) brightness(1.6) contrast(0.85);
+}
+
+.card__link-image {
+  display: block;
+  width: 100%;
+  height: auto; /* same "never cropped/stretched" rule as .card__image */
+  border-bottom: 1px solid var(--border-soft);
+  cursor: grab; /* same as .card__image — draggable, not clickable-to-navigate */
+  -webkit-user-drag: none;
+}
+
+.card__link-meta {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* The only part of a link card that actually navigates anywhere — icon +
+   underline-on-hover mark that clearly, so the image/card body (which just
+   select/drag like any other card) don't read as clickable-to-navigate too.
+   A flex row rather than a block of clamped text: the icon is a fixed-size
+   sibling of the (separately truncated) title text, so a long title always
+   truncates around it instead of a multi-line clamp's ellipsis cutting the
+   icon off along with the overflow text. */
+.card__link-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-user-drag: none;
+}
+
+.card__link-title:hover .card__link-title-text {
+  text-decoration: underline;
+}
+
+.card__link-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card__link-icon {
+  flex-shrink: 0;
+}
+
+.card--done .card__content,
+.card--done .card__link-title {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}
+
+/* Task-mode-only dimming for a non-task item — same washed-out color as a
+   done task's text, but no strikethrough (this item isn't "done", it's
+   just not a task at all, so nothing here claims it was completed). */
+.card--dimmed .card__content,
+.card--dimmed .card__link-title {
+  color: var(--ink-soft);
+}
+
+.card__content {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  border: none;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px;
+  background: transparent;
+  cursor: text;
+}
+
+.card__content:focus {
+  outline: none;
+}
+
+/* Big text: an explicit height (set inline from card.h) instead of growing
+   with content, a large font, and — since it never scrolls internally —
+   overflow is just clipped (truncated) rather than given a scrollbar.
+   The content area is absolutely positioned to exactly fill the space below
+   the bar (17px = card__bar's 16px min-height + 1px border) rather than
+   relying on flexbox to shrink it: a <textarea>'s intrinsic content size
+   otherwise wins over flex-shrink in most browsers even with min-height: 0,
+   which was silently defeating the truncation. */
+.card--big .card__inner {
+  position: relative;
+  height: 100%;
+}
+
+.card--big .card__content {
+  position: absolute;
+  inset: 17px 0 0 0;
+  height: auto;
+  overflow: hidden;
+  font-size: 3rem;
+  line-height: 1.2;
+}
+
+/* ---------- group ---------- */
+
+/* Never given a z-index — its stacking relies entirely on DOM order (it's
+   rendered before cards in Board.jsx) so notes always paint on top of it. */
+.group {
+  position: absolute;
+  background-color: var(--surface);
+  background-repeat: repeat;
+  border: 3px solid var(--line);
+  border-radius: var(--radius);
+  user-select: none;
+}
+
+.group--dragging {
+  cursor: grabbing;
+}
+
+/* Only this moves the group — dragging elsewhere in its body instead
+   marquee-selects whatever notes sit inside the border (see Board.jsx). */
+.group__drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 16px; /* matches GRID_SIZE in board.js */
+  padding: 1px 3px;
+  /* Flat and opaque rather than translucent — over the group's own
+     colored/patterned background, a translucent fill (like the note bar's
+     var(--dot)) would tint with whatever's underneath instead of reading
+     as a plain neutral bar. */
+  background: var(--surface-hover);
+  border-bottom: 1px solid var(--border-soft);
+  cursor: grab;
+}
+
+.group--selected {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
+
+/* Never given a z-index either, for the same reason as .group above. */
+.group--connect-target {
+  outline: 3px solid #8fbcbb;
+  outline-offset: 2px;
+}
+
+.resize-handle {
+  position: absolute;
+}
+
+.resize-handle--n,
+.resize-handle--s {
+  left: 10px;
+  right: 10px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resize-handle--n {
+  top: -5px;
+}
+
+.resize-handle--s {
+  bottom: -5px;
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  top: 10px;
+  bottom: 10px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.resize-handle--e {
+  right: -5px;
+}
+
+.resize-handle--w {
+  left: -5px;
+}
+
+.resize-handle--ne,
+.resize-handle--nw,
+.resize-handle--se,
+.resize-handle--sw {
+  width: 14px;
+  height: 14px;
+}
+
+.resize-handle--ne,
+.resize-handle--sw {
+  cursor: nesw-resize;
+}
+
+.resize-handle--nw,
+.resize-handle--se {
+  cursor: nwse-resize;
+}
+
+.resize-handle--ne {
+  top: -7px;
+  right: -7px;
+}
+
+.resize-handle--nw {
+  top: -7px;
+  left: -7px;
+}
+
+.resize-handle--se {
+  bottom: -7px;
+  right: -7px;
+}
+
+.resize-handle--sw {
+  bottom: -7px;
+  left: -7px;
+}
+
+.selection-menu {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 2px solid var(--outline);
+  border-radius: var(--radius);
+  z-index: 20;
+}
+
+.selection-menu__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 6px;
+}
+
+.selection-menu__divider {
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.pattern-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-soft);
+  cursor: pointer;
+  padding: 0;
+  background-color: var(--surface);
+  background-repeat: repeat;
+}
+
+.pattern-swatch--active {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
+
+.textsize-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-soft);
+  cursor: pointer;
+  padding: 0;
+  background-color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.textsize-swatch--active {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
+
+.task-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-soft);
+  cursor: pointer;
+  padding: 0;
+  background-color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.task-swatch--active {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
+
+/* ---------- connectors ---------- */
+
+.node-connector {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--outline);
+  cursor: crosshair;
+  transition: transform 0.08s ease, background-color 0.08s ease;
+}
+
+/* The side a connection is about to attach to, while dragging one in. */
+.node-connector--active {
+  background: #8fbcbb;
+  border-color: #8fbcbb;
+  transform: scale(1.6);
+}
+
+.node-connector--top.node-connector--active,
+.node-connector--bottom.node-connector--active {
+  transform: translateX(-50%) scale(1.6);
+}
+
+.node-connector--left.node-connector--active,
+.node-connector--right.node-connector--active {
+  transform: translateY(-50%) scale(1.6);
+}
+
+.node-connector--top,
+.node-connector--bottom {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node-connector--top {
+  top: -5px;
+}
+
+.node-connector--bottom {
+  bottom: -5px;
+}
+
+.node-connector--left,
+.node-connector--right {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node-connector--left {
+  left: -5px;
+}
+
+.node-connector--right {
+  right: -5px;
+}
+
+/* ---------- edges (connections between nodes) ---------- */
+
+/* No pointer-events on the SVG root — its transparent area must let clicks
+   through to the marquee/pan handling below it. Each edge's own hit-path
+   re-enables pointer-events just along its stroke. */
+.board__edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.edge__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* A wider, neutral-surface stroke under the colored line so it stays
+   readable over a busy group pattern instead of blending into it. */
+.edge__halo {
+  fill: none;
+  stroke: var(--surface);
+  stroke-width: 6;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.edge__line {
+  fill: none;
+  stroke: var(--edge-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.edge--selected .edge__halo {
+  stroke-width: 7;
+}
+
+.edge--selected .edge__line {
+  /* Opaque, unlike var(--outline) (an rgba() meant for border-style
+     decoration) — using that here let the background show through a
+     filled shape like the arrowhead, reading as an odd transparency. */
+  stroke: var(--ink);
+  stroke-width: 4;
+}
+
+.edge__arrowhead--selected {
+  fill: var(--ink);
+}
+
+.board__edge-preview {
+  fill: none;
+  stroke: var(--edge-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 6 4;
+}
+
+.edge-menu__btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--border-soft);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.edge-menu__btn--active {
+  outline: 2px solid var(--outline);
+  outline-offset: 2px;
+}
