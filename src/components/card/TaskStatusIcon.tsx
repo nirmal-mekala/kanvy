@@ -23,12 +23,19 @@ export function TaskStatusIcon({
   size = 12,
   strokeWidth = 2,
   className,
+  ariaLabel,
 }: {
   status: TaskStatus
   theme: Theme
   size?: number
   strokeWidth?: number
   className?: string
+  /** Spec §11: the drag-bar glyph is non-interactive but still meaningful
+   * — pass a label (e.g. "Status: blocked") so it has an accessible name.
+   * Omit when the icon sits inside an already-labeled control (e.g. a
+   * selection-menu button with its own `title`), where the icon is purely
+   * decorative and should stay out of the accessibility tree. */
+  ariaLabel?: string
 }) {
   const Icon = ICONS[status]
   return (
@@ -37,6 +44,9 @@ export function TaskStatusIcon({
       strokeWidth={strokeWidth}
       color={resolveTaskStatusColor(status, theme)}
       className={className}
+      role={ariaLabel ? 'img' : undefined}
+      aria-label={ariaLabel}
+      aria-hidden={ariaLabel ? undefined : true}
     />
   )
 }

@@ -4,18 +4,23 @@
 
 export function CardMedia({
   src,
+  alt,
   divided,
   tinted,
   className,
 }: {
   src: string
+  /** Spec §11: meaningful images (a card's own photo, a link's preview)
+   * get real alt text — the card's caption or the link's title, passed in
+   * by the caller since CardMedia doesn't know which. */
+  alt: string
   divided: boolean
   tinted: boolean
   className: string
 }) {
   return (
     <div className={`card__media${divided ? ' card__media--divided' : ''}`}>
-      <img className={className} src={src} alt="" draggable={false} />
+      <img className={className} src={src} alt={alt} draggable={false} />
       {tinted && <div className="card__media-tint" aria-hidden="true" />}
     </div>
   )

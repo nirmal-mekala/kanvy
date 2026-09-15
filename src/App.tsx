@@ -1,13 +1,14 @@
 // Boots the app: the full toolbar (Stage 7 — theme toggle/import/export/
-// view-mode menu) and the canvas (Stage 4). Board load already fell back
-// to the seed board on corrupt data (see state/persistence/storage.ts);
-// the visible "recovery happened" notification spec §9/Q12 requires is
-// Stage 9's job — this stage just doesn't crash or clobber the bad data
-// (autosave stays gated on `recoveryAcknowledgedAtom` until then).
+// view-mode menu), the corrupt-save recovery banner (Stage 9, spec
+// §9/Q12), and the canvas (Stage 4). Board load already fell back to the
+// seed board on corrupt data (see state/persistence/storage.ts); dismissing
+// the banner is the acknowledgement that resumes autosave
+// (`recoveryAcknowledgedAtom`).
 
 import { useAtomValue } from 'jotai'
 import { useEffect } from 'react'
 import { Canvas } from './components/canvas/Canvas'
+import { RecoveryBanner } from './components/notifications/RecoveryBanner'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { themeAtom } from './state/atoms/theme'
 
@@ -23,6 +24,7 @@ function App() {
 
   return (
     <div className="app">
+      <RecoveryBanner />
       <Toolbar />
       <Canvas />
     </div>

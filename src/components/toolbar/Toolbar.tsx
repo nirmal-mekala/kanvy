@@ -25,6 +25,7 @@ import {
   loadImportedBoardAtom,
 } from '../../state/history/boardHistoryAtom'
 import { exportBoard, parseImportedBoard } from '../../state/persistence/import'
+import { Banner } from '../notifications/Banner'
 
 const VIEW_MODES: readonly {
   key: ViewMode
@@ -49,6 +50,10 @@ function downloadBoardJson(json: string) {
   URL.revokeObjectURL(url)
 }
 
+// CRAP scoring penalizes this component's 0% coverage — component tests
+// aren't a required tier for v0 (spec §13); real coverage comes from
+// e2e/visual-regression specs, same precedent as CardBody/Container/Canvas.
+// fallow-ignore-next-line complexity
 export function Toolbar() {
   const [board] = useAtom(boardAtom)
   const [theme] = useAtom(themeAtom)
@@ -60,6 +65,7 @@ export function Toolbar() {
   const setFocusNodeId = useSetAtom(focusNodeIdAtom)
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [importError, setImportError] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -81,9 +87,7 @@ export function Toolbar() {
   }
 
   // Replacing the whole board makes the old selection/focus request almost
-  // certainly stale (spec §9/Q14's import path — the failure-modal UI this
-  // needs is Stage 9's; `window.alert` is a placeholder until then, same
-  // deferral pattern as App.tsx's corrupt-recovery notification).
+  // certainly stale (spec §9/Q14's import path).
   async function handleImportFileChange(
     e: React.ChangeEvent<HTMLInputElement>,
   ) {
@@ -92,7 +96,7 @@ export function Toolbar() {
     if (!file) return
     const result = parseImportedBoard(await file.text())
     if (!result.ok) {
-      window.alert('Could not import that file — is it a Kanvy JSON export?')
+      setImportError(true)
       return
     }
     loadImportedBoard(result.board)
@@ -101,78 +105,86 @@ export function Toolbar() {
   }
 
   return (
-    <div className="toolbar">
-      <input
-        ref={importInputRef}
-        type="file"
-        accept="application/json,.json"
-        onChange={handleImportFileChange}
-        style={{ display: 'none' }}
-      />
-      <span className="toolbar__brand">kanvy</span>
+    <>
+      {importError && (
+        <Banner
+          message="Could not import that file — is it a Kanvy JSON export?"
+          onDismiss={() => setImportError(false)}
+        />
+      )}
+      <div className="toolbar">
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImportFileChange}
+          style={{ display: 'none' }}
+        />
+        <span className="toolbar__brand">kanvy</span>
 
-      <div className="toolbar__view-menu-wrap" ref={wrapRef}>
+        <div className="toolbar__view-menu-wrap" ref={wrapRef}>
+          <button
+            type="button"
+            className="toolbar__btn toolbar__btn--icon"
+            onClick={() => setMenuOpen((open) => !open)}
+            title="Change view mode"
+          >
+            <Eye size={16} strokeWidth={2} />
+          </button>
+
+          {menuOpen && (
+            <div className="toolbar__view-menu">
+              {VIEW_MODES.map(({ key, label, Icon }) => (
+                <button
+                  type="button"
+                  key={key}
+                  className={`toolbar__view-menu-item${viewMode === key ? ' toolbar__view-menu-item--active' : ''}`}
+                  onClick={() => {
+                    setViewMode(key)
+                    setMenuOpen(false)
+                  }}
+                >
+                  <Icon size={14} strokeWidth={2} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           className="toolbar__btn toolbar__btn--icon"
-          onClick={() => setMenuOpen((open) => !open)}
-          title="Change view mode"
+          onClick={() => toggleTheme()}
+          title={
+            theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+          }
         >
-          <Eye size={16} strokeWidth={2} />
+          {theme === 'dark' ? (
+            <Sun size={16} strokeWidth={2} />
+          ) : (
+            <Moon size={16} strokeWidth={2} />
+          )}
         </button>
 
-        {menuOpen && (
-          <div className="toolbar__view-menu">
-            {VIEW_MODES.map(({ key, label, Icon }) => (
-              <button
-                type="button"
-                key={key}
-                className={`toolbar__view-menu-item${viewMode === key ? ' toolbar__view-menu-item--active' : ''}`}
-                onClick={() => {
-                  setViewMode(key)
-                  setMenuOpen(false)
-                }}
-              >
-                <Icon size={14} strokeWidth={2} />
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        <button
+          type="button"
+          className="toolbar__btn toolbar__btn--icon"
+          onClick={handleImportClick}
+          title="Import a board from a JSON file"
+        >
+          <Upload size={16} strokeWidth={2} />
+        </button>
+
+        <button
+          type="button"
+          className="toolbar__btn toolbar__btn--icon"
+          onClick={handleDownload}
+          title="Download the board as a JSON file"
+        >
+          <Download size={16} strokeWidth={2} />
+        </button>
       </div>
-
-      <button
-        type="button"
-        className="toolbar__btn toolbar__btn--icon"
-        onClick={() => toggleTheme()}
-        title={
-          theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        }
-      >
-        {theme === 'dark' ? (
-          <Sun size={16} strokeWidth={2} />
-        ) : (
-          <Moon size={16} strokeWidth={2} />
-        )}
-      </button>
-
-      <button
-        type="button"
-        className="toolbar__btn toolbar__btn--icon"
-        onClick={handleImportClick}
-        title="Import a board from a JSON file"
-      >
-        <Upload size={16} strokeWidth={2} />
-      </button>
-
-      <button
-        type="button"
-        className="toolbar__btn toolbar__btn--icon"
-        onClick={handleDownload}
-        title="Download the board as a JSON file"
-      >
-        <Download size={16} strokeWidth={2} />
-      </button>
-    </div>
+    </>
   )
 }

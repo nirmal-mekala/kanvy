@@ -73,6 +73,38 @@ body {
   flex-direction: column;
 }
 
+/* ---------- notifications (spec §9: import failure, corrupt-save recovery) ---------- */
+
+.banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: color-mix(
+    in srgb,
+    var(--color-outline) 15%,
+    var(--color-surface)
+  );
+  border-bottom: 2px solid var(--color-border-soft);
+  font-size: 0.8rem;
+}
+
+.banner__message {
+  flex: 1 1 auto;
+}
+
+.banner__dismiss {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--color-ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
 /* ---------- toolbar (minimal — full functionality is Stage 7) ---------- */
 
 .toolbar {
@@ -169,6 +201,12 @@ body {
   background-image: radial-gradient(var(--color-dot) 1px, transparent 1px);
   user-select: none;
   -webkit-user-drag: none;
+  /* Spec §12: basic touch support. Pointer Events already unify mouse/
+     touch/pen for pan/select/drag/resize (see useBoardInteraction.ts) —
+     this just stops the browser's native touch-scroll/pinch-zoom from
+     racing our own pan/zoom handling for a one-finger drag on blank
+     canvas. */
+  touch-action: none;
 }
 
 .board--panning {
@@ -299,6 +337,7 @@ body {
 
 .resize-handle {
   position: absolute;
+  touch-action: none;
 }
 
 .resize-handle--n,
@@ -383,6 +422,7 @@ body {
   cursor: grab;
   user-select: none;
   transition: background-color 0.1s ease;
+  touch-action: none;
 }
 
 /* Clipping lives here rather than on .card itself, so future sibling
@@ -571,6 +611,7 @@ body {
   background: var(--color-surface-hover);
   border-bottom: 1px solid var(--color-border-soft);
   cursor: grab;
+  touch-action: none;
 }
 
 .container-node--selected {
@@ -792,4 +833,41 @@ body {
 .task-swatch--active {
   outline: 2px solid var(--color-outline);
   outline-offset: 2px;
+}
+
+/* ---------- a11y baseline (spec §11, tier (a)) ---------- */
+
+/* Visible keyboard-focus indication on every interactive control — none
+   of the buttons/swatches/inputs above had one before. Scoped to
+   `:focus-visible` (not plain `:focus`) so a mouse click doesn't leave a
+   distracting ring, matching normal browser/OS focus-ring conventions. */
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
+}
+
+.card__content:focus-visible {
+  outline: 2px solid var(--color-outline);
+  outline-offset: -2px;
+}
+
+/* Only 3 cosmetic (non-essential) transitions exist in this stylesheet —
+   overridden here by matching selector + specificity (not `!important`,
+   which Biome's `noImportantStyles` rule forbids), relying on cascade
+   order since this block comes last. */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  .toolbar__btn {
+    transition: none;
+  }
+
+  .card {
+    transition: none;
+  }
 }

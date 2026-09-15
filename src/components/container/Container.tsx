@@ -105,6 +105,7 @@ export function Container({
             status={node.task.status}
             theme={theme}
             className="task-status-icon"
+            ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
           />
         )}
       </div>

@@ -39,6 +39,7 @@ export function CardBody({
             status={node.task.status}
             theme={theme}
             className="task-status-icon"
+            ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
           />
         )}
       </div>
@@ -46,6 +47,7 @@ export function CardBody({
       {node.kind === 'image' && imageSrc && (
         <CardMedia
           src={imageSrc}
+          alt={node.content || 'Image card'}
           divided={showCaption}
           tinted={tinted}
           className="card__image"
@@ -57,6 +59,7 @@ export function CardBody({
           {node.link.imageUrl && (
             <CardMedia
               src={node.link.imageUrl}
+              alt={node.link.title || 'Link preview image'}
               divided={false}
               tinted={tinted}
               className="card__link-image"
@@ -70,6 +73,7 @@ export function CardBody({
         <textarea
           ref={contentRef}
           className="card__content"
+          aria-label="Card caption"
           value={node.content}
           placeholder="Write something..."
           rows={1}

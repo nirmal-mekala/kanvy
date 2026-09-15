@@ -124,6 +124,16 @@ harness; verify manually or add a spec later if this becomes a real gap.
 - [ ] `done` styling (strikethrough/dim text, theme-tinted image overlay)
 
 ### Error handling, a11y, touch (spec §9, §11, §12) — Stage 9
+Specs written in `e2e/errorHandlingA11yTouch.spec.ts` against Stage 9's
+actual behavior (`.banner`/`.banner__dismiss`, `recoveryAcknowledgedAtom`
+gating localStorage writes, `[role="dialog"]` on the help panel, `alt` text
+on `CardMedia`, `prefers-reduced-motion`, a touch-tap smoke check), but
+**not run to a passing result** — re-confirmed the same environment
+limitation this stage: `pnpm e2e` fails locally with
+`chrome-headless-shell: error while loading shared libraries:
+libglib-2.0.so.0` (no system libs in this container, root/apt unavailable),
+and the host↔container route for the remote-browser workaround still isn't
+published. Run `pnpm e2e` for real before checking any of these off.
 - [ ] Import-failure UI (modal/toast, not `window.alert`)
 - [ ] Corrupt-save recovery UI (visible notification, no autosave-over until acknowledged)
 - [ ] Baseline a11y smoke checks (focus states, alt text, `prefers-reduced-motion`)
