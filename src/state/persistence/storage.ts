@@ -1,0 +1,117 @@
+// localStorage load/save (spec §9). This is the only side-effecting
+// boundary in the persistence layer — everything it delegates to
+// (schema/legacy.ts, schema/board.ts, serialize.ts) is pure.
+//
+// Corrupt/unreadable data handling (spec §9 Q12): `loadBoard` never
+// throws and always returns a usable board (falling back to the seed
+// board), but when the persisted data was corrupt it reports that via
+// `ok: false` rather than silently recovering. It deliberately does NOT
+// write the seed board back to storage itself — a later UI stage is
+// responsible for surfacing the recovery to the user and must not call
+// `writeBoard`/a `DebouncedSaver.save` until that's acknowledged, so the
+// original bytes stay inspectable/exportable until then.
+
+import type { Board } from '../../schema/board'
+import { BoardSchema } from '../../schema/board'
+import { normalizeLegacyBoard } from '../../schema/legacy'
+import { createSeedBoard } from '../../schema/seed'
+import { serializeBoard } from './serialize'
+
+export const STORAGE_KEY = 'kanvy.board'
+
+export type LoadResult =
+  | { ok: true; board: Board }
+  | {
+      ok: false
+      board: Board
+      reason: 'parse-error' | 'validation-error'
+      raw: string
+    }
+
+function validateParsed(parsed: unknown): Board | undefined {
+  const result = BoardSchema.safeParse(normalizeLegacyBoard(parsed))
+  return result.success ? result.data : undefined
+}
+
+/** Loads and validates the persisted board, falling back to a fresh seed board. */
+export function loadBoard(): LoadResult {
+  let raw: string | null
+  try {
+    raw = localStorage.getItem(STORAGE_KEY)
+  } catch {
+    // localStorage unavailable (e.g. disabled in the browser) — same
+    // fallback as "nothing saved yet", not a reportable corruption.
+    return { ok: true, board: createSeedBoard() }
+  }
+
+  if (raw === null) {
+    return { ok: true, board: createSeedBoard() }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { ok: false, board: createSeedBoard(), reason: 'parse-error', raw }
+  }
+
+  const board = validateParsed(parsed)
+  if (!board) {
+    return {
+      ok: false,
+      board: createSeedBoard(),
+      reason: 'validation-error',
+      raw,
+    }
+  }
+  return { ok: true, board }
+}
+
+/** Immediate, unconditional write. Callers own the "don't autosave over corrupt data" gate. */
+export function writeBoard(board: Board): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, serializeBoard(board))
+  } catch {
+    // Storage-quota-exceeded etc.: accepted silent failure for v0, matching
+    // today's behavior (spec §9 Q13) — not a first-class error state yet.
+  }
+}
+
+export interface DebouncedSaver {
+  save: (board: Board) => void
+  /** Writes the most recent pending board immediately, if any, and clears the timer. */
+  flush: () => void
+  /** Drops any pending save without writing it. */
+  cancel: () => void
+}
+
+const DEFAULT_DEBOUNCE_MS = 500
+
+/** Hand-rolled debounce (no lodash/use-debounce dependency, per phase3 stack decision). */
+export function createDebouncedSaver(
+  delayMs = DEFAULT_DEBOUNCE_MS,
+): DebouncedSaver {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let pending: Board | undefined
+
+  const flush = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
+    if (pending) writeBoard(pending)
+    pending = undefined
+  }
+
+  const cancel = () => {
+    if (timer !== undefined) clearTimeout(timer)
+    timer = undefined
+    pending = undefined
+  }
+
+  const save = (board: Board) => {
+    pending = board
+    if (timer !== undefined) clearTimeout(timer)
+    timer = setTimeout(flush, delayMs)
+  }
+
+  return { save, flush, cancel }
+}
