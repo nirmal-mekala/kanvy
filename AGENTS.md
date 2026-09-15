@@ -2,44 +2,59 @@
 
 ## Where this repo is right now
 
-`kanvy` is being migrated from a working JavaScript/React prototype (kept for
-reference, not built or run from this repo — see below) into a new
-TypeScript implementation. As of this writing, the prototype-migration has
-completed **prototype-migration phase 6** (test suite) of the process
-defined in `ctx/prompt/260915-migration-process.md`. No feature code exists
-yet — `src/App.tsx` is still a bare booting shell — but the test suite that
-phase 7 builds against is in place:
+`kanvy` has completed **prototype-migration phase 7** (implementation) of
+the process defined in `ctx/prompt/260915-migration-process.md` — all 10
+build stages from `ctx/notes/260915-prototype-migration-phase5-implementation-plan.md`
+§4 are implemented: schema/persistence (Zod, localStorage, legacy-document
+normalization), Jotai state/history (undo/redo, selection-restore),
+canvas/node rendering (Tailwind theme, pan/zoom, dot-grid), selection/
+drag/resize + formal container ownership, card-kind conversion + link
+metadata fetch/retry + edge connections, clipboard/shortcuts/toolbar/help,
+task layer + view modes (Standard/Task/Recency) via a new
+`components/selection-menu/`, and a baseline error-handling/a11y/touch
+pass (import-failure banner, corrupt-save recovery notification, alt
+text/focus-visible/`prefers-reduced-motion`, touch-action tuning).
 
-- **Unit tests** (`pnpm test`): a real, runnable suite covering every
-  pure-function module named in spec §13 (`src/geometry/`, `src/colors/`,
-  `src/cards/urlSlurp.ts`), written against type-only stub signatures
-  (every function throws `not implemented — phase 7`). `pnpm typecheck`
-  and `pnpm lint` pass; `pnpm test` correctly reports 63 failing
-  assertions (red, not "module not found") — expected until phase 7 fills
-  in real logic. No coverage-threshold gate yet (see `vitest.config.ts`'s
-  comment) — 0% coverage is expected right now, not a regression.
-- **E2e harness** (`pnpm e2e`): Playwright fixtures for clipboard-paste
-  mocking, link-metadata (microlink.io) mocking, and board-state seeding
-  (`e2e/fixtures/`), plus one smoke test proving the harness runs against
-  the bare app shell. Full interaction specs are deferred to phase 7,
-  written stage-by-stage as each part of the UI lands — see
-  `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md` for the list to
-  close out.
-- **Visual-regression tier** (`pnpm e2e:visual`, after one-time
-  `pnpm e2e:visual:setup`): a dedicated `playwright.visual.config.ts`
-  running the new app and the vendored prototype
-  (`ctx/support/260915-prototype-source/`, via a pinned port) as paired
-  live servers, a pixelmatch diff utility (`e2e/visual/diff.ts`), and one
-  smoke test proving both servers boot and diff without throwing. Real
-  scenarios (per-card-kind, per-pattern, per-view-mode, light/dark) are
-  also deferred to phase 7 (Stage 10), per the same checklist.
-- `fallow audit` still correctly flags the phase-3-decided dependencies
-  (`zod`/`jotai`/`nanoid`/`clsx`/`lucide-react`/`hero-patterns`) as
-  unused, since nothing consumes them yet — expected until phase 7 lands.
+**Verified, as of this writing (all re-run fresh, not assumed):**
+- `pnpm test` — 181/181 passing.
+- `pnpm typecheck` / `pnpm build` — clean.
+- `pnpm lint` — clean (a handful of pre-existing warnings only: one
+  `noNonNullAssertion` in the Vite-generated `main.tsx`, a few CSS
+  `noDescendingSpecificity` notices — none are errors).
+- `npx fallow audit --format json --quiet --gate-marker agent` — verdict
+  `pass`, zero newly-introduced dead-code/complexity/duplication findings.
 
-Next: prototype-migration phase 7 (implementation) — build against this
-suite, closing out red unit tests and the e2e/visual-regression checklist
-stage by stage.
+**NOT verified — a real, outstanding gap, not just an administrative
+loose end:** this repo was implemented inside a sandboxed Debian container
+with no display server and no working local Chromium (missing system
+libs, no root/`apt`), and while a Playwright server on the developer's
+host Mac is reachable from the container over `ws://host.docker.internal`,
+that remote browser cannot route back into the container's own dev server
+(no published port / Docker Desktop network asymmetry). Net effect:
+- Every Playwright **e2e interaction spec** in `e2e/` (selection, dragging/
+  snapping, containers, card-kind behavior, connections, clipboard/
+  shortcuts, task/view-mode, error-handling/a11y/touch) and every
+  **visual-regression scenario** in `e2e/visual/scenarios.spec.ts` (default
+  board light/dark, each card kind, each container pattern, task view,
+  recency across all 4 thresholds, done styling, help panel, mixed-
+  selection menu) exists as real, code-reviewed spec code, but **has never
+  actually been run against a live browser**. `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md`
+  reflects this honestly — every item is unchecked per the checklist's
+  own rule ("check off only once a spec exists and passes"), even though
+  specs now exist for nearly the full list.
+- Concretely: this means pixel-parity with the prototype and real
+  pointer-driven canvas interactions (drag, resize, marquee, connect,
+  paste) are unconfirmed by anything other than static code review against
+  the spec/prototype source and the pure-function unit-test suite (which
+  *is* fully green and covers the geometry/color/urlSlurp logic those
+  interactions depend on).
+- **Before treating phase 7 as fully closed**, run `pnpm e2e` and
+  `pnpm e2e:visual` (after `pnpm e2e:visual:setup`) on a machine with a
+  working local browser (or a container with real host↔container
+  networking to a Playwright server) and fix whatever that first real run
+  surfaces — some drift between "should work per the code" and "actually
+  renders/behaves correctly" should be expected the first time a UI this
+  size gets an actual browser pointed at it.
 
 Before making any change, check `ctx/prompt/260915-migration-process.md` for
 which prototype-migration phase is currently active, and re-read this file —
