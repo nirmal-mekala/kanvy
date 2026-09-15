@@ -58,6 +58,10 @@ real before checking any of these off.
 - [ ] Clicking an already-multi-selected card without a modifier preserves the multi-selection
 
 ### Dragging & snapping (spec §4.4) — Stage 5
+Specs written in `e2e/interaction.spec.ts` (`dragging & snapping` describe
+block) against Stage 5's actual DOM, but **not run to a passing result** —
+same environment limitation noted under "Selection" above. Run `pnpm e2e`
+for real before checking any of these off.
 - [ ] X-axis snaps to grid midpoints
 - [ ] Y-axis gutter-snaps near a column-overlapping neighbor's edge
 - [ ] Container no-fly-zone clamping
@@ -68,12 +72,21 @@ real before checking any of these off.
 - [ ] 8-way resize (containers always; big-text cards only), grid-snapped with documented minimum
 
 ### Containers (spec §2.3, §4.5) — Stage 5
+Specs written in `e2e/interaction.spec.ts` (`containers` describe block)
+against Stage 5's actual DOM, but **not run to a passing result** — same
+environment limitation noted under "Selection" above. Run `pnpm e2e` for
+real before checking any of these off.
 - [ ] Ctrl/Cmd+click-drag creates a container, winning over starting on an existing node
 - [ ] Drop-by-largest-overlap parent assignment
 - [ ] Node with no overlapping container has no parent
 - [ ] Containers always render beneath cards
 
 ### Card-kind behavior (spec §5) — Stage 6
+Specs written in `e2e/cards.spec.ts` (`card-kind behavior` describe block)
+against Stage 6's actual DOM, mocking link metadata via
+`e2e/fixtures/linkMetadata.ts`, but **not run to a passing result** — same
+environment limitation noted under Stage 4/5 above. Run `pnpm e2e` for
+real before checking any of these off.
 - [ ] Text card creation (double-click, ⌘/Ctrl+N, typing/pasting plain text)
 - [ ] Big-text resize, truncation (not scroll), toggle back to regular on kind conversion
 - [ ] Image card creation (file drop, paste with nothing/container selected, paste onto a convertible card)
@@ -83,6 +96,11 @@ real before checking any of these off.
 - [ ] Kind conversion resets `size` to `regular`; discards stale `image`/`link` data
 
 ### Connections (spec §4.6) — Stage 6
+Specs written in `e2e/cards.spec.ts` (`connections` describe block)
+against Stage 6's actual DOM (`e2e/visual/scenarios.spec.ts`'s selection-
+menu scenario also exercises the direction control's DOM, for what it's
+worth statically), but **not run to a passing result** — same environment
+limitation. Run `pnpm e2e` for real before checking any of these off.
 - [ ] Connector affordance appears on hover, generous hit area
 - [ ] At most one edge per pair; a second attempt selects the existing edge
 - [ ] Direction toggle (none/forward/backward) via selection menu
@@ -146,6 +164,20 @@ both servers, screenshot via `page.screenshot()`, diff via
 `e2e/visual/diff.ts` at `threshold: 0.2` / `maxDiffPixelRatio: 0.01`
 (tighten per-scenario where an exact match is expected).
 
+All nine scenarios below are written in `e2e/visual/scenarios.spec.ts`,
+using `e2e/visual/scenes.ts`'s shared scene-builder (one scenario
+description compiled into both the new app's v0 schema and the
+prototype's legacy `{cards, groups, edges}` shape, verified field-by-field
+against `ctx/support/260915-prototype-source/src/data/board.js` and
+`src/schema/node.ts` — see that file's own comments for the exact
+evidence) — but **not run to a passing result**: same hard environment
+limitation as every interaction-e2e section above (confirmed again this
+stage: `pnpm e2e` fails locally with the missing-`libglib` error, and the
+host-Mac remote-browser workaround still has no route back into this
+container's dev server). Run `pnpm e2e:visual:setup` once and then `pnpm
+e2e:visual` for real (CI, or a dev environment without this networking
+split) before checking any of these off — do not check based on code
+review alone.
 - [ ] Default seed board, standard view, light theme
 - [ ] Default seed board, standard view, dark theme
 - [ ] Each card kind (text regular, text big, image, link) in isolation
