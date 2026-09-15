@@ -1,7 +1,9 @@
-// Minimal inline direction toggle for a selected edge (spec §4.6) — a full
-// selection-menu UI (also covering color/pattern/task) is Stage 7's job;
-// this is just enough to make `direction` settable now that edges can be
-// created interactively.
+// Direction toggle for the currently selected edge(s) (spec §4.6) — the
+// edges half of the selection menu (`components/selection-menu/`
+// covers the node half), kept separate since edges never share the
+// color/pattern/task sections. `direction` is `null` for a mixed-direction
+// multi-edge selection (spec §4.3's "one selection menu for the whole
+// selection, however mixed" — no option reads as falsely "active" then).
 
 import type { EdgeDirection } from '../../schema/edge'
 
@@ -19,7 +21,7 @@ export function EdgeDirectionControl({
 }: {
   x: number
   y: number
-  direction: EdgeDirection
+  direction: EdgeDirection | null
   onChange: (direction: EdgeDirection) => void
 }) {
   return (

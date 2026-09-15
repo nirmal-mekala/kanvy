@@ -49,3 +49,18 @@ export function resolveColorHex(color: ColorKey, theme: Theme): string {
 export function isThemeDynamic(color: ColorKey): boolean {
   return color === 'gray'
 }
+
+/**
+ * CSS `background` value for a color-picker swatch button (spec §3) — a
+ * plain fill for every static color, but a half-light/half-dark split for
+ * `gray` specifically, so its swatch visibly signals "this one changes
+ * with the theme." Always shows both halves regardless of the current
+ * theme — `resolveColorHex` is what picks the single theme-appropriate one
+ * for actually rendering a card/container/edge.
+ */
+export function swatchBackground(color: ColorKey): string {
+  if (color === 'gray') {
+    return `linear-gradient(90deg, ${GRAY_LIGHT} 50%, ${COLORS.gray} 50%)`
+  }
+  return COLORS[color]
+}

@@ -677,7 +677,7 @@ body {
   right: -5px;
 }
 
-/* ---------- edge direction control (minimal — full selection menu is Stage 7) ---------- */
+/* ---------- edge direction control (spec §4.6 — the edges half of the selection menu) ---------- */
 
 .edge-direction-control {
   position: absolute;
@@ -709,4 +709,87 @@ body {
 .edge-direction-control__btn--active {
   background: var(--color-surface-hover);
   outline: 1px solid var(--color-outline);
+}
+
+/* ---------- selection menu (spec §3/§4.3/§5.2/§6.1) ---------- */
+
+.selection-menu {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+  z-index: 20;
+}
+
+.selection-menu__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 6px;
+}
+
+.selection-menu__divider {
+  height: 1px;
+  background: var(--color-border-soft);
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  /* A static (opaque) border rather than the usual translucent
+     --color-border-soft — the "gray" swatch's fill is a linear-gradient
+     split, and a translucent ring blends with (and visibly reveals)
+     whatever's under it, giving a striped rim instead of one consistent
+     ring color. */
+  border: 2px solid var(--color-border-static);
+  cursor: pointer;
+  padding: 0;
+  background-clip: padding-box;
+}
+
+.swatch--active {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
+}
+
+.pattern-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--color-border-soft);
+  cursor: pointer;
+  padding: 0;
+  background-color: var(--color-surface);
+  background-repeat: repeat;
+}
+
+.pattern-swatch--active {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
+}
+
+.textsize-swatch,
+.task-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid var(--color-border-soft);
+  cursor: pointer;
+  padding: 0;
+  background-color: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink);
+  line-height: 1;
+}
+
+.textsize-swatch--active,
+.task-swatch--active {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
 }

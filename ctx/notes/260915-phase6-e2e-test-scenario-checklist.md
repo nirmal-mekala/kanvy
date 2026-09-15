@@ -105,6 +105,18 @@ Run `pnpm e2e` for real before checking any of these off.
 - [ ] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut
 
 ### Task layer & view modes (spec §6) — Stage 8
+Specs written in `e2e/taskViewModes.spec.ts` against Stage 8's actual
+behavior (the new `components/selection-menu/SelectionMenu.tsx`'s
+`.task-swatch`/`.task-swatch--active`, `card--done`/`card--dimmed`, the
+toolbar's `.toolbar__view-menu-item`), but **not run to a passing result**
+— same environment limitation noted under Stage 4 onward; re-confirmed this
+stage (no `playwright` package resolvable for a standalone connect check,
+and the underlying host↔container route still isn't published). Run
+`pnpm e2e` for real before checking any of these off. Recency's periodic
+re-evaluation (Canvas.tsx's 60s interval while that view is active) isn't
+covered by a spec at all — it's a timing behavior awkward to assert
+deterministically in Playwright without fake timers wired through the
+harness; verify manually or add a spec later if this becomes a real gap.
 - [ ] Task toggle idempotent on re-toggle
 - [ ] Status cycling only via selection menu
 - [ ] Standard / Task / Recency view mode rendering rules

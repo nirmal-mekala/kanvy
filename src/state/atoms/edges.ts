@@ -40,16 +40,23 @@ export const addEdgeAtom = atom(null, (_get, set, edge: Edge) => {
   }))
 })
 
-export const updateEdgeAtom = atom(
+/**
+ * Sets `direction` on every edge in `ids` in one history step (spec §4.6's
+ * selection-menu direction toggle) — a single-element `ids` array covers
+ * the single-selected-edge case too, so there's no separate one-id action.
+ */
+export const setEdgeDirectionAtom = atom(
   null,
-  (_get, set, id: string, patch: Partial<Edge>) => {
+  (_get, set, ids: readonly string[], direction: Edge['direction']) => {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
     const now = new Date().toISOString()
     set(updateBoardAtom, (board: Board) => {
       let changed = false
       const edges = board.edges.map((edge) => {
-        if (edge.id !== id) return edge
+        if (!idSet.has(edge.id) || edge.direction === direction) return edge
         changed = true
-        return { ...edge, ...patch, updatedAt: now }
+        return { ...edge, direction, updatedAt: now }
       })
       return changed ? { ...board, edges } : board
     })

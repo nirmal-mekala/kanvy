@@ -18,6 +18,10 @@ export const NEW_CARD_HEIGHT_ESTIMATE = 90
 export const BIG_TEXT_MIN_W = GRID_SIZE * 10
 export const BIG_TEXT_MIN_H = GRID_SIZE * 6
 
+/** Starting size when a regular text card is switched to `size: 'big'` via the selection menu (spec §5.2). */
+export const BIG_TEXT_DEFAULT_W = GRID_SIZE * 16
+export const BIG_TEXT_DEFAULT_H = GRID_SIZE * 8
+
 /** Minimum size for a container's 8-way resize (spec §4.4), ported from the prototype. */
 export const CONTAINER_MIN_W = GRID_SIZE * 8
 export const CONTAINER_MIN_H = GRID_SIZE * 6

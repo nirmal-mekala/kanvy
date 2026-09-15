@@ -10,10 +10,18 @@ import { anchorPoint } from '../../geometry/anchor'
 import { boundingBox } from '../../geometry/containment'
 import { GRID_SIZE } from '../../geometry/snap'
 import type { EdgeDirection } from '../../schema/edge'
-import { updateEdgeAtom } from '../../state/atoms/edges'
+import type { CardNode, ContainerNode } from '../../schema/node'
+import { setEdgeDirectionAtom } from '../../state/atoms/edges'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { imagesAtom } from '../../state/atoms/images'
-import { updateNodeAtom } from '../../state/atoms/nodes'
+import {
+  setColorAtom,
+  setPatternAtom,
+  setTaskKindAtom,
+  setTaskStatusAtom,
+  setTextSizeAtom,
+  updateNodeAtom,
+} from '../../state/atoms/nodes'
 import { themeAtom } from '../../state/atoms/theme'
 import { viewModeAtom } from '../../state/atoms/viewMode'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
@@ -22,6 +30,8 @@ import { Container } from '../container/Container'
 import { EdgeDirectionControl } from '../edge/EdgeDirectionControl'
 import { EdgeLayer } from '../edge/EdgeLayer'
 import { HelpPanel } from '../help-panel/HelpPanel'
+import { commonValue } from '../selection-menu/commonValue'
+import { SelectionMenu } from '../selection-menu/SelectionMenu'
 import { useBoardInteraction } from './useBoardInteraction'
 import { useCardCreation } from './useCardCreation'
 import { useCardEditing } from './useCardEditing'
@@ -52,9 +62,29 @@ export function Canvas() {
   const theme = useAtomValue(themeAtom)
   const viewMode = useAtomValue(viewModeAtom)
   const updateNode = useSetAtom(updateNodeAtom)
-  const updateEdge = useSetAtom(updateEdgeAtom)
+  const setEdgeDirection = useSetAtom(setEdgeDirectionAtom)
+  const setColor = useSetAtom(setColorAtom)
+  const setPattern = useSetAtom(setPatternAtom)
+  const setTextSize = useSetAtom(setTextSizeAtom)
+  const setTaskKind = useSetAtom(setTaskKindAtom)
+  const setTaskStatus = useSetAtom(setTaskStatusAtom)
   const [focusNodeId, setFocusNodeId] = useAtom(focusNodeIdAtom)
   const [helpOpen, setHelpOpen] = useState(false)
+
+  // Recency-mode border colors are a function of wall-clock time, not just
+  // board data (spec §6.2) — this re-renders periodically while that mode
+  // is active so a card visibly ages into the next threshold on its own,
+  // without requiring a board edit. 60s is plenty given the coarsest
+  // threshold (1 day) — the interval only runs while recency mode is on.
+  const [, forceRecencyTick] = useState(0)
+  useEffect(() => {
+    if (viewMode !== 'recency') return
+    const id = window.setInterval(
+      () => forceRecencyTick((tick) => tick + 1),
+      60_000,
+    )
+    return () => window.clearInterval(id)
+  }, [viewMode])
 
   const boardElRef = useRef<HTMLDivElement | null>(null)
   const panRef = useRef<{
@@ -113,12 +143,20 @@ export function Canvas() {
     boardElRef,
   })
 
-  // Exactly one edge selected → the minimal direction-toggle control (spec
-  // §4.6) — a full selection-menu UI is Stage 7's job.
-  const selectedEdge =
-    selection.size === 1
-      ? board.edges.find((edge) => selection.has(edge.id))
-      : undefined
+  // Selected edges get the direction-toggle control (spec §4.6); selected
+  // cards/containers get the full SelectionMenu (spec §4.3 — "one selection
+  // menu for the whole selection, however mixed" — both can show at once).
+  const selectedEdges = board.edges.filter((edge) => selection.has(edge.id))
+  const selectedCards = board.nodes.filter(
+    (node): node is CardNode => node.type === 'card' && selection.has(node.id),
+  )
+  const selectedContainers = board.nodes.filter(
+    (node): node is ContainerNode =>
+      node.type === 'container' && selection.has(node.id),
+  )
+  const selectedNodeIds = [...selectedCards, ...selectedContainers].map(
+    (node) => node.id,
+  )
 
   const zoomAt = useCallback(
     (anchorX: number, anchorY: number, factor: number) => {
@@ -431,22 +469,51 @@ export function Canvas() {
         />
       )}
 
-      {selectedEdge &&
+      {selectedEdges.length > 0 &&
         (() => {
-          const fromNode = nodesById.get(selectedEdge.fromNodeId)
-          const toNode = nodesById.get(selectedEdge.toNodeId)
+          const first = selectedEdges[0]
+          if (!first) return null
+          const fromNode = nodesById.get(first.fromNodeId)
+          const toNode = nodesById.get(first.toNodeId)
           if (!fromNode || !toNode) return null
-          const from = anchorPoint(fromNode, selectedEdge.fromSide)
-          const to = anchorPoint(toNode, selectedEdge.toSide)
+          const from = anchorPoint(fromNode, first.fromSide)
+          const to = anchorPoint(toNode, first.toSide)
           const midX = (from.x + to.x) / 2
           const midY = (from.y + to.y) / 2
+          const edgeIds = selectedEdges.map((edge) => edge.id)
+          const commonDirection = commonValue(
+            selectedEdges.map((edge) => edge.direction),
+          )
           return (
             <EdgeDirectionControl
               x={midX * view.zoom + view.x}
               y={midY * view.zoom + view.y}
-              direction={selectedEdge.direction}
+              direction={commonDirection}
               onChange={(direction: EdgeDirection) =>
-                updateEdge(selectedEdge.id, { direction })
+                setEdgeDirection(edgeIds, direction)
+              }
+            />
+          )
+        })()}
+
+      {selectedNodeIds.length > 0 &&
+        (() => {
+          const box = boundingBox([...selectedCards, ...selectedContainers])
+          const worldX = box.x + box.w + GRID_SIZE
+          const worldY = box.y
+          return (
+            <SelectionMenu
+              x={worldX * view.zoom + view.x}
+              y={worldY * view.zoom + view.y}
+              theme={theme}
+              selectedCards={selectedCards}
+              selectedContainers={selectedContainers}
+              onSetColor={(color) => setColor(selectedNodeIds, color)}
+              onSetPattern={(pattern) => setPattern(selectedNodeIds, pattern)}
+              onSetTextSize={(size) => setTextSize(selectedNodeIds, size)}
+              onSetTaskKind={(kind) => setTaskKind(selectedNodeIds, kind)}
+              onSetTaskStatus={(status) =>
+                setTaskStatus(selectedNodeIds, status)
               }
             />
           )

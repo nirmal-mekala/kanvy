@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { type ColorKey, isThemeDynamic, resolveColorHex } from './colorKey'
+import {
+  type ColorKey,
+  isThemeDynamic,
+  resolveColorHex,
+  swatchBackground,
+} from './colorKey'
 
 const nonGrayColors: ColorKey[] = [
   'coral',
@@ -39,5 +44,15 @@ describe('isThemeDynamic', () => {
     for (const color of nonGrayColors) {
       expect(isThemeDynamic(color)).toBe(false)
     }
+  })
+})
+
+describe('swatchBackground', () => {
+  it('is a split gradient for gray', () => {
+    expect(swatchBackground('gray')).toMatch(/^linear-gradient\(/)
+  })
+
+  it.each(nonGrayColors)('is a plain hex fill for %s', (color) => {
+    expect(swatchBackground(color)).toBe(resolveColorHex(color, 'light'))
   })
 })

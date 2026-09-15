@@ -11,13 +11,21 @@
 // synchronized copy of node state to keep consistent with undo/redo.
 
 import { atom } from 'jotai'
+import {
+  BIG_TEXT_DEFAULT_H,
+  BIG_TEXT_DEFAULT_W,
+  CARD_WIDTH,
+} from '../../geometry/constants'
 import type { Board } from '../../schema/board'
 import type {
   ColorKey,
+  ContainerNode,
   LinkCard,
   Node,
   NodeId,
+  PatternKey,
   TaskStatus,
+  TextCard,
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
@@ -57,6 +65,12 @@ function nowISO(): string {
 /** Returns `node` with `parentId` removed entirely (not set to `undefined` — exactOptionalPropertyTypes). */
 function withoutParent(node: Node): Node {
   const { parentId: _parentId, ...rest } = node
+  return rest as Node
+}
+
+/** Returns `node` with `task` removed entirely (not set to `undefined` — exactOptionalPropertyTypes). */
+function withoutTask(node: Node): Node {
+  const { task: _task, ...rest } = node
   return rest as Node
 }
 
@@ -298,6 +312,130 @@ export const removeEntitiesAtom = atom(
         return { ...board, nodes, edges, images }
       },
       ids,
+    )
+  },
+)
+
+/**
+ * Selection-menu bulk actions (Stage 8, spec §3/§5.2/§6.1) — each applies to
+ * every id in `ids` in one history step (so a mixed-selection edit undoes as
+ * one gesture). Shares one map-and-patch shape via `patchSelectedNodes`:
+ * `skip` decides which of the matched ids a given action doesn't apply to
+ * (e.g. `setPatternAtom` skips any selected card) so a caller can pass the
+ * whole current selection without pre-filtering by node type/kind.
+ */
+function patchSelectedNodes(
+  set: (
+    write: typeof updateBoardAtom,
+    updater: (board: Board) => Board,
+  ) => void,
+  ids: readonly NodeId[],
+  skip: (node: Node) => boolean,
+  patch: (node: Node, now: string) => Node,
+) {
+  if (ids.length === 0) return
+  const idSet = new Set(ids)
+  const now = nowISO()
+  set(updateBoardAtom, (board: Board) => {
+    let changed = false
+    const nodes = board.nodes.map((node) => {
+      if (!idSet.has(node.id) || skip(node)) return node
+      changed = true
+      return patch(node, now)
+    })
+    return changed ? { ...board, nodes } : board
+  })
+}
+
+export const setColorAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[], color: ColorKey) => {
+    patchSelectedNodes(
+      set,
+      ids,
+      (node) => node.color === color,
+      (node, now) => ({ ...node, color, updatedAt: now }),
+    )
+  },
+)
+
+/** Pattern only applies to containers (spec §4.5) — any selected card is left untouched. */
+export const setPatternAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[], pattern: PatternKey) => {
+    patchSelectedNodes(
+      set,
+      ids,
+      (node) => node.type !== 'container' || node.pattern === pattern,
+      // `skip` already guarantees `type === 'container'` here.
+      (node, now) => ({ ...(node as ContainerNode), pattern, updatedAt: now }),
+    )
+  },
+)
+
+/**
+ * Toggles `size` on every selected `kind: 'text'` card (spec §5.2) — any
+ * image/link card in `ids` is left untouched (they're never `'big'`).
+ * Switching to `'big'` seeds a fixed default box; switching back to
+ * `'regular'` only resets `w` — `h` is left for the card's own auto-grow
+ * measurement (spec §2.4) to correct on its next render, matching how a
+ * freshly-created regular card's height is established.
+ */
+export const setTextSizeAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[], size: 'regular' | 'big') => {
+    patchSelectedNodes(
+      set,
+      ids,
+      (node) =>
+        node.type !== 'card' || node.kind !== 'text' || node.size === size,
+      (node, now) => {
+        // `skip` already guarantees `type === 'card', kind === 'text'` here.
+        const card = node as TextCard
+        return size === 'big'
+          ? {
+              ...card,
+              size,
+              w: BIG_TEXT_DEFAULT_W,
+              h: BIG_TEXT_DEFAULT_H,
+              updatedAt: now,
+            }
+          : { ...card, size, w: CARD_WIDTH, updatedAt: now }
+      },
+    )
+  },
+)
+
+/**
+ * Default↔Task toggle (spec §6.1) — idempotent: switching an already-task
+ * node to `'task'` again leaves its existing status alone (never resets to
+ * `'todo'`), and switching a non-task node to `'default'` is a no-op.
+ */
+export const setTaskKindAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[], kind: 'default' | 'task') => {
+    patchSelectedNodes(
+      set,
+      ids,
+      (node) =>
+        kind === 'task' ? node.task !== undefined : node.task === undefined,
+      (node, now) =>
+        kind === 'task'
+          ? { ...node, task: { status: 'todo' as const }, updatedAt: now }
+          : { ...withoutTask(node), updatedAt: now },
+    )
+  },
+)
+
+/** Status is only ever set via the selection menu (spec §6.1) — a no-op on any selected node that isn't already a task. */
+export const setTaskStatusAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[], status: TaskStatus) => {
+    patchSelectedNodes(
+      set,
+      ids,
+      (node) => !node.task || node.task.status === status,
+      (node, now) => ({ ...node, task: { status }, updatedAt: now }),
     )
   },
 )
