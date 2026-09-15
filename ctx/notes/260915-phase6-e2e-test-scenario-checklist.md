@@ -42,6 +42,13 @@ checking any of these off — do not check based on code review alone.
 - [ ] Zoom to fit (⌘/Ctrl+Shift+Enter): never zooms in past 100%, centers on combined bounding box with fixed padding
 
 ### Selection (spec §4.3) — Stage 5
+Specs written in `e2e/interaction.spec.ts` against Stage 5's actual DOM
+(`[data-node-id]`, `.card--selected`/`.container-node--selected`,
+`.container-node__drag-handle`, `.resize-handle--<dir>`), but **not run to a
+passing result** — same environment limitation noted under Stage 4 above
+(no local browser in this container; no network path from the host-Mac
+remote browser back into this container's dev server). Run `pnpm e2e` for
+real before checking any of these off.
 - [ ] Click selects a single card/container/edge
 - [ ] Shift/Ctrl/Cmd+click toggles additive selection
 - [ ] Marquee-select on blank canvas

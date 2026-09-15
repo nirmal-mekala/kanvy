@@ -14,6 +14,15 @@ export const CARD_WIDTH = GRID_SIZE * 14
  */
 export const NEW_CARD_HEIGHT_ESTIMATE = 90
 
-// Big-text/container resize-minimum constants (spec §4.4's 8-way resize)
-// belong here once Stage 5 (selection/dragging/resizing) actually
-// consumes them — adding them now would just be unused exports.
+/** Minimum size for a big-text card's 8-way resize (spec §4.4), ported from the prototype. */
+export const BIG_TEXT_MIN_W = GRID_SIZE * 10
+export const BIG_TEXT_MIN_H = GRID_SIZE * 6
+
+/** Minimum size for a container's 8-way resize (spec §4.4), ported from the prototype. */
+export const CONTAINER_MIN_W = GRID_SIZE * 8
+export const CONTAINER_MIN_H = GRID_SIZE * 6
+
+/** Rounds `value` to the nearest grid multiple, no smaller than `min` (spec §4.4 resize snapping). */
+export function snapSize(value: number, min: number): number {
+  return Math.max(min, Math.round(value / GRID_SIZE) * GRID_SIZE)
+}

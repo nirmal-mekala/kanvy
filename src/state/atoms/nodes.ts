@@ -84,6 +84,58 @@ export const updateNodeAtom = atom(
   },
 )
 
+/**
+ * Repositions many nodes in one history step (spec §4.4 dragging a
+ * multi-selection or a container's descendants) — every touched node
+ * refreshes `updatedAt` together, matching a single user gesture.
+ */
+export const moveNodesAtom = atom(
+  null,
+  (_get, set, moves: readonly { id: NodeId; x: number; y: number }[]) => {
+    if (moves.length === 0) return
+    const now = nowISO()
+    const byId = new Map(moves.map((move) => [move.id, move]))
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        const move = byId.get(node.id)
+        if (!move) return node
+        changed = true
+        return { ...node, x: move.x, y: move.y, updatedAt: now }
+      })
+      return changed ? { ...board, nodes } : board
+    })
+  },
+)
+
+/**
+ * Sets or clears `parentId` for one node (drop-by-largest-overlap
+ * assignment, spec §2.3) — a dedicated action rather than folding into
+ * `updateNodeAtom`'s patch, since clearing a parent means removing the
+ * field entirely (`exactOptionalPropertyTypes`), not patching it to
+ * `undefined`.
+ */
+export const setParentIdAtom = atom(
+  null,
+  (_get, set, id: NodeId, parentId: NodeId | undefined) => {
+    const now = nowISO()
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        if (node.id !== id || node.parentId === parentId) return node
+        changed = true
+        const next = parentId === undefined ? withoutParent(node) : node
+        return {
+          ...next,
+          ...(parentId !== undefined ? { parentId } : {}),
+          updatedAt: now,
+        }
+      })
+      return changed ? { ...board, nodes } : board
+    })
+  },
+)
+
 /** Reorders `nodes` to match `orderedIds` exactly (array order doubles as z-index — phase2 schema §1). */
 export const reorderNodesAtom = atom(
   null,

@@ -10,6 +10,8 @@ import { useLayoutEffect, useRef } from 'react'
 import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
 import type { CardNode } from '../../schema/node'
+import { ResizeHandles } from '../canvas/ResizeHandles'
+import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
 import { CardBody } from './CardBody'
 import { cardClassNames } from './cardClassNames'
 
@@ -65,6 +67,12 @@ export function Card({
   viewMode,
   selected = false,
   onHeightChange,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onResizePointerDown,
+  onResizePointerMove,
+  onResizePointerUp,
 }: {
   node: CardNode
   imageSrc?: string
@@ -72,6 +80,17 @@ export function Card({
   viewMode: ViewMode
   selected?: boolean
   onHeightChange?: (height: number) => void
+  onPointerDown?: (id: string, e: React.PointerEvent) => void
+  onPointerMove?: (e: React.PointerEvent) => void
+  onPointerUp?: (e: React.PointerEvent) => void
+  onResizePointerDown?: (
+    id: string,
+    dir: ResizeDir,
+    kind: ResizeKind,
+    e: React.PointerEvent,
+  ) => void
+  onResizePointerMove?: (e: React.PointerEvent) => void
+  onResizePointerUp?: (e: React.PointerEvent) => void
 }) {
   const isBig = node.kind === 'text' && node.size === 'big'
   const showCaption =
@@ -114,6 +133,9 @@ export function Card({
         height: isBig ? node.h : undefined,
         borderColor,
       }}
+      onPointerDown={onPointerDown && ((e) => onPointerDown(node.id, e))}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
     >
       <CardBody
         node={node}
@@ -123,6 +145,18 @@ export function Card({
         tinted={isDone || isDimmedByViewMode}
         contentRef={contentRef}
       />
+      {isBig &&
+        onResizePointerDown &&
+        onResizePointerMove &&
+        onResizePointerUp && (
+          <ResizeHandles
+            id={node.id}
+            kind="bigText"
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+          />
+        )}
     </div>
   )
 }

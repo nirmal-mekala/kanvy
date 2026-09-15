@@ -148,6 +148,97 @@ body {
   font-size: 0.75rem;
 }
 
+.board__marquee {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  border: 1px solid var(--color-outline);
+  pointer-events: none;
+}
+
+.board__container-preview {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-outline) 12%, transparent);
+  border: 2px dashed var(--color-outline);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+
+/* ---------- resize handles (spec §4.4: containers always, big-text cards only) ---------- */
+
+.resize-handle {
+  position: absolute;
+}
+
+.resize-handle--n,
+.resize-handle--s {
+  left: 10px;
+  right: 10px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resize-handle--n {
+  top: -5px;
+}
+
+.resize-handle--s {
+  bottom: -5px;
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  top: 10px;
+  bottom: 10px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.resize-handle--e {
+  right: -5px;
+}
+
+.resize-handle--w {
+  left: -5px;
+}
+
+.resize-handle--ne,
+.resize-handle--nw,
+.resize-handle--se,
+.resize-handle--sw {
+  width: 14px;
+  height: 14px;
+}
+
+.resize-handle--ne,
+.resize-handle--sw {
+  cursor: nesw-resize;
+}
+
+.resize-handle--nw,
+.resize-handle--se {
+  cursor: nwse-resize;
+}
+
+.resize-handle--ne {
+  top: -7px;
+  right: -7px;
+}
+
+.resize-handle--nw {
+  top: -7px;
+  left: -7px;
+}
+
+.resize-handle--se {
+  bottom: -7px;
+  right: -7px;
+}
+
+.resize-handle--sw {
+  bottom: -7px;
+  left: -7px;
+}
+
 /* ---------- card ---------- */
 
 .card {
@@ -178,6 +269,10 @@ body {
   outline: 2px solid var(--color-outline);
   outline-offset: 2px;
   z-index: 5;
+}
+
+.card:active {
+  cursor: grabbing;
 }
 
 .card__bar {
@@ -349,6 +444,10 @@ body {
 .container-node--selected {
   outline: 2px solid var(--color-outline);
   outline-offset: 2px;
+}
+
+.container-node__drag-handle:active {
+  cursor: grabbing;
 }
 
 /* ---------- edges (connections between nodes) ---------- */
