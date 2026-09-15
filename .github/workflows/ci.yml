@@ -31,3 +31,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps
 
       - run: pnpm e2e
+
+      - run: pnpm e2e:visual:setup
+
+      - run: pnpm e2e:visual

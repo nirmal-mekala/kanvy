@@ -5,19 +5,41 @@
 `kanvy` is being migrated from a working JavaScript/React prototype (kept for
 reference, not built or run from this repo — see below) into a new
 TypeScript implementation. As of this writing, the prototype-migration has
-completed **prototype-migration phase 5** (implementation plan) of the
-process defined in `ctx/prompt/260915-migration-process.md`, plus
-"Milestone 0" of that plan
-(`ctx/notes/260915-prototype-migration-phase5-implementation-plan.md` §2) —
-the repo scaffold (`package.json`, TypeScript, Vite, Tailwind v4, Biome,
-Vitest, Playwright, `fallow`) — and now has a `package.json` and a booting
-(but functionally empty) app shell at `src/App.tsx`. No feature code exists
-yet: `pnpm test`/`pnpm e2e` correctly fail with "no tests found," and
-`fallow audit` correctly flags the phase-3-decided dependencies
-(`zod`/`jotai`/`nanoid`/`clsx`/`lucide-react`/`hero-patterns`, `pixelmatch`)
-as unused, since nothing consumes them yet — expected until
-prototype-migration phase 6 (test suite) and phase 7 (implementation) land.
-Next: prototype-migration phase 6.
+completed **prototype-migration phase 6** (test suite) of the process
+defined in `ctx/prompt/260915-migration-process.md`. No feature code exists
+yet — `src/App.tsx` is still a bare booting shell — but the test suite that
+phase 7 builds against is in place:
+
+- **Unit tests** (`pnpm test`): a real, runnable suite covering every
+  pure-function module named in spec §13 (`src/geometry/`, `src/colors/`,
+  `src/cards/urlSlurp.ts`), written against type-only stub signatures
+  (every function throws `not implemented — phase 7`). `pnpm typecheck`
+  and `pnpm lint` pass; `pnpm test` correctly reports 63 failing
+  assertions (red, not "module not found") — expected until phase 7 fills
+  in real logic. No coverage-threshold gate yet (see `vitest.config.ts`'s
+  comment) — 0% coverage is expected right now, not a regression.
+- **E2e harness** (`pnpm e2e`): Playwright fixtures for clipboard-paste
+  mocking, link-metadata (microlink.io) mocking, and board-state seeding
+  (`e2e/fixtures/`), plus one smoke test proving the harness runs against
+  the bare app shell. Full interaction specs are deferred to phase 7,
+  written stage-by-stage as each part of the UI lands — see
+  `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md` for the list to
+  close out.
+- **Visual-regression tier** (`pnpm e2e:visual`, after one-time
+  `pnpm e2e:visual:setup`): a dedicated `playwright.visual.config.ts`
+  running the new app and the vendored prototype
+  (`ctx/support/260915-prototype-source/`, via a pinned port) as paired
+  live servers, a pixelmatch diff utility (`e2e/visual/diff.ts`), and one
+  smoke test proving both servers boot and diff without throwing. Real
+  scenarios (per-card-kind, per-pattern, per-view-mode, light/dark) are
+  also deferred to phase 7 (Stage 10), per the same checklist.
+- `fallow audit` still correctly flags the phase-3-decided dependencies
+  (`zod`/`jotai`/`nanoid`/`clsx`/`lucide-react`/`hero-patterns`) as
+  unused, since nothing consumes them yet — expected until phase 7 lands.
+
+Next: prototype-migration phase 7 (implementation) — build against this
+suite, closing out red unit tests and the e2e/visual-regression checklist
+stage by stage.
 
 Before making any change, check `ctx/prompt/260915-migration-process.md` for
 which prototype-migration phase is currently active, and re-read this file —

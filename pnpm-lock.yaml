@@ -48,6 +48,9 @@ importers:
       '@types/pixelmatch':
         specifier: ^7.1.0
         version: 7.1.0
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
       '@types/react':
         specifier: ^19.2.18
         version: 19.3.0
@@ -63,6 +66,9 @@ importers:
       pixelmatch:
         specifier: ^7.2.0
         version: 7.2.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -407,6 +413,9 @@ packages:
   '@types/pixelmatch@7.1.0':
     resolution: {integrity: sha512-0QezS/yQirZ++KVOHu3a49ZB3zeRxGh3PRd9z9+FUNO+14N3oL0vibN3ADEaIvSeY8hsdChi09U6fjTcTcqowQ==}
     deprecated: This is a stub types definition. pixelmatch provides its own type definitions, so you do not need this installed.
+
+  '@types/pngjs@6.0.5':
+    resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
 
   '@types/react-dom@19.3.0':
     resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
@@ -1218,6 +1227,10 @@ snapshots:
   '@types/pixelmatch@7.1.0':
     dependencies:
       pixelmatch: 7.2.0
+
+  '@types/pngjs@6.0.5':
+    dependencies:
+      '@types/node': 24.13.4
 
   '@types/react-dom@19.3.0(@types/react@19.3.0)':
     dependencies:
