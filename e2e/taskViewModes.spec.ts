@@ -52,14 +52,16 @@ test.describe('task toggle & status (spec §6.1)', () => {
     await page.locator('[data-node-id="a"]').click()
 
     await page.locator('.task-swatch[title="Task"]').click()
-    await expect(page.locator('[data-node-id="a"] .task-status-icon')).toBeVisible()
+    await expect(
+      page.locator('[data-node-id="a"] .task-status-icon'),
+    ).toBeVisible()
 
     // Cycle status via the menu, then re-click "Task" — status must survive.
     await page.locator('.task-swatch[title="blocked"]').click()
     await page.locator('.task-swatch[title="Task"]').click()
-    await expect(
-      page.locator('.task-swatch[title="blocked"]'),
-    ).toHaveClass(/task-swatch--active/)
+    await expect(page.locator('.task-swatch[title="blocked"]')).toHaveClass(
+      /task-swatch--active/,
+    )
   })
 
   test('done styling strikes through and dims the caption', async ({
@@ -120,7 +122,9 @@ test.describe('view modes (spec §6.2)', () => {
     })
     await page.goto('/')
     await page.locator('button[title="Change view mode"]').click()
-    await page.locator('.toolbar__view-menu-item', { hasText: 'Recency' }).click()
+    await page
+      .locator('.toolbar__view-menu-item', { hasText: 'Recency' })
+      .click()
 
     const freshColor = await page
       .locator('[data-node-id="fresh"]')
