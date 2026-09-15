@@ -9,8 +9,9 @@ React and TypeScript
 
 with the help of agents, we created a prototype of this application that
 presently works off of localStorage. we want to clone the applicaiton in its
-current state, while improving its underlying architecture a bit. for example,
-the prototype was written in JavaScript, but we'd like to adopt TypeScript
+current state (preserving e.g. styling, behavior, icons and backgroudn libs),
+while improving its underlying architecture a bit. for example, the prototype
+was written in JavaScript, but we'd like to adopt TypeScript
 
 **areas of improvement:**
 
@@ -43,6 +44,12 @@ the prototype was written in JavaScript, but we'd like to adopt TypeScript
 - a11y
   - poor a11y. this was not a major concern of initial pass
 
+**changes:**
+
+- since it is so foundational, one area where we do want legitimate changes is
+  the underlying data structure that powers the entire application. we want the
+  functionality to be constant, but we want the data model to be correct
+
 **out of scope:**
 
 - feature improvements - we want to preserve functionatliy - warts and all - and
@@ -59,7 +66,7 @@ the prototype was written in JavaScript, but we'd like to adopt TypeScript
   - source 4: developer answers to an agent-generated questionairre
     - claude creates a questionairre based on sources 1 and 2 to further hone in
       on behavior
-    - questionairre has exactly twenty-five questions
+    - questionairre has 10-25 questions
     - developer fills out questionairre
 - secondary goal: agents.md
   - agent uses context to poulate an agents md file
@@ -67,6 +74,15 @@ the prototype was written in JavaScript, but we'd like to adopt TypeScript
 **phase 2: align on schema**
 
 - v0 schema should be fully expressed by end of this phase
+- at this point in time we want to consider - but not fully build out - a future
+  version of the applicaiton that uses JSON on hard drive + the json-server npm
+  package and the REST server it spins up.
+  - we also want to consider an important change - multiboard
+- at this point we also want to consider nomenclature and taxonomy
+  - the "group"/"border" concept feels a bit loose in my mind and im
+  wondering if we can have a better name. also are they nodes?
+  - how to organize image and text nodes is a bit squishy right now
+- we can use JSON canvas spec as inspiration (see support directory)
 
 **phase 3: align on tooling, config, and stack**
 
