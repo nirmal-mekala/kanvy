@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { diffScreenshots } from './diff'
 
-const NEW_APP_URL = 'http://localhost:5173'
-const PROTOTYPE_URL = 'http://localhost:5174'
+// Mirrors playwright.visual.config.ts's port overrides — see its comment.
+const NEW_APP_URL = `http://localhost:${process.env.KANVY_VISUAL_NEW_APP_PORT ?? '5173'}`
+const PROTOTYPE_URL = `http://localhost:${process.env.KANVY_VISUAL_PROTOTYPE_PORT ?? '5174'}`
 
 // Proves the visual-regression harness (dual dev servers + pixelmatch
 // diffing) works end-to-end: both servers are reachable and diffScreenshots
