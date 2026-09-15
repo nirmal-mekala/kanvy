@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Throwaway CRUD smoke-test CLI for exercising 260915-kanvy-db-sample.json
 // against `json-server`. Not part of the app — support material only,
-// per ctx/prompt/260915-migration-process.md phase 2.
+// per ctx/prompt/260915-migration-process.md prototype-migration phase 2.
 //
 // Setup:
 //   npx json-server ctx/support/260915-kanvy-db-sample.json --port 3000

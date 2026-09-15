@@ -1,4 +1,4 @@
-# Phase 1 questionnaire — kanvy migration
+# prototype-migration phase 1 questionnaire — kanvy migration
 
 ## Method
 
@@ -118,8 +118,8 @@ Given localStorage has a hard size ceiling (typically ~5–10MB) and every image
 full base64 blob, do you want the v0 schema/spec to account for that limit explicitly
 (e.g. a documented image-count/size budget, or an explicit non-goal that today's
 localStorage-only persistence is expected to break down at scale and that's acceptable
-until the phase-2 JSON-on-disk backend), or should size concerns wait entirely for
-phase 2?
+until the prototype-migration phase 2 JSON-on-disk backend), or should size concerns wait entirely for
+prototype-migration phase 2?
 
 - don't worry about this. its a known weakness of the localStorage appraoch and
   it will be less of a concern with JSON-on-disk
@@ -190,7 +190,7 @@ synchronously and, since nothing catches it, that failure is silent to the user 
 looks fine, but the board is no longer actually persisting). Given "error handling" is
 an explicit improvement area, should quota-exceeded be a first-class error state (e.g.
 a visible banner: "board isn't saving — remove some images"), and is that important
-enough to prioritize in the v0 spec, or acceptable to defer until phase 2's disk-backed
+enough to prioritize in the v0 spec, or acceptable to defer until prototype-migration phase 2's disk-backed
 storage removes the ceiling entirely?
 
 - i think we can defer
@@ -203,12 +203,13 @@ generic message sufficient for v0, with structured validation errors deferred?
 
 - i think we can defer structured validation.
 
-**15. No schema version field anywhere in the board JSON.** Given phase 2 is about
-finalizing a v0 schema (and there will necessarily be a "pre-v0" shape from this
-prototype to migrate away from), should the new schema carry an explicit `version`
-field from day one, so future format changes have something to branch on for
+**15. No schema version field anywhere in the board JSON.** Given prototype-migration
+phase 2 is about finalizing a v0 schema (and there will necessarily be a "pre-v0" shape
+from this prototype to migrate away from), should the new schema carry an explicit
+`version` field from day one, so future format changes have something to branch on for
 backward-compat/migration logic? (This feels like a now decision even though schema
-alignment itself is phase 2 — reasonable to note for the spec regardless.)
+alignment itself is prototype-migration phase 2 — reasonable to note for the spec
+regardless.)
 
 - yeah i think versioning schema is wise
 

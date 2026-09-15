@@ -57,7 +57,7 @@ was written in JavaScript, but we'd like to adopt TypeScript
 
 ## approach
 
-**phase 1: writing documentation: spec, agents.md**
+**prototype-migration phase 1: writing documentation: spec, agents.md**
 
 - major goal - write a spec file
   - source 1: distilled information from claude code chats
@@ -71,7 +71,7 @@ was written in JavaScript, but we'd like to adopt TypeScript
 - secondary goal: agents.md
   - agent uses context to poulate an agents md file
 
-**phase 2: align on schema**
+**prototype-migration phase 2: align on schema**
 
 - v0 schema should be fully expressed by end of this phase
 - at this point in time we want to consider - but not fully build out - a future
@@ -84,7 +84,7 @@ was written in JavaScript, but we'd like to adopt TypeScript
   - how to organize image and text nodes is a bit squishy right now
 - we can use JSON canvas spec as inspiration (see support directory)
 
-**phase 3: align on tooling, config, and stack**
+**prototype-migration phase 3: align on tooling, config, and stack**
 
 - align on a code health solution + config: lean toward strict, maximalist
   fallow config
@@ -92,8 +92,13 @@ was written in JavaScript, but we'd like to adopt TypeScript
   linting
   - e.g. code complexity
 - align on testing frameworks
+- align on FE libraries
+  - zod
+  - TS
+  - UI libs (some existing in prototype)
+  - others?
 
-**phase 4: agent readiness**
+**prototype-migration phase 4: agent readiness**
 
 - ensure agent has what it needs to succeed
   - primarily concerned about enablign a browser for testing; unsure how this
@@ -101,16 +106,16 @@ was written in JavaScript, but we'd like to adopt TypeScript
     - ideally, it woudl be possible to run a browser that is visible to
       developer outside the container
 
-**phase 5: agent writes implementation plan**
+**prototype-migration phase 5: agent writes implementation plan**
 
 - based on available context, agent writes implementation plan to complete
   migration
 
-**phase 6: agent builds test suite**
+**prototype-migration phase 6: agent builds test suite**
 
 - agent writes a test suite based on all available context
 
-**phase 6: agent builds applicaition**
+**prototype-migration phase 7: agent builds applicaition**
 
 - based on available context and test suite, agent executes implementation plan
 - end of this phase: migration complete, additional features and changes to follow 

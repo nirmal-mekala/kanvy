@@ -1,22 +1,23 @@
-# kanvy — phase 2: schema alignment (draft)
+# kanvy — prototype-migration phase 2: schema alignment (draft)
 
 ## Status of this document
 
-Draft deliverable for phase 2 of `ctx/prompt/260915-migration-process.md`
-("align on schema"). Builds on `ctx/notes/260915-kanvy-spec.md` (phase 1) and
-resolves the items that document explicitly deferred to this phase (its §14).
-Also sketches — but does not build — multiboard and a future JSON-on-disk +
-`json-server` backend, per the migration prompt's phase 2 scope.
+Draft deliverable for prototype-migration phase 2 of
+`ctx/prompt/260915-migration-process.md` ("align on schema"). Builds on
+`ctx/notes/260915-kanvy-spec.md` (prototype-migration phase 1) and resolves the
+items that document explicitly deferred to this phase (its §14). Also sketches
+— but does not build — multiboard and a future JSON-on-disk + `json-server`
+backend, per the migration prompt's prototype-migration phase 2 scope.
 
 This is a draft: decisions below marked **(confirmed)** were made directly by
 the developer in this session; everything else is a proposal open to
-revision before phase 3 (tooling/config) begins.
+revision before prototype-migration phase 3 (tooling/config) begins.
 
 ## 1. Node collection shape — resolved
 
 **(confirmed)** v0 uses a single unified `nodes` array, discriminated by
 `type`, rather than separate `cards`/`containers` arrays. This resolves
-phase-1 Q6.
+prototype-migration phase 1 Q6.
 
 Rationale: matches the JSON Canvas top-level shape used as inspiration,
 removes the need for a typed edge-endpoint union (an edge just references a
@@ -34,9 +35,9 @@ interface NodeBase {
   x: number
   y: number
   w: number
-  h: number                      // stored per phase-1 §2.4; rendered content is source of truth
+  h: number                      // stored per prototype-migration phase 1 §2.4; rendered content is source of truth
   color: ColorKey                 // 'gray' | 'coral' | 'orange' | 'amber' | 'lime' | 'teal' | 'sky' | 'violet' | 'pink'
-  parentId?: NodeId                // formal ownership, phase-1 §2.3
+  parentId?: NodeId                // formal ownership, prototype-migration phase 1 §2.3
   task?: { status: 'todo' | 'blocked' | 'in_progress' | 'done' }  // (confirmed) nested shape
   createdAt: string                // ISO-8601
   updatedAt: string
@@ -91,7 +92,7 @@ interface Board {
   version: number
   nodes: Node[]
   edges: Edge[]
-  images: Record<string, string>   // last key when serialized, per phase-1 §2.8
+  images: Record<string, string>   // last key when serialized, per prototype-migration phase 1 §2.8
 }
 ```
 
@@ -99,14 +100,14 @@ Notes:
 
 - `CardNode` is a discriminated union over `kind` (`TextCard | ImageCard |
   LinkCard`), not one interface with optional `size`/`imageId`/`link`
-  fields. This makes the invalid combinations phase 1 explicitly forbids —
+  fields. This makes the invalid combinations prototype-migration phase 1 explicitly forbids —
   `kind: 'image'` with `size: 'big'`, `kind: 'link'` with `imageId` set,
   etc. — unrepresentable in the type system rather than merely
   undocumented. `size` only exists on `TextCard`; `imageId` only on
   `ImageCard`; `link` only on `LinkCard`. A `switch (node.kind)` narrows to
   the exact variant, so e.g. `card.link.status` is inaccessible without
   first checking `kind === 'link'`.
-  - Converting a card between kinds (per phase-1 §2.2/§5.3/§5.4 — e.g. a
+  - Converting a card between kinds (per prototype-migration phase 1 §2.2/§5.3/§5.4 — e.g. a
     text card becoming an image card on paste) is therefore a full object
     replacement at the type level, not a field mutation — matches the
     actual behavior (dropping `size: 'big'` back to `'regular'`, discarding
@@ -140,7 +141,7 @@ interface BoardIndex {
 ```
 
 Each board's full content (`nodes`/`edges`/`images`) stays a separate
-document, keyed by `BoardMeta.id`. This is deferred to phase 2+ per the
+document, keyed by `BoardMeta.id`. This is deferred to prototype-migration phase 2+ per the
 migration prompt — not implemented now, just shaped so it doesn't require a
 schema break later.
 
@@ -158,7 +159,7 @@ top-level collections rather than one file per board:
 }
 ```
 
-Consequences of this choice, to carry into phase 2+/implementation:
+Consequences of this choice, to carry into prototype-migration phase 2+/implementation:
 
 - `nodes`/`edges`/`images` all gain a `boardId` foreign key not present in
   the single-board `Board` schema in §2 — the REST resources are
@@ -167,7 +168,7 @@ Consequences of this choice, to carry into phase 2+/implementation:
 - `images` moves from an in-board map (`Record<string, string>`, §2.8's
   "last key" ordering trick) to its own flat collection, since a shared
   `db.json` can't nest per-board maps and still be `json-server`-routable.
-  The diff-ordering concern from phase 1 §2.8 doesn't carry over as directly
+  The diff-ordering concern from prototype-migration phase 1 §2.8 doesn't carry over as directly
   — worth revisiting once this is actually built, not now.
   **(deferred)**
 - This is a bigger structural break from the localStorage-era `Board` shape
@@ -191,22 +192,22 @@ Consequences of this choice, to carry into phase 2+/implementation:
 
 - JSON Canvas's `group` node type has no formal parent/child relationship —
   containment is purely visual/geometric, matching the *prototype's*
-  pre-migration behavior. Phase 1 §2.3 already decided to add `parentId`
+  pre-migration behavior. prototype-migration phase 1 §2.3 already decided to add `parentId`
   formal ownership to containers — this is an intentional improvement over
   JSON Canvas, not an alignment gap to close.
 - JSON Canvas's `color` is a loose `canvasColor` (hex or one of 6 numbered
   presets). Kanvy's `ColorKey` stays the existing fixed 9-color Nord-derived
-  palette (phase 1 §3) — no free-hex colors, no renumbering to match JSON
+  palette (prototype-migration phase 1 §3) — no free-hex colors, no renumbering to match JSON
   Canvas's preset scheme.
 - JSON Canvas has no task-status, recency-mode, or pattern-background
   concept — these remain kanvy-specific, not mapped to any JSON Canvas
   field.
 
-## 6. Open items still deferred beyond phase 2
+## 6. Open items still deferred beyond prototype-migration phase 2
 
 - Concrete `PatternKey`/`ColorKey` as TypeScript string-literal unions vs.
-  enums — a phase 3 (tooling/lint config) style call, not a schema-shape
-  question.
+  enums — a prototype-migration phase 3 (tooling/lint config) style call, not
+  a schema-shape question.
 - Whether the future disk-backed backend's REST layer is `json-server`
   as-is or a thin custom server in front of the same `db.json` shape —
   §4 assumes `json-server` per the migration prompt, not re-litigated here.

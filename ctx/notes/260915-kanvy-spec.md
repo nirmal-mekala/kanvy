@@ -2,28 +2,28 @@
 
 ## Status of this document
 
-This is the phase 1 deliverable of the migration described in
+This is the prototype-migration phase 1 deliverable of the migration described in
 `ctx/prompt/260915-migration-process.md`: a spec of the *existing prototype's*
 behavior, corrected only where the migration prompt and the developer
 explicitly called for a data-model fix. It is not a spec for new features.
 
 Sources, in order of authority when they conflicted:
 
-1. `ctx/notes/260915-phase1-questionnaire.md` — developer decisions (highest authority; overrides 2–4 wherever they conflict)
+1. `ctx/notes/260915-prototype-migration-phase1-questionnaire.md` — developer decisions (highest authority; overrides 2–4 wherever they conflict)
 2. `ctx/support/260915-dev-kanvy-natural-language-description.md` — developer's own description of the app
 3. `ctx/support/260915-prototype-source/` — the prototype's source code (source of truth for anything not covered by 1–2)
 4. `ctx/support/260915-prototype-claude-convos/dev-input.json` — the prompt history that produced the prototype (used to resolve ambiguity/intent, lowest authority)
 
 Anything marked **(wart, keep)** is known-imperfect behavior the developer
 explicitly chose to preserve rather than fix in this migration. Anything
-marked **(deferred to phase 2)** is a real open question, but one that
+marked **(deferred to prototype-migration phase 2)** is a real open question, but one that
 belongs to schema/taxonomy alignment, not this document.
 
 ## 1. What kanvy is
 
 An opinionated, single-user, infinite canvas / whiteboarding app. A board is
 one JSON document containing nodes (cards, containers) and edges connecting
-them. Presently persisted to `localStorage`; phase 2 considers a JSON-on-disk
+them. Presently persisted to `localStorage`; prototype-migration phase 2 considers a JSON-on-disk
 + REST backend and multiboard support, both out of scope here.
 
 **In scope for this migration:** TypeScript, Tailwind, Jotai, testing,
@@ -44,8 +44,9 @@ this document calls out. Preserve functionality "warts and all."
 - No "project" concept. "Task" is the only status-bearing label, applicable
   to any card or container (see §6).
 - Whether `nodes` should be one physically unified array (vs. separate
-  `cards`/`containers` arrays as today) is explicitly **deferred to phase 2**
-  (questionnaire Q6) — this doc uses the conceptual name "node" but does not
+  `cards`/`containers` arrays as today) is explicitly **deferred to
+  prototype-migration phase 2** (questionnaire Q6) — this doc uses the
+  conceptual name "node" but does not
   mandate a specific array shape.
 
 ### 2.2 Card kinds — discriminated union (per Q2)
@@ -111,8 +112,9 @@ estimate only for a card that hasn't rendered yet this session.
 Today `fromId`/`toId` are untyped strings that could reference either a card
 or a container. Whether to introduce a typed union
 (`{ type: 'card' | 'container', id }`) — or whether a single unified `nodes`
-collection makes the type discriminator unnecessary — is **deferred to phase
-2** (Q6). For v0 spec purposes, an edge connects exactly two nodes (of any
+collection makes the type discriminator unnecessary — is **deferred to
+prototype-migration phase 2** (Q6). For v0 spec purposes, an edge connects
+exactly two nodes (of any
 kind) by id, at most one edge per unordered pair, each end anchored to one of
 four sides (`top`/`right`/`bottom`/`left`) chosen once at creation and never
 recomputed.
@@ -126,7 +128,7 @@ base64, and are kept out of the otherwise-diffable node data. Orphaned image
 entries (no card references them) are pruned after any mutation that could
 leave one behind. No reference-counting/size-budget schema changes — this is
 an accepted weakness of localStorage-based persistence, expected to improve
-naturally once phase 2 moves to disk-backed storage (Q7).
+naturally once prototype-migration phase 2 moves to disk-backed storage (Q7).
 
 ### 2.7 Timestamps & schema version
 
@@ -490,11 +492,11 @@ concrete decisions (Q12–Q15):
   (c) not autosave over the unreadable data until the user acknowledges the
   situation — i.e., the original bytes must not be clobbered by the next
   autosave before the user has had a chance to know something was wrong.
-  This is expected to be revisited when phase 2 moves to JSON-on-disk + REST
+  This is expected to be revisited when prototype-migration phase 2 moves to JSON-on-disk + REST
   persistence.
 - **Storage-quota exceeded on autosave (Q13):** out of scope for v0 — no
   first-class error state required; acceptable to silently fail as today
-  until phase 2 removes the size ceiling. (Don't regress below today's
+  until prototype-migration phase 2 removes the size ceiling. (Don't regress below today's
   behavior, but don't invest here either.)
 - **JSON import failure (Q14):** replace the current `window.alert` with a
   proper UI element (modal/toast) carrying the same level of generic
@@ -539,7 +541,7 @@ reasonable-effort pass is sufficient (e.g., touch-drag working for basic
 move/select), not full parity with the mouse/trackpad interaction model
 described in §4.
 
-## 13. Testing priorities (informs, does not replace, phase 3 framework choice)
+## 13. Testing priorities (informs, does not replace, prototype-migration phase 3 framework choice)
 
 Per Q16–Q18:
 
@@ -561,16 +563,16 @@ Per Q16–Q18:
   live network dependency. The retry/timeout behavior added per §5.4 should
   itself be testable via the mock (e.g. simulate a slow/failing response).
 
-## 14. Explicitly deferred to later phases
+## 14. Explicitly deferred to later prototype-migration phases
 
 - Final shape of the node/edge collections (single `nodes` array vs.
-  separate `cards`/`containers`; typed edge-endpoint union) — phase 2.
-- Multiboard support — phase 2.
-- JSON-on-disk + REST backend — phase 2 (design only), implementation later.
-- JSON Canvas spec alignment/inspiration — phase 2.
+  separate `cards`/`containers`; typed edge-endpoint union) — prototype-migration phase 2.
+- Multiboard support — prototype-migration phase 2.
+- JSON-on-disk + REST backend — prototype-migration phase 2 (design only), implementation later.
+- JSON Canvas spec alignment/inspiration — prototype-migration phase 2.
 - Image storage size/reference-counting budget — revisit once disk-backed.
 - Structured import-validation error reporting — revisit post-v0.
-- Storage-quota-exceeded first-class error UI — revisit post-v0 (phase 2
-  persistence change likely obviates it).
+- Storage-quota-exceeded first-class error UI — revisit post-v0
+  (prototype-migration phase 2 persistence change likely obviates it).
 - Full keyboard/screen-reader accessibility for the canvas — future work,
   not v0.
