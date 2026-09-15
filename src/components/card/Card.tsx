@@ -6,7 +6,7 @@
 // data flow spec §2.4 requires regardless of interactivity: a regular
 // card's rendered height flowing into the persisted `h` field.
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
 import type { Side } from '../../geometry/anchor'
@@ -70,6 +70,8 @@ export function Card({
   selected = false,
   connectorsVisible = false,
   connectorActiveSide = null,
+  autoFocus = false,
+  onAutoFocusHandled,
   onHeightChange,
   onContentChange,
   onContentBlur,
@@ -90,6 +92,9 @@ export function Card({
   selected?: boolean
   connectorsVisible?: boolean
   connectorActiveSide?: Side | null
+  /** Grabs this card's caption focus once on mount/update (⌘/Ctrl+N, ⌘/Ctrl+D — spec §4.2). */
+  autoFocus?: boolean
+  onAutoFocusHandled?: () => void
   onHeightChange?: (height: number) => void
   onContentChange?: (id: string, content: string) => void
   onContentBlur?: (id: string) => void
@@ -135,6 +140,12 @@ export function Card({
   // regular card's total rendered height (bar + content) only lives in the
   // DOM moment-to-moment, so this flows it one-way into the node.
   useMeasuredHeight(cardElRef, isBig, onHeightChange)
+
+  useEffect(() => {
+    if (!autoFocus) return
+    contentRef.current?.focus()
+    onAutoFocusHandled?.()
+  }, [autoFocus, onAutoFocusHandled])
 
   return (
     <div

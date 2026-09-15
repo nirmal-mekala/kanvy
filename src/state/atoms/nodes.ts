@@ -81,6 +81,20 @@ export const addNodeAtom = atom(
 )
 
 /**
+ * Appends several already fully constructed nodes in one history step (spec
+ * §7's in-app clipboard paste and ⌘/Ctrl+D duplicate — both create more
+ * than one node at once when the source selection was multi-node, and
+ * should undo as a single step).
+ */
+export const addNodesAtom = atom(null, (_get, set, nodes: readonly Node[]) => {
+  if (nodes.length === 0) return
+  set(updateBoardAtom, (board: Board) => ({
+    ...board,
+    nodes: [...board.nodes, ...nodes],
+  }))
+})
+
+/**
  * Replaces one node with `next` wholesale (spec §2.2's kind-conversion —
  * text↔image↔link is a full object replacement, not a field patch, per
  * phase2 schema §2's notes). `newImage`, when given, adds the corresponding

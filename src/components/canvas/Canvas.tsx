@@ -3,7 +3,7 @@
 // resize, marquee, and connector-drawing interactivity are later stages
 // (5-6); this stage renders the board and supports pan/zoom.
 
-import { useAtomValue, useSetAtom } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { anchorPoint } from '../../geometry/anchor'
@@ -11,17 +11,21 @@ import { boundingBox } from '../../geometry/containment'
 import { GRID_SIZE } from '../../geometry/snap'
 import type { EdgeDirection } from '../../schema/edge'
 import { updateEdgeAtom } from '../../state/atoms/edges'
+import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { imagesAtom } from '../../state/atoms/images'
 import { updateNodeAtom } from '../../state/atoms/nodes'
 import { themeAtom } from '../../state/atoms/theme'
+import { viewModeAtom } from '../../state/atoms/viewMode'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
 import { Card } from '../card/Card'
 import { Container } from '../container/Container'
 import { EdgeDirectionControl } from '../edge/EdgeDirectionControl'
 import { EdgeLayer } from '../edge/EdgeLayer'
+import { HelpPanel } from '../help-panel/HelpPanel'
 import { useBoardInteraction } from './useBoardInteraction'
 import { useCardCreation } from './useCardCreation'
 import { useCardEditing } from './useCardEditing'
+import { useClipboardShortcuts } from './useClipboardShortcuts'
 import { useConnectionInteraction } from './useConnectionInteraction'
 import {
   clamp,
@@ -46,11 +50,11 @@ export function Canvas() {
   const board = useAtomValue(boardAtom)
   const images = useAtomValue(imagesAtom)
   const theme = useAtomValue(themeAtom)
+  const viewMode = useAtomValue(viewModeAtom)
   const updateNode = useSetAtom(updateNodeAtom)
   const updateEdge = useSetAtom(updateEdgeAtom)
-  // View modes (standard/task/recency, spec §6.2) are Stage 8's concern —
-  // this stage always renders standard.
-  const viewMode = 'standard' as const
+  const [focusNodeId, setFocusNodeId] = useAtom(focusNodeIdAtom)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const boardElRef = useRef<HTMLDivElement | null>(null)
   const panRef = useRef<{
@@ -98,6 +102,14 @@ export function Canvas() {
     nodes: board.nodes,
     edges: board.edges,
     view,
+    boardElRef,
+  })
+
+  useClipboardShortcuts({
+    nodes: board.nodes,
+    nodesById,
+    view,
+    setView,
     boardElRef,
   })
 
@@ -372,6 +384,8 @@ export function Canvas() {
                     ? connectingHoverSide
                     : null
               }
+              autoFocus={focusNodeId === node.id}
+              onAutoFocusHandled={() => setFocusNodeId(null)}
               onHeightChange={(h) => {
                 if (h !== node.h) updateNode(node.id, { h })
               }}
@@ -438,8 +452,8 @@ export function Canvas() {
           )
         })()}
 
-      {/* The `?` help-panel button (spec §4.2) is Stage 7's — it needs the
-          shortcut list/modal, which doesn't exist yet. */}
+      <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+
       <div className="board__zoom">
         <button
           type="button"

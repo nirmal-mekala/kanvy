@@ -87,6 +87,16 @@ export const undoBoardAtom = atom(null, (get, set) => {
   autosaveIfAcknowledged(get, result.history.present.state)
 })
 
+/**
+ * Replaces the whole board with an imported one (spec §9/Q14) — goes
+ * through the normal `updateBoardAtom` history path, so an accidental
+ * import is just another ⌘/Ctrl+Z away from being undone, same as any
+ * other mutation.
+ */
+export const loadImportedBoardAtom = atom(null, (_get, set, board: Board) => {
+  set(updateBoardAtom, () => board)
+})
+
 export const redoBoardAtom = atom(null, (get, set) => {
   const nextHistory = redoReducer(get(boardHistoryAtom))
   set(boardHistoryAtom, nextHistory)

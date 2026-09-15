@@ -89,6 +89,14 @@ real before checking any of these off.
 - [ ] Edge path leaves/arrives perpendicular to the chosen side
 
 ### Clipboard & shortcuts (spec §7, §4.2) — Stage 7
+Specs written in `e2e/clipboard.spec.ts` against Stage 7's actual behavior
+(in-app clipboard, OS-clipboard plain-text paste via
+`e2e/fixtures/clipboard.ts`'s `dispatchPaste`, ⌘/Ctrl+N/D/Z/Backspace,
+help panel), but **not run to a passing result** — same environment
+limitation noted under Stage 4/5 above; re-confirmed directly this stage
+(`ws://host.docker.internal:3322/` connects, `page.goto` to this
+container's `--host`-bound address from that remote browser times out).
+Run `pnpm e2e` for real before checking any of these off.
 - [ ] In-app clipboard copy/paste with staircase offset on repeated paste — mock via `e2e/fixtures/clipboard.ts`
 - [ ] Paste always lands outside every container
 - [ ] Paste outside viewport pans (without zoom change) into view
