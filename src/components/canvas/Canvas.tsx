@@ -6,16 +6,23 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { anchorPoint } from '../../geometry/anchor'
 import { boundingBox } from '../../geometry/containment'
 import { GRID_SIZE } from '../../geometry/snap'
+import type { EdgeDirection } from '../../schema/edge'
+import { updateEdgeAtom } from '../../state/atoms/edges'
 import { imagesAtom } from '../../state/atoms/images'
 import { updateNodeAtom } from '../../state/atoms/nodes'
 import { themeAtom } from '../../state/atoms/theme'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
 import { Card } from '../card/Card'
 import { Container } from '../container/Container'
+import { EdgeDirectionControl } from '../edge/EdgeDirectionControl'
 import { EdgeLayer } from '../edge/EdgeLayer'
 import { useBoardInteraction } from './useBoardInteraction'
+import { useCardCreation } from './useCardCreation'
+import { useCardEditing } from './useCardEditing'
+import { useConnectionInteraction } from './useConnectionInteraction'
 import {
   clamp,
   FIT_PADDING,
@@ -40,6 +47,7 @@ export function Canvas() {
   const images = useAtomValue(imagesAtom)
   const theme = useAtomValue(themeAtom)
   const updateNode = useSetAtom(updateNodeAtom)
+  const updateEdge = useSetAtom(updateEdgeAtom)
   // View modes (standard/task/recency, spec §6.2) are Stage 8's concern —
   // this stage always renders standard.
   const viewMode = 'standard' as const
@@ -68,6 +76,37 @@ export function Canvas() {
     handleCanvasPointerMove,
     handleCanvasPointerUp,
   } = useBoardInteraction({ nodes: board.nodes, view, boardElRef })
+
+  const nodesById = new Map(board.nodes.map((node) => [node.id, node]))
+
+  const { handleContentChange, handleContentBlur } = useCardEditing({
+    nodesById,
+  })
+  const { handleCanvasDoubleClick, handleCanvasDragOver, handleCanvasDrop } =
+    useCardCreation({ nodesById, selection, view, boardElRef })
+  const {
+    connectingFromId,
+    connectingFromSide,
+    connectingHoverId,
+    connectingHoverSide,
+    previewStart,
+    previewEndpoint,
+    handleConnectorPointerDown,
+    handleConnectingPointerMove,
+    finishConnecting,
+  } = useConnectionInteraction({
+    nodes: board.nodes,
+    edges: board.edges,
+    view,
+    boardElRef,
+  })
+
+  // Exactly one edge selected → the minimal direction-toggle control (spec
+  // §4.6) — a full selection-menu UI is Stage 7's job.
+  const selectedEdge =
+    selection.size === 1
+      ? board.edges.find((edge) => selection.has(edge.id))
+      : undefined
 
   const zoomAt = useCallback(
     (anchorX: number, anchorY: number, factor: number) => {
@@ -208,9 +247,14 @@ export function Canvas() {
       }))
       return
     }
+    if (connectingFromId !== null) {
+      handleConnectingPointerMove(e)
+      return
+    }
     handleCanvasPointerMove(e)
   }
 
+  // fallow-ignore-next-line complexity
   function handlePointerUp(e: React.PointerEvent) {
     if (panRef.current) {
       panRef.current = null
@@ -227,10 +271,19 @@ export function Canvas() {
     } catch {
       // ignore
     }
+    if (connectingFromId !== null) {
+      finishConnecting()
+      return
+    }
     handleCanvasPointerUp()
   }
 
-  const nodesById = new Map(board.nodes.map((node) => [node.id, node]))
+  const edgePreview = (() => {
+    if (connectingFromSide === null) return null
+    const from = previewStart()
+    const to = previewEndpoint()
+    return from && to ? { from, fromSide: connectingFromSide, to } : null
+  })()
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: the infinite canvas is pointer/wheel-driven by nature; full keyboard/screen-reader operability is explicitly out of v0 scope (spec §11).
@@ -246,6 +299,9 @@ export function Canvas() {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onDoubleClick={handleCanvasDoubleClick}
+      onDragOver={handleCanvasDragOver}
+      onDrop={handleCanvasDrop}
     >
       <div
         className="board__layer"
@@ -264,19 +320,38 @@ export function Canvas() {
               theme={theme}
               viewMode={viewMode}
               selected={selection.has(node.id)}
+              connectorsVisible={
+                connectingFromId === node.id || connectingHoverId === node.id
+              }
+              connectorActiveSide={
+                connectingFromId === node.id
+                  ? connectingFromSide
+                  : connectingHoverId === node.id
+                    ? connectingHoverSide
+                    : null
+              }
               onDragHandlePointerDown={handleNodePointerDown}
               onDragHandlePointerMove={handleNodePointerMove}
               onDragHandlePointerUp={handleNodePointerUp}
               onResizePointerDown={handleResizePointerDown}
               onResizePointerMove={handleResizePointerMove}
               onResizePointerUp={handleResizePointerUp}
+              onConnectorPointerDown={handleConnectorPointerDown}
+              onConnectorPointerMove={handleConnectingPointerMove}
+              onConnectorPointerUp={handlePointerUp}
             />
           ))}
 
-        <EdgeLayer edges={board.edges} nodesById={nodesById} />
+        <EdgeLayer
+          edges={board.edges}
+          nodesById={nodesById}
+          selectedIds={selection}
+          preview={edgePreview}
+        />
 
         {board.nodes
           .filter((node) => node.type === 'card')
+          // fallow-ignore-next-line complexity
           .map((node) => (
             <Card
               key={node.id}
@@ -287,15 +362,30 @@ export function Canvas() {
               theme={theme}
               viewMode={viewMode}
               selected={selection.has(node.id)}
+              connectorsVisible={
+                connectingFromId === node.id || connectingHoverId === node.id
+              }
+              connectorActiveSide={
+                connectingFromId === node.id
+                  ? connectingFromSide
+                  : connectingHoverId === node.id
+                    ? connectingHoverSide
+                    : null
+              }
               onHeightChange={(h) => {
                 if (h !== node.h) updateNode(node.id, { h })
               }}
+              onContentChange={handleContentChange}
+              onContentBlur={handleContentBlur}
               onPointerDown={handleNodePointerDown}
               onPointerMove={handleNodePointerMove}
               onPointerUp={handleNodePointerUp}
               onResizePointerDown={handleResizePointerDown}
               onResizePointerMove={handleResizePointerMove}
               onResizePointerUp={handleResizePointerUp}
+              onConnectorPointerDown={handleConnectorPointerDown}
+              onConnectorPointerMove={handleConnectingPointerMove}
+              onConnectorPointerUp={handlePointerUp}
             />
           ))}
       </div>
@@ -326,6 +416,27 @@ export function Canvas() {
           }}
         />
       )}
+
+      {selectedEdge &&
+        (() => {
+          const fromNode = nodesById.get(selectedEdge.fromNodeId)
+          const toNode = nodesById.get(selectedEdge.toNodeId)
+          if (!fromNode || !toNode) return null
+          const from = anchorPoint(fromNode, selectedEdge.fromSide)
+          const to = anchorPoint(toNode, selectedEdge.toSide)
+          const midX = (from.x + to.x) / 2
+          const midY = (from.y + to.y) / 2
+          return (
+            <EdgeDirectionControl
+              x={midX * view.zoom + view.x}
+              y={midY * view.zoom + view.y}
+              direction={selectedEdge.direction}
+              onChange={(direction: EdgeDirection) =>
+                updateEdge(selectedEdge.id, { direction })
+              }
+            />
+          )
+        })()}
 
       {/* The `?` help-panel button (spec §4.2) is Stage 7's — it needs the
           shortcut list/modal, which doesn't exist yet. */}

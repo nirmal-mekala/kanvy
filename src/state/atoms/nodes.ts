@@ -12,7 +12,13 @@
 
 import { atom } from 'jotai'
 import type { Board } from '../../schema/board'
-import type { ColorKey, Node, NodeId, TaskStatus } from '../../schema/node'
+import type {
+  ColorKey,
+  LinkCard,
+  Node,
+  NodeId,
+  TaskStatus,
+} from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
 import { pruneOrphanedImages } from './images'
@@ -54,13 +60,85 @@ function withoutParent(node: Node): Node {
   return rest as Node
 }
 
-/** Appends a new node (already fully constructed — kind-specific creation is a later stage's concern). */
-export const addNodeAtom = atom(null, (_get, set, node: Node) => {
-  set(updateBoardAtom, (board: Board) => ({
-    ...board,
-    nodes: [...board.nodes, node],
-  }))
-})
+/**
+ * Appends a new, already fully constructed node (spec §5.1/§5.3/§5.4's
+ * card factories, or §4.5's `createContainer`). `newImage`, when given,
+ * adds the corresponding blob to the board's `images` map in the same
+ * history step (spec §2.6) — used when the new node is a freshly created
+ * image card.
+ */
+export const addNodeAtom = atom(
+  null,
+  (_get, set, node: Node, newImage?: { id: string; dataUri: string }) => {
+    set(updateBoardAtom, (board: Board) => ({
+      ...board,
+      nodes: [...board.nodes, node],
+      images: newImage
+        ? { ...board.images, [newImage.id]: newImage.dataUri }
+        : board.images,
+    }))
+  },
+)
+
+/**
+ * Replaces one node with `next` wholesale (spec §2.2's kind-conversion —
+ * text↔image↔link is a full object replacement, not a field patch, per
+ * phase2 schema §2's notes). `newImage`, when given, adds the corresponding
+ * blob to `images` in the same history step before pruning orphans, so a
+ * conversion *to* `kind: 'image'` doesn't have its own fresh blob pruned as
+ * unreferenced, and a conversion *away from* `kind: 'image'` correctly
+ * frees the old one (spec §2.6).
+ */
+export const replaceNodeAtom = atom(
+  null,
+  (
+    _get,
+    set,
+    id: NodeId,
+    next: Node,
+    newImage?: { id: string; dataUri: string },
+  ) => {
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        if (node.id !== id) return node
+        changed = true
+        return next
+      })
+      if (!changed) return board
+      const withNewImage = newImage
+        ? { ...board.images, [newImage.id]: newImage.dataUri }
+        : board.images
+      return {
+        ...board,
+        nodes,
+        images: pruneOrphanedImages(nodes, withNewImage),
+      }
+    })
+  },
+)
+
+/**
+ * Patches a card's caption text (spec §5's per-kind content editing) — kept
+ * separate from `updateNodeAtom`'s common-field patch since `content` isn't
+ * part of `NodeCommonPatch` (see its comment) and only ever applies to a
+ * `type: 'card'` node.
+ */
+export const updateCardContentAtom = atom(
+  null,
+  (_get, set, id: NodeId, content: string) => {
+    const now = nowISO()
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        if (node.id !== id || node.type !== 'card') return node
+        changed = true
+        return { ...node, content, updatedAt: now }
+      })
+      return changed ? { ...board, nodes } : board
+    })
+  },
+)
 
 /**
  * Shallow-patches one node by id and refreshes `updatedAt` — a move with no
@@ -130,6 +208,28 @@ export const setParentIdAtom = atom(
           ...(parentId !== undefined ? { parentId } : {}),
           updatedAt: now,
         }
+      })
+      return changed ? { ...board, nodes } : board
+    })
+  },
+)
+
+/**
+ * Patches a link card's fetched-metadata fields once a `fetchLinkMetadata`
+ * call (spec §5.4) resolves or fails — a no-op if the card was converted
+ * away from `kind: 'link'` (or deleted) before the fetch settled.
+ */
+export const updateLinkAtom = atom(
+  null,
+  (_get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
+    const now = nowISO()
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        if (node.id !== id || node.type !== 'card' || node.kind !== 'link')
+          return node
+        changed = true
+        return { ...node, link: { ...node.link, ...patch }, updatedAt: now }
       })
       return changed ? { ...board, nodes } : board
     })

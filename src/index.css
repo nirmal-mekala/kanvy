@@ -479,3 +479,102 @@ body {
   stroke: var(--color-ink);
   stroke-width: 4;
 }
+
+.edge__preview {
+  fill: none;
+  stroke: var(--color-outline);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+}
+
+/* ---------- connector affordances (spec §4.6) ---------- */
+
+.node-connector {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  cursor: crosshair;
+  z-index: 1;
+}
+
+.node-connector--active {
+  background: #8fbcbb;
+  border-color: #8fbcbb;
+  transform: scale(1.6);
+}
+
+.node-connector--top.node-connector--active,
+.node-connector--bottom.node-connector--active {
+  transform: translateX(-50%) scale(1.6);
+}
+
+.node-connector--left.node-connector--active,
+.node-connector--right.node-connector--active {
+  transform: translateY(-50%) scale(1.6);
+}
+
+.node-connector--top,
+.node-connector--bottom {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node-connector--top {
+  top: -5px;
+}
+
+.node-connector--bottom {
+  bottom: -5px;
+}
+
+.node-connector--left,
+.node-connector--right {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node-connector--left {
+  left: -5px;
+}
+
+.node-connector--right {
+  right: -5px;
+}
+
+/* ---------- edge direction control (minimal — full selection menu is Stage 7) ---------- */
+
+.edge-direction-control {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.edge-direction-control__btn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.edge-direction-control__btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.edge-direction-control__btn--active {
+  background: var(--color-surface-hover);
+  outline: 1px solid var(--color-outline);
+}

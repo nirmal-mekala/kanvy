@@ -19,6 +19,8 @@ export function CardBody({
   showCaption,
   tinted,
   contentRef,
+  onContentChange,
+  onContentBlur,
 }: {
   node: CardNode
   imageSrc: string | undefined
@@ -26,6 +28,8 @@ export function CardBody({
   showCaption: boolean
   tinted: boolean
   contentRef: RefObject<HTMLTextAreaElement | null>
+  onContentChange?: (content: string) => void
+  onContentBlur?: () => void
 }) {
   return (
     <div className="card__inner">
@@ -68,8 +72,10 @@ export function CardBody({
           className="card__content"
           value={node.content}
           placeholder="Write something..."
-          readOnly
           rows={1}
+          onPointerDown={(e) => e.stopPropagation()}
+          onChange={onContentChange && ((e) => onContentChange(e.target.value))}
+          onBlur={onContentBlur}
         />
       )}
     </div>

@@ -6,10 +6,12 @@
 // data flow spec §2.4 requires regardless of interactivity: a regular
 // card's rendered height flowing into the persisted `h` field.
 
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
+import type { Side } from '../../geometry/anchor'
 import type { CardNode } from '../../schema/node'
+import { NodeConnectors } from '../canvas/NodeConnectors'
 import { ResizeHandles } from '../canvas/ResizeHandles'
 import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
 import { CardBody } from './CardBody'
@@ -66,20 +68,31 @@ export function Card({
   theme,
   viewMode,
   selected = false,
+  connectorsVisible = false,
+  connectorActiveSide = null,
   onHeightChange,
+  onContentChange,
+  onContentBlur,
   onPointerDown,
   onPointerMove,
   onPointerUp,
   onResizePointerDown,
   onResizePointerMove,
   onResizePointerUp,
+  onConnectorPointerDown,
+  onConnectorPointerMove,
+  onConnectorPointerUp,
 }: {
   node: CardNode
   imageSrc?: string
   theme: Theme
   viewMode: ViewMode
   selected?: boolean
+  connectorsVisible?: boolean
+  connectorActiveSide?: Side | null
   onHeightChange?: (height: number) => void
+  onContentChange?: (id: string, content: string) => void
+  onContentBlur?: (id: string) => void
   onPointerDown?: (id: string, e: React.PointerEvent) => void
   onPointerMove?: (e: React.PointerEvent) => void
   onPointerUp?: (e: React.PointerEvent) => void
@@ -91,6 +104,13 @@ export function Card({
   ) => void
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
+  onConnectorPointerDown?: (
+    id: string,
+    side: Side,
+    e: React.PointerEvent,
+  ) => void
+  onConnectorPointerMove?: (e: React.PointerEvent) => void
+  onConnectorPointerUp?: (e: React.PointerEvent) => void
 }) {
   const isBig = node.kind === 'text' && node.size === 'big'
   const showCaption =
@@ -104,6 +124,7 @@ export function Card({
 
   const cardElRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+  const [hovered, setHovered] = useState(false)
 
   // Regular notes grow to fit their content; big text has an explicit,
   // user-resized height instead (a later stage's resize handles), so it
@@ -136,6 +157,8 @@ export function Card({
       onPointerDown={onPointerDown && ((e) => onPointerDown(node.id, e))}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
     >
       <CardBody
         node={node}
@@ -144,6 +167,15 @@ export function Card({
         showCaption={showCaption}
         tinted={isDone || isDimmedByViewMode}
         contentRef={contentRef}
+        {...(onContentChange
+          ? {
+              onContentChange: (content: string) =>
+                onContentChange(node.id, content),
+            }
+          : {})}
+        {...(onContentBlur
+          ? { onContentBlur: () => onContentBlur(node.id) }
+          : {})}
       />
       {isBig &&
         onResizePointerDown &&
@@ -155,6 +187,18 @@ export function Card({
             onPointerDown={onResizePointerDown}
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}
+          />
+        )}
+      {(hovered || selected || connectorsVisible) &&
+        onConnectorPointerDown &&
+        onConnectorPointerMove &&
+        onConnectorPointerUp && (
+          <NodeConnectors
+            nodeId={node.id}
+            activeSide={connectorActiveSide}
+            onPointerDown={onConnectorPointerDown}
+            onPointerMove={onConnectorPointerMove}
+            onPointerUp={onConnectorPointerUp}
           />
         )}
     </div>

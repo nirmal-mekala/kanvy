@@ -38,6 +38,7 @@ import {
   selectionAtom,
   setSelectionAtom,
 } from '../../state/atoms/selection'
+import { screenPoint, worldPoint } from './viewportCoords'
 
 /** Matches `.container-node__drag-handle`'s `min-height` (spec §4.4's no-fly-zone band). */
 const CONTAINER_HANDLE_HEIGHT = GRID_SIZE
@@ -182,15 +183,21 @@ export function useBoardInteraction({
   // v0 (spec §13), and `.tsx`/hook interaction code is excluded from unit
   // coverage entirely (vitest.config.ts); real coverage comes from e2e
   // (e2e/*.spec.ts), which fallow's static analysis can't see.
-  // fallow-ignore-next-line complexity
   function toScreen(clientX: number, clientY: number) {
-    const rect = boardElRef.current?.getBoundingClientRect()
-    return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) }
+    return screenPoint(
+      clientX,
+      clientY,
+      boardElRef.current?.getBoundingClientRect(),
+    )
   }
 
   function toWorld(clientX: number, clientY: number) {
-    const { x, y } = toScreen(clientX, clientY)
-    return { x: (x - view.x) / view.zoom, y: (y - view.y) / view.zoom }
+    return worldPoint(
+      clientX,
+      clientY,
+      boardElRef.current?.getBoundingClientRect(),
+      view,
+    )
   }
 
   // Every container whose bounds contain a world point, innermost first —

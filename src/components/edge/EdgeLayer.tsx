@@ -3,6 +3,7 @@
 // connector affordance) is Stage 6's job — this stage only needs correct
 // static rendering of edges already in the board.
 
+import type { Point, Side } from '../../geometry/anchor'
 import { anchorPoint } from '../../geometry/anchor'
 import { bezierPath } from '../../geometry/curve'
 import type { Edge as EdgeData } from '../../schema/edge'
@@ -13,10 +14,13 @@ export function EdgeLayer({
   edges,
   nodesById,
   selectedIds,
+  preview,
 }: {
   edges: readonly EdgeData[]
   nodesById: ReadonlyMap<string, Node>
   selectedIds?: ReadonlySet<string>
+  /** An in-progress connection being dragged out (spec §4.6) — not yet a real edge. */
+  preview?: { from: Point; fromSide: Side; to: Point } | null
 }) {
   return (
     <svg className="board__edges" data-testid="edge-layer" aria-hidden="true">
@@ -49,6 +53,18 @@ export function EdgeLayer({
           />
         )
       })}
+      {preview && (
+        <path
+          className="edge__preview"
+          d={bezierPath(
+            preview.from,
+            preview.fromSide,
+            preview.to,
+            preview.fromSide,
+            '__preview__',
+          )}
+        />
+      )}
     </svg>
   )
 }
