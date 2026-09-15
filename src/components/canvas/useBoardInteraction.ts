@@ -218,6 +218,15 @@ export function useBoardInteraction({
       .sort((a, b) => a.w * a.h - b.w * b.h)
   }
 
+  // An edge is select-only (spec §4.3: "click a card/container/edge:
+  // select it") — never draggable, so this doesn't need dragRef/carry
+  // logic like handleNodePointerDown below.
+  function handleEdgePointerDown(id: string, e: React.PointerEvent) {
+    if (e.button !== 0) return
+    e.stopPropagation()
+    setSelection(computeSelectionAfterClick(selection, id, e.shiftKey))
+  }
+
   // ---- Node drag: a card's whole body, or a container's drag handle ----
 
   // fallow-ignore-next-line complexity
@@ -562,6 +571,7 @@ export function useBoardInteraction({
     selection,
     marqueeRect,
     creatingContainerRect,
+    handleEdgePointerDown,
     handleNodePointerDown,
     handleNodePointerMove,
     handleNodePointerUp,

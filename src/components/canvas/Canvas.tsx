@@ -100,6 +100,7 @@ export function Canvas() {
     selection,
     marqueeRect,
     creatingContainerRect,
+    handleEdgePointerDown,
     handleNodePointerDown,
     handleNodePointerMove,
     handleNodePointerUp,
@@ -397,6 +398,7 @@ export function Canvas() {
           nodesById={nodesById}
           selectedIds={selection}
           preview={edgePreview}
+          onEdgePointerDown={handleEdgePointerDown}
         />
 
         {board.nodes

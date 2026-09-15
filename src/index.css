@@ -653,6 +653,21 @@ body {
   stroke-width: 4;
 }
 
+.edge__arrowhead--selected {
+  fill: var(--color-ink);
+}
+
+/* Invisible, much wider than .edge__line — the actual click target for
+   selecting an edge (spec §4.3), since the visible line alone is too thin
+   to reliably hit. */
+.edge__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
 .edge__preview {
   fill: none;
   stroke: var(--color-outline);
