@@ -13,14 +13,30 @@ export interface SlurpMatch {
   remainingText: string
 }
 
+const URL_PATTERN = /https?:\/\/[^\s]+/
+
 /** The first URL in `text`, or undefined if none — only the first URL is ever slurped. */
-export function findFirstUrl(_text: string): UrlMatch | undefined {
-  throw new Error('not implemented — phase 7')
+export function findFirstUrl(text: string): UrlMatch | undefined {
+  const match = URL_PATTERN.exec(text)
+  if (!match) return undefined
+  return {
+    url: match[0],
+    start: match.index,
+    end: match.index + match[0].length,
+  }
 }
 
 /** True when `text` (trimmed) is a URL and nothing else. */
-export function isPlainUrl(_text: string): boolean {
-  throw new Error('not implemented — phase 7')
+export function isPlainUrl(text: string): boolean {
+  const trimmed = text.trim()
+  const match = URL_PATTERN.exec(trimmed)
+  return (
+    match !== null && match.index === 0 && match[0].length === trimmed.length
+  )
+}
+
+function isTriggerWhitespace(char: string | undefined): boolean {
+  return char === ' ' || char === '\n'
 }
 
 /**
@@ -30,16 +46,32 @@ export function isPlainUrl(_text: string): boolean {
  * triggering whitespace.
  */
 export function detectSlurpOnType(
-  _text: string,
-  _cursorPos: number,
+  text: string,
+  cursorPos: number,
 ): SlurpMatch | undefined {
-  throw new Error('not implemented — phase 7')
+  if (!isTriggerWhitespace(text[cursorPos - 1])) return undefined
+
+  const match = findFirstUrl(text)
+  if (!match) return undefined
+  if (!isTriggerWhitespace(text[match.end])) return undefined
+
+  return {
+    url: match.url,
+    remainingText: text.slice(0, match.start) + text.slice(match.end + 1),
+  }
 }
 
 /**
  * Blur trigger: the first URL is slurped if it's the last thing in `text`
  * — nothing typed after it yet (spec §5.4b).
  */
-export function detectSlurpOnBlur(_text: string): SlurpMatch | undefined {
-  throw new Error('not implemented — phase 7')
+export function detectSlurpOnBlur(text: string): SlurpMatch | undefined {
+  const match = findFirstUrl(text)
+  if (!match) return undefined
+  if (match.end !== text.length) return undefined
+
+  return {
+    url: match.url,
+    remainingText: text.slice(0, match.start).trimEnd(),
+  }
 }

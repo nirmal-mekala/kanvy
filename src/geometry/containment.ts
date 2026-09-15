@@ -8,8 +8,11 @@ export interface IdentifiedRect extends Rect {
 }
 
 /** Overlap area in px² between two rects (0 when they don't overlap). */
-export function overlapArea(_a: Rect, _b: Rect): number {
-  throw new Error('not implemented — phase 7')
+export function overlapArea(a: Rect, b: Rect): number {
+  const width = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+  const height = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+  if (width <= 0 || height <= 0) return 0
+  return width * height
 }
 
 /**
@@ -17,13 +20,37 @@ export function overlapArea(_a: Rect, _b: Rect): number {
  * it overlaps *most* by area, or `undefined` if it overlaps none (spec §2.3).
  */
 export function findParentByLargestOverlap(
-  _node: Rect,
-  _containers: readonly IdentifiedRect[],
+  node: Rect,
+  containers: readonly IdentifiedRect[],
 ): string | undefined {
-  throw new Error('not implemented — phase 7')
+  let bestId: string | undefined
+  let bestArea = 0
+  for (const container of containers) {
+    const area = overlapArea(node, container)
+    if (area > bestArea) {
+      bestArea = area
+      bestId = container.id
+    }
+  }
+  return bestId
 }
 
 /** The smallest rect enclosing every rect in `rects`. Throws on an empty array. */
-export function boundingBox(_rects: readonly Rect[]): Rect {
-  throw new Error('not implemented — phase 7')
+export function boundingBox(rects: readonly Rect[]): Rect {
+  if (rects.length === 0) {
+    throw new Error(
+      'boundingBox: cannot compute bounding box of an empty array',
+    )
+  }
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const rect of rects) {
+    minX = Math.min(minX, rect.x)
+    minY = Math.min(minY, rect.y)
+    maxX = Math.max(maxX, rect.x + rect.w)
+    maxY = Math.max(maxY, rect.y + rect.h)
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }

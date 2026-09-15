@@ -24,10 +24,15 @@ export const Y_SNAP_GUTTER = GRID_SIZE
  * gaps between grid dots rather than on them (spec §3).
  */
 export function snapToGridMidpoint(
-  _value: number,
-  _gridSize: number = GRID_SIZE,
+  value: number,
+  gridSize: number = GRID_SIZE,
 ): number {
-  throw new Error('not implemented — phase 7')
+  const offset = gridSize / 2
+  return Math.round((value - offset) / gridSize) * gridSize + offset
+}
+
+function columnsOverlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x
 }
 
 /**
@@ -36,6 +41,19 @@ export function snapToGridMidpoint(
  * `Y_SNAP_THRESHOLD`, otherwise returns the candidate's own Y unchanged
  * (the Y-axis does not follow the grid — spec §4.4).
  */
-export function snapY(_candidate: Rect, _neighbors: readonly Rect[]): number {
-  throw new Error('not implemented — phase 7')
+export function snapY(candidate: Rect, neighbors: readonly Rect[]): number {
+  for (const neighbor of neighbors) {
+    if (!columnsOverlap(candidate, neighbor)) continue
+
+    const neighborBottom = neighbor.y + neighbor.h
+    if (Math.abs(candidate.y - neighborBottom) <= Y_SNAP_THRESHOLD) {
+      return neighborBottom + Y_SNAP_GUTTER
+    }
+
+    const candidateBottom = candidate.y + candidate.h
+    if (Math.abs(candidateBottom - neighbor.y) <= Y_SNAP_THRESHOLD) {
+      return neighbor.y - Y_SNAP_GUTTER - candidate.h
+    }
+  }
+  return candidate.y
 }

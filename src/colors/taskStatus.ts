@@ -12,8 +12,17 @@ export type TaskStatus = 'todo' | 'blocked' | 'in_progress' | 'done'
  * `done` green. Only `todo` varies by theme.
  */
 export function resolveTaskStatusColor(
-  _status: TaskStatus,
-  _theme: Theme,
+  status: TaskStatus,
+  theme: Theme,
 ): string {
-  throw new Error('not implemented — phase 7')
+  switch (status) {
+    case 'blocked':
+      return '#bf616a' // nord11
+    case 'in_progress':
+      return '#5e81ac' // nord10
+    case 'done':
+      return '#a3be8c' // nord14
+    default:
+      return theme === 'light' ? '#4c566a' /* nord3 */ : '#d8dee9' /* nord4 */
+  }
 }
