@@ -4,14 +4,13 @@
 // board.js) into the v0 schema shape. A single starter note, not a demo
 // board — there's no "reset" affordance to get back to a clean slate.
 
+import { CARD_WIDTH, NEW_CARD_HEIGHT_ESTIMATE } from '../geometry/constants'
 import type { Board } from './board'
 import { SCHEMA_VERSION } from './board'
 import { generateId } from './legacy'
 
 const SEED_CARD_X = 88 // snapToGrid(80), spec §3 grid-midpoint offset
 const SEED_CARD_Y = 104 // snapToGrid(100)
-const SEED_CARD_W = 224 // CARD_WIDTH = GRID_SIZE * 14
-const SEED_CARD_H = 90 // pre-render content-height estimate (spec §2.4)
 
 /** A fresh seed board, with new ids/timestamps each call. */
 export function createSeedBoard(): Board {
@@ -26,8 +25,8 @@ export function createSeedBoard(): Board {
         size: 'regular',
         x: SEED_CARD_X,
         y: SEED_CARD_Y,
-        w: SEED_CARD_W,
-        h: SEED_CARD_H,
+        w: CARD_WIDTH,
+        h: NEW_CARD_HEIGHT_ESTIMATE,
         color: 'amber',
         content: 'Welcome to Kanvy\n\nDouble-click the canvas to add a note.',
         createdAt: now,

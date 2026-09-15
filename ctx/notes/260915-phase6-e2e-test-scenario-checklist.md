@@ -23,6 +23,17 @@ Playwright spec exists and passes — this file is not itself a spec.
 ## Interaction e2e (spec §4, §5, §6, §7) — maps to phase 5 §4 Stages 4–9
 
 ### Viewport (spec §4.1) — Stage 4
+Specs written in `e2e/viewport.spec.ts` against Stage 4's actual DOM, but
+**not run to a passing result** — this session's sandboxed dev container has
+no local browser (no display server, cached Chromium binaries fail to
+launch — see `playwright-remote-browser` skill) and, despite a Playwright
+server reachable on the host Mac (`ws://host.docker.internal:3322/`
+connects fine), the host has no route back into this container's bridge IP
+to load the dev server itself (`page.goto` to the container's own
+`--host`-bound address times out, not refused — consistent with Docker
+Desktop's asymmetric host↔container networking with no port published).
+Run `pnpm e2e` for real (CI, or a dev environment without this split) before
+checking any of these off — do not check based on code review alone.
 - [ ] Pan via right-click drag
 - [ ] Pan via two-finger scroll / mouse wheel (non-zoom axis)
 - [ ] Zoom via Ctrl/Cmd+scroll, keeping the point under the cursor fixed

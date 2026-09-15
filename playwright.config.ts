@@ -16,6 +16,16 @@ import { defineConfig } from '@playwright/test'
 // port into this file.
 const PORT = process.env.KANVY_E2E_PORT ?? '5173'
 
+// KANVY_E2E_HOST overrides the hostname the *browser* uses to reach the dev
+// server (default localhost) — needed when the browser itself is remote
+// (e.g. a Playwright server on the macOS host connected to from a
+// container via PW_TEST_CONNECT_WS_ENDPOINT, per the
+// playwright-remote-browser skill): "localhost" from that browser's
+// perspective is the host machine, not this container, so the browser must
+// instead target this container's own address. The webServer command below
+// always binds to all interfaces regardless of this value.
+const HOST = process.env.KANVY_E2E_HOST ?? 'localhost'
+
 export default defineConfig({
   testDir: './e2e',
   testIgnore: ['visual/**'],
@@ -23,7 +33,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: `http://${HOST}:${PORT}`,
     trace: 'on-first-retry',
   },
   webServer: {
