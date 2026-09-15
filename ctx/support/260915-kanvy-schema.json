@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanvy.local/schema/260915-kanvy-schema.json",
+  "title": "kanvy v0 board schema",
+  "description": "JSON Schema expression of the v0 schema drafted in ctx/notes/260915-phase2-schema.md §2. This describes the single in-memory Board document shape (nested nodes/edges/images), not the flat json-server db.json layout from §4 — see 260915-kanvy-db-sample.json for that.",
+  "$defs": {
+    "colorKey": {
+      "type": "string",
+      "enum": ["gray", "coral", "orange", "amber", "lime", "teal", "sky", "violet", "pink"]
+    },
+    "patternKey": {
+      "type": "string",
+      "enum": ["none", "diagonal", "graph-paper", "wiggle", "plus", "jupiter", "topography", "yyy", "corkscrew"]
+    },
+    "side": {
+      "type": "string",
+      "enum": ["top", "right", "bottom", "left"]
+    },
+    "taskStatus": {
+      "type": "string",
+      "enum": ["todo", "blocked", "in_progress", "done"]
+    },
+    "task": {
+      "type": "object",
+      "description": "Any node type may optionally be a task; presence of this field means the node is a task.",
+      "properties": {
+        "status": { "$ref": "#/$defs/taskStatus" }
+      },
+      "required": ["status"],
+      "additionalProperties": false
+    },
+    "nodeBase": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number" },
+        "h": { "type": "number" },
+        "color": { "$ref": "#/$defs/colorKey" },
+        "parentId": {
+          "description": "Formal ownership (phase-1 §2.3). Any node may be a child of any container; a node with no container overlapping it at drop time has no parentId.",
+          "type": "string"
+        },
+        "task": { "$ref": "#/$defs/task" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "x", "y", "w", "h", "color", "createdAt", "updatedAt"]
+    },
+    "textCard": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "card" },
+            "kind": { "const": "text" },
+            "content": { "type": "string" },
+            "size": { "type": "string", "enum": ["regular", "big"] }
+          },
+          "required": ["type", "kind", "content", "size"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "imageCard": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "card" },
+            "kind": { "const": "image" },
+            "content": { "type": "string" },
+            "imageId": { "type": "string" }
+          },
+          "required": ["type", "kind", "content", "imageId"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "linkCard": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "card" },
+            "kind": { "const": "link" },
+            "content": { "type": "string" },
+            "link": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string", "format": "uri" },
+                "title": { "type": "string" },
+                "imageUrl": { "type": "string", "format": "uri" },
+                "status": { "type": "string", "enum": ["loading", "ready", "error"] }
+              },
+              "required": ["url", "status"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["type", "kind", "content", "link"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "containerNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "container" },
+            "pattern": { "$ref": "#/$defs/patternKey" }
+          },
+          "required": ["type", "pattern"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cardNode": {
+      "description": "Discriminated union over kind — size only on text, imageId only on image, link only on link.",
+      "oneOf": [
+        { "$ref": "#/$defs/textCard" },
+        { "$ref": "#/$defs/imageCard" },
+        { "$ref": "#/$defs/linkCard" }
+      ]
+    },
+    "node": {
+      "description": "Discriminated union over type, then (for cards) kind.",
+      "oneOf": [
+        { "$ref": "#/$defs/textCard" },
+        { "$ref": "#/$defs/imageCard" },
+        { "$ref": "#/$defs/linkCard" },
+        { "$ref": "#/$defs/containerNode" }
+      ]
+    },
+    "edge": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fromNodeId": { "type": "string" },
+        "fromSide": { "$ref": "#/$defs/side" },
+        "toNodeId": { "type": "string" },
+        "toSide": { "$ref": "#/$defs/side" },
+        "direction": { "type": "string", "enum": ["none", "forward", "backward"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fromNodeId", "fromSide", "toNodeId", "toSide", "direction", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "version": { "type": "integer", "minimum": 0 },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "images": {
+      "description": "Map of image id -> base64 data URI. Must be the last serialized key (phase-1 §2.8) — not expressible as a JSON Schema constraint, noted here only.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "required": ["version", "nodes", "edges", "images"],
+  "additionalProperties": false
+}

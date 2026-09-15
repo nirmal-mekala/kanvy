@@ -1,0 +1,126 @@
+{
+  "boards": [
+    {
+      "id": "b1",
+      "name": "Sample board",
+      "createdAt": "2026-09-15T12:00:00.000Z",
+      "updatedAt": "2026-09-15T12:00:00.000Z"
+    },
+    {
+      "id": "b2",
+      "name": "Second empty-ish board",
+      "createdAt": "2026-09-15T12:00:00.000Z",
+      "updatedAt": "2026-09-15T12:00:00.000Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "text",
+      "x": 80,
+      "y": 100,
+      "w": 224,
+      "h": 90,
+      "color": "amber",
+      "content": "edited via CLI",
+      "size": "regular",
+      "createdAt": "2026-09-15T12:00:00.000Z",
+      "updatedAt": "2026-09-15T12:00:00.000Z"
+    },
+    {
+      "id": "n2",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "text",
+      "x": 400,
+      "y": 100,
+      "w": 256,
+      "h": 128,
+      "color": "sky",
+      "content": "A big text card, freeform resizable.",
+      "size": "big",
+      "parentId": "n5",
+      "createdAt": "2026-09-15T12:05:00.000Z",
+      "updatedAt": "2026-09-15T12:05:00.000Z"
+    },
+    {
+      "id": "n3",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "image",
+      "x": 80,
+      "y": 260,
+      "w": 224,
+      "h": 168,
+      "color": "gray",
+      "content": "",
+      "imageId": "img1",
+      "createdAt": "2026-09-15T12:10:00.000Z",
+      "updatedAt": "2026-09-15T12:10:00.000Z"
+    },
+    {
+      "id": "n4",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "link",
+      "x": 400,
+      "y": 260,
+      "w": 224,
+      "h": 120,
+      "color": "teal",
+      "content": "",
+      "link": {
+        "url": "https://json-schema.org/",
+        "title": "JSON Schema",
+        "status": "ready"
+      },
+      "task": {
+        "status": "todo"
+      },
+      "createdAt": "2026-09-15T12:15:00.000Z",
+      "updatedAt": "2026-09-15T12:15:00.000Z"
+    },
+    {
+      "id": "n5",
+      "boardId": "b1",
+      "type": "container",
+      "x": 360,
+      "y": 60,
+      "w": 320,
+      "h": 220,
+      "color": "violet",
+      "pattern": "graph-paper",
+      "task": {
+        "status": "in_progress"
+      },
+      "createdAt": "2026-09-15T11:55:00.000Z",
+      "updatedAt": "2026-09-15T12:05:00.000Z"
+    },
+    {
+      "id": "n6",
+      "boardId": "b2",
+      "type": "card",
+      "kind": "text",
+      "x": 120,
+      "y": 120,
+      "w": 224,
+      "h": 90,
+      "color": "gray",
+      "content": "Second board, minimal content.",
+      "size": "regular",
+      "createdAt": "2026-09-15T12:20:00.000Z",
+      "updatedAt": "2026-09-15T12:20:00.000Z"
+    }
+  ],
+  "edges": [],
+  "images": [
+    {
+      "id": "img1",
+      "boardId": "b1",
+      "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
