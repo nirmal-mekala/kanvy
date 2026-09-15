@@ -2,15 +2,22 @@
 
 ## Where this repo is right now
 
-This repo currently contains no application code. `kanvy` is being migrated
-from a working JavaScript/React prototype (kept for reference, not built or
-run from this repo — see below) into a new TypeScript implementation. As of
-this writing, the prototype-migration is at the end of **prototype-migration
-phase 3** (tooling/config/stack alignment) of the process defined in
-`ctx/prompt/260915-migration-process.md`. There is no `package.json`, build
-tool, test runner, or lint config at the repo root yet — the stack is now
-decided (see below) but not yet set up; that happens in prototype-migration
-phase 4.
+`kanvy` is being migrated from a working JavaScript/React prototype (kept for
+reference, not built or run from this repo — see below) into a new
+TypeScript implementation. As of this writing, the prototype-migration has
+completed **prototype-migration phase 5** (implementation plan) of the
+process defined in `ctx/prompt/260915-migration-process.md`, plus
+"Milestone 0" of that plan
+(`ctx/notes/260915-prototype-migration-phase5-implementation-plan.md` §2) —
+the repo scaffold (`package.json`, TypeScript, Vite, Tailwind v4, Biome,
+Vitest, Playwright, `fallow`) — and now has a `package.json` and a booting
+(but functionally empty) app shell at `src/App.tsx`. No feature code exists
+yet: `pnpm test`/`pnpm e2e` correctly fail with "no tests found," and
+`fallow audit` correctly flags the phase-3-decided dependencies
+(`zod`/`jotai`/`nanoid`/`clsx`/`lucide-react`/`hero-patterns`, `pixelmatch`)
+as unused, since nothing consumes them yet — expected until
+prototype-migration phase 6 (test suite) and phase 7 (implementation) land.
+Next: prototype-migration phase 6.
 
 Before making any change, check `ctx/prompt/260915-migration-process.md` for
 which prototype-migration phase is currently active, and re-read this file —
@@ -111,17 +118,48 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
 - Code health: `fallow` — complexity/duplication/circular-dependency/
   unused-code checks, CI-blocking (`error` severity). Also the primary
   circular-dependency check (not Biome's `noImportCycles`, which is
-  `nursery`/unstable). Set up agent integration via `npx fallow agent
-  install` during prototype-migration phase 4 — this generates an AGENTS.md
-  task-map section (merge into this file, don't overwrite it), a CLAUDE.md
-  import, an MCP server, and an agent skill, so status/health checks are
-  available to an agent directly rather than only surfacing as a CI
-  failure after the fact.
+  `nursery`/unstable). Agent integration is set up (`npx fallow agent
+  install` — see the task map below), so status/health checks are available
+  directly rather than only surfacing as a CI failure after the fact. `ctx/`
+  is excluded from analysis (`.fallowrc.jsonc`'s `ignorePatterns`) — it's
+  process/reference material, not app code.
 - Package manager: pnpm. Single-package repo — no monorepo/workspace split;
   the future JSON-on-disk + `json-server` backend (phase 2 §4) stays
   light enough not to need one.
 
-Do not assume a specific config's exact contents without checking the file
-itself once it exists (this section records decisions, not the literal
-`biome.json`/`.fallowrc.json`/`vitest.config.ts` contents) — those are set
-up in prototype-migration phase 4.
+This section records decisions, not the literal config contents — check
+`biome.json`/`.fallowrc.jsonc`/`vitest.config.ts`/`playwright.config.ts`
+themselves, now that they exist at the repo root, for exact rule sets and
+thresholds.
+
+---
+
+<!-- fallow:setup-hooks:start -->
+## Fallow local gate
+
+Before any `git commit` or `git push`, run `fallow audit --format json --quiet --explain --gate-marker agent`. If the verdict is `fail`, fix the reported findings before retrying. Treat JSON runtime errors like `{ "error": true, ... }` as non-blocking.
+
+Audit defaults to `gate=new-only`: only findings introduced by the current changeset affect the verdict. Inherited findings on touched files are reported under `attribution` and annotated with `introduced: false`, but do not block the commit. Set `[audit] gate = "all"` in `fallow.toml` to gate every finding in changed files.
+
+For non-skill agents, treat the task map below as the local onboarding source: run the listed fallow command before destructive edits, before commits, and before pull request handoff.
+
+## Fallow task map
+
+| When the agent is about to... | Run |
+|---|---|
+| delete an "unused" export or file | `fallow dead-code --trace <file>:<export>` |
+| prove a TypeScript symbol's exact consumers before refactoring | `fallow dead-code --type-aware --symbol-impact <file>:<export-or-class.method>` |
+| find how one module reaches another | `fallow trace --path <from> <to>` (Reports `reachable: false` instead of failing when no import path exists; type-only hops are reported, not skipped.) |
+| delete an "unused" dependency | `fallow dead-code --trace-dependency <name>` |
+| commit or open a PR | `fallow audit --base <ref>` |
+| read a diff before approving it | `fallow review --base <ref> --brief` (orientation, never gates: deterministic and always exit 0, unlike the audit row) |
+| prioritize refactoring | `fallow health --hotspots --targets` |
+| ask who owns code | `fallow health --ownership` |
+| check untested-but-reachable code | `fallow health --coverage-gaps` |
+| consolidate duplication | `fallow dupes --trace dup:<fingerprint>` |
+| find feature flags | `fallow flags` |
+| check which architecture rules apply to a file before changing it | `fallow guard <files>` |
+| surface security candidates | `fallow security` |
+| understand a finding | `fallow explain <issue-type>` |
+| scope a monorepo | `--workspace <glob> / --changed-workspaces <ref>` (global flags, prefix any command) |
+<!-- fallow:setup-hooks:end -->
