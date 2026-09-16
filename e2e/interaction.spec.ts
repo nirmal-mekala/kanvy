@@ -8,7 +8,7 @@ import { seedBoard } from './fixtures/board'
 // as the only container drag surface, `.resize-handle--<dir>` for the 8-way
 // handles.
 //
-// Run and passing (all 19) via the playwright-remote-browser skill. This
+// Run and passing (all 78) via the playwright-remote-browser skill. This
 // run caught a real, significant bug: clicking a card's caption text
 // (nearly its entire visible surface) failed to select it at all —
 // `CardBody.tsx`'s textarea called `stopPropagation()` on `pointerdown`,
@@ -21,6 +21,23 @@ import { seedBoard } from './fixtures/board'
 // snap, no-fly-zone clamping, nested-container ancestor safety,
 // multi-selection carry, no-parent-on-no-overlap, container z-order) —
 // all passed cleanly, no further app bugs found there.
+// A later pass found one more, real bug in a manual verification: a
+// container being actively dragged rendered *behind* an unrelated
+// container it happened to cross mid-gesture, even though the final,
+// post-drop result looked fine — container z-order only got recomputed at
+// drop, so a dragged container otherwise kept its pre-drag DOM position
+// (and z-order) for the *entire* drag. Fixed by bringing the grabbed node
+// (and whatever it's carrying) to the front the instant a drag actually
+// starts moving (`bringToFrontAtom` in `state/atoms/nodes.ts`,
+// `useBoardInteraction.ts`'s `bringDragToFrontOnce`).
+//
+// v0.1 (spec §2.3): container membership was reverted from a formal, stored
+// `parentId` field back to the original prototype's purely spatial model —
+// what a dragged container carries is recomputed fresh from x/y/w/h every
+// time (containers/containment.ts), never stored. Every test below that
+// used to assert a `parentId` value now asserts the equivalent *behavior*
+// instead (carried on drag, or not) — a strictly more robust check, since
+// it's what a user can actually observe.
 
 function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   return {
@@ -39,14 +56,7 @@ function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   }
 }
 
-function containerNode(
-  id: string,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  parentId?: string,
-) {
+function containerNode(id: string, x: number, y: number, w: number, h: number) {
   return {
     id,
     type: 'container',
@@ -56,7 +66,6 @@ function containerNode(
     y,
     w,
     h,
-    ...(parentId ? { parentId } : {}),
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
@@ -350,7 +359,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
       version: 1,
       nodes: [
         containerNode('outer', 50, 50, 500, 500),
-        { ...containerNode('inner', 100, 150, 200, 200), parentId: 'outer' },
+        containerNode('inner', 100, 150, 200, 200),
       ],
       edges: [],
       images: {},
@@ -418,14 +427,14 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     expect(bAfter.y - bBefore.y).toBeCloseTo(dyA, 0)
   })
 
-  test('dragging a container moves its formal descendants', async ({
+  test('dragging a container moves everything spatially inside it', async ({
     page,
   }) => {
     await seed(page, {
       version: 1,
       nodes: [
         containerNode('parent', 50, 50, 400, 400),
-        { ...textCard('child', 100, 150), parentId: 'parent' },
+        textCard('child', 100, 150),
       ],
       edges: [],
       images: {},
@@ -533,7 +542,125 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     await expect(page.locator('.container-node')).toHaveCount(1)
   })
 
-  test('dropping a card over a container assigns it as parent', async ({
+  test('ctrl+click-drag around existing cards makes them children, carried along on a later drag', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [textCard('a', 100, 100), textCard('b', 250, 100)],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    // Draw a box around both cards.
+    await page.keyboard.down('Control')
+    await page.mouse.move(boardBox.x + 50, boardBox.y + 50)
+    await page.mouse.down()
+    await page.mouse.move(boardBox.x + 400, boardBox.y + 250, { steps: 10 })
+    await page.mouse.up()
+    await page.keyboard.up('Control')
+    await expect(page.locator('.container-node')).toHaveCount(1)
+
+    const cardA = page.locator('[data-node-id="a"]:not(.node-connector)')
+    const cardB = page.locator('[data-node-id="b"]:not(.node-connector)')
+    const beforeA = await cardA.boundingBox()
+    const beforeB = await cardB.boundingBox()
+    if (!beforeA || !beforeB) throw new Error('missing bounding box')
+
+    const handle = page.locator('.container-node .container-node__drag-handle')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    await page.mouse.move(handleBox.x + 10, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 10 + 60, handleBox.y + 5 + 60, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    const afterA = await cardA.boundingBox()
+    const afterB = await cardB.boundingBox()
+    if (!afterA || !afterB) throw new Error('missing bounding box')
+    expect(afterA.x - beforeA.x).toBeGreaterThan(30)
+    expect(afterA.y - beforeA.y).toBeGreaterThan(30)
+    expect(afterB.x - beforeB.x).toBeGreaterThan(30)
+    expect(afterB.y - beforeB.y).toBeGreaterThan(30)
+  })
+
+  test('ctrl+click-drag around an existing (nested) container paints the new grandparent beneath it, and still carries the grandchild on drag', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [
+        containerNode('parent', 100, 100, 200, 200),
+        textCard('child', 130, 150, 80, 60),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    // Draw a box around the whole existing "parent" container.
+    await page.keyboard.down('Control')
+    await page.mouse.move(boardBox.x + 20, boardBox.y + 20)
+    await page.mouse.down()
+    await page.mouse.move(boardBox.x + 450, boardBox.y + 450, { steps: 10 })
+    await page.mouse.up()
+    await page.keyboard.up('Control')
+    await expect(page.locator('.container-node')).toHaveCount(2)
+
+    // "parent" must visually paint on top of the new grandparent that now
+    // geometrically encloses it, not get lost behind it — containers have
+    // no z-index of their own (DOM order is the only mechanism), and the
+    // grandparent is appended to the end of the nodes array on creation,
+    // so naive array-order rendering would paint it over "parent" despite
+    // "parent" now being nested inside it (renderOrder.ts derives nesting
+    // from geometry, v0.1).
+    const parentBox = await page
+      .locator('[data-node-id="parent"]:not(.node-connector)')
+      .boundingBox()
+    if (!parentBox) throw new Error('parent not rendered')
+    const topmostAtParentCorner = await page.evaluate(
+      ([x, y]: [number, number]) =>
+        (document.elementFromPoint(x, y) as HTMLElement)
+          ?.closest('[data-node-id]')
+          ?.getAttribute('data-node-id') ?? null,
+      [parentBox.x + 5, parentBox.y + 5] as [number, number],
+    )
+    expect(topmostAtParentCorner).toBe('parent')
+
+    const child = page.locator('[data-node-id="child"]:not(.node-connector)')
+    const beforeChild = await child.boundingBox()
+    if (!beforeChild) throw new Error('child not rendered')
+
+    // The new (grandparent) container is whichever one isn't "parent".
+    const grandparentHandle = page.locator(
+      '.container-node:not([data-node-id="parent"]) .container-node__drag-handle',
+    )
+    const gpBox = await grandparentHandle.boundingBox()
+    if (!gpBox) throw new Error('grandparent handle not rendered')
+    await page.mouse.move(gpBox.x + 10, gpBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(gpBox.x + 10 + 60, gpBox.y + 5 + 60, { steps: 10 })
+    await page.mouse.up()
+
+    const afterChild = await child.boundingBox()
+    if (!afterChild) throw new Error('child not rendered')
+    // The grandchild moves too — dragging the grandparent carries every
+    // node spatially inside it in one flat pass (spec §2.3, v0.1), however
+    // deep it's nested, with no separate per-level propagation needed.
+    expect(afterChild.x - beforeChild.x).toBeGreaterThan(30)
+    expect(afterChild.y - beforeChild.y).toBeGreaterThan(30)
+  })
+
+  test('dropping a card so it lands over a container makes it spatially "sticky" to it', async ({
     page,
   }) => {
     await seed(page, {
@@ -560,8 +687,9 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     )
     await page.mouse.up()
 
-    // A card with a parent moves with its container — verified indirectly
-    // here by re-dragging the container and checking the card follows.
+    // A card spatially inside a container moves with it — verified
+    // indirectly here by re-dragging the container and checking the card
+    // follows.
     const handle = page.locator(
       '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
     )
@@ -583,7 +711,7 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     expect(cardAfter.y - cardBefore.y).toBeGreaterThan(30)
   })
 
-  test('a card dropped with no overlapping container gets no parent', async ({
+  test('a card dropped with no overlapping container is not spatially "sticky" to anything', async ({
     page,
   }) => {
     await seed(page, {
@@ -605,7 +733,7 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     const cardBefore = await card.boundingBox()
     if (!cardBefore) throw new Error('card not rendered')
 
-    // No parent assigned → dragging the (unrelated, non-overlapping)
+    // Nothing overlapping → dragging the (unrelated, non-overlapping)
     // container never carries the card along with it.
     const handle = page.locator(
       '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
@@ -647,5 +775,59 @@ test.describe('containers (spec §2.3, §4.5)', () => {
       [box.x + box.width / 2, box.y + box.height / 2] as [number, number],
     )
     expect(topTestId).toBe('card')
+  })
+
+  test('a container being actively dragged paints above whatever it is dragged over, for the whole gesture (not just after drop)', async ({
+    page,
+  }) => {
+    // Regression: container render/paint order only got recomputed at
+    // drop. A dragged container kept its pre-drag DOM position the entire
+    // time it was moving, so it could visually vanish *behind* a later-
+    // appended, unrelated container it was dragged over mid-gesture, even
+    // though the final, post-drop result looked correct. Fixed by bringing
+    // the grabbed node (and whatever it's carrying) to the front the
+    // moment a drag actually starts moving (`bringToFrontAtom`,
+    // `useBoardInteraction.ts`'s `bringDragToFrontOnce`).
+    await seed(page, {
+      version: 1,
+      nodes: [
+        containerNode('a', 100, 100, 200, 200),
+        // Appended after "a", so it paints on top of "a" until "a" is
+        // actually grabbed and dragged.
+        containerNode('b', 500, 100, 200, 200),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const handleA = page.locator(
+      '[data-node-id="a"]:not(.node-connector) .container-node__drag-handle',
+    )
+    const boxB = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
+    const handleBoxA = await handleA.boundingBox()
+    if (!boxB || !handleBoxA) throw new Error('missing bounding box')
+
+    await page.mouse.move(
+      handleBoxA.x + handleBoxA.width / 2,
+      handleBoxA.y + handleBoxA.height / 2,
+    )
+    await page.mouse.down()
+    // Drag "a" so it fully overlaps "b", but don't release yet.
+    await page.mouse.move(boxB.x + boxB.width / 2, boxB.y + 10, {
+      steps: 10,
+    })
+
+    const topNodeId = await page.evaluate(
+      ([x, y]: [number, number]) =>
+        (document.elementFromPoint(x, y) as HTMLElement)
+          ?.closest('[data-node-id]')
+          ?.getAttribute('data-node-id') ?? null,
+      [boxB.x + boxB.width / 2, boxB.y + boxB.height / 2] as [number, number],
+    )
+    await page.mouse.up()
+
+    expect(topNodeId).toBe('a')
   })
 })

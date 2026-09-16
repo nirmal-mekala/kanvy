@@ -14,7 +14,6 @@ type CommonFields = Pick<
   | 'w'
   | 'h'
   | 'color'
-  | 'parentId'
   | 'task'
   | 'content'
   | 'createdAt'
@@ -22,19 +21,7 @@ type CommonFields = Pick<
 >
 
 function commonFields(card: CardNode): CommonFields {
-  const {
-    id,
-    x,
-    y,
-    w,
-    h,
-    color,
-    parentId,
-    task,
-    content,
-    createdAt,
-    updatedAt,
-  } = card
+  const { id, x, y, w, h, color, task, content, createdAt, updatedAt } = card
   return {
     id,
     x,
@@ -42,7 +29,6 @@ function commonFields(card: CardNode): CommonFields {
     w,
     h,
     color,
-    ...(parentId !== undefined ? { parentId } : {}),
     ...(task !== undefined ? { task } : {}),
     content,
     createdAt,

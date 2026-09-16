@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  boundingBox,
-  findParentByLargestOverlap,
-  type IdentifiedRect,
-  overlapArea,
-} from './containment'
+import { boundingBox, fullyEncloses, overlapArea } from './containment'
 import type { Rect } from './snap'
 
 describe('overlapArea', () => {
@@ -21,30 +16,30 @@ describe('overlapArea', () => {
   })
 })
 
-describe('findParentByLargestOverlap', () => {
-  const node: Rect = { x: 40, y: 40, w: 20, h: 20 } // 40..60, 40..60
+describe('fullyEncloses', () => {
+  const outer: Rect = { x: 0, y: 0, w: 100, h: 100 }
 
-  it('picks the container with the greatest overlap area', () => {
-    const smallOverlap: IdentifiedRect = {
-      id: 'small',
-      x: 0,
-      y: 0,
-      w: 50,
-      h: 50,
-    } // overlaps 40..50 = 100
-    const bigOverlap: IdentifiedRect = { id: 'big', x: 0, y: 0, w: 200, h: 200 } // overlaps fully = 400
-    expect(findParentByLargestOverlap(node, [smallOverlap, bigOverlap])).toBe(
-      'big',
-    )
+  it('is true when inner sits entirely within outer', () => {
+    const inner: Rect = { x: 10, y: 10, w: 20, h: 20 }
+    expect(fullyEncloses(outer, inner)).toBe(true)
   })
 
-  it('returns undefined when there is no overlap with any container', () => {
-    const far: IdentifiedRect = { id: 'far', x: 1000, y: 1000, w: 10, h: 10 }
-    expect(findParentByLargestOverlap(node, [far])).toBeUndefined()
+  it('is true when inner exactly matches outer (edges touch)', () => {
+    expect(fullyEncloses(outer, { ...outer })).toBe(true)
   })
 
-  it('returns undefined for an empty container list', () => {
-    expect(findParentByLargestOverlap(node, [])).toBeUndefined()
+  it('is false when inner pokes outside outer on any edge', () => {
+    expect(fullyEncloses(outer, { x: -1, y: 10, w: 20, h: 20 })).toBe(false)
+    expect(fullyEncloses(outer, { x: 10, y: 10, w: 200, h: 20 })).toBe(false)
+  })
+
+  it('is false (not symmetric) when outer and inner are swapped', () => {
+    const inner: Rect = { x: 10, y: 10, w: 20, h: 20 }
+    expect(fullyEncloses(inner, outer)).toBe(false)
+  })
+
+  it('is false for two disjoint rects', () => {
+    expect(fullyEncloses(outer, { x: 1000, y: 1000, w: 10, h: 10 })).toBe(false)
   })
 })
 

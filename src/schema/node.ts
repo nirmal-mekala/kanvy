@@ -66,7 +66,6 @@ const NodeBaseSchema = z.object({
   w: z.number(),
   h: z.number(),
   color: ColorKeySchema,
-  parentId: NodeIdSchema.optional(),
   task: z.object({ status: TaskStatusSchema }).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),

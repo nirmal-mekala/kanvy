@@ -8,24 +8,33 @@ build stages from `ctx/notes/260915-prototype-migration-phase5-implementation-pl
 §4 are implemented: schema/persistence (Zod, localStorage, legacy-document
 normalization), Jotai state/history (undo/redo, selection-restore),
 canvas/node rendering (Tailwind theme, pan/zoom, dot-grid), selection/
-drag/resize + formal container ownership, card-kind conversion + link
+drag/resize + container membership, card-kind conversion + link
 metadata fetch/retry + edge connections, clipboard/shortcuts/toolbar/help,
 task layer + view modes (Standard/Task/Recency) via a new
 `components/selection-menu/`, and a baseline error-handling/a11y/touch
 pass (import-failure banner, corrupt-save recovery notification, alt
 text/focus-visible/`prefers-reduced-motion`, touch-action tuning).
 
+**Schema v0.1 (v2)**: container membership was reverted from a formal,
+stored `parentId` field back to the original prototype's purely spatial
+model — re-derived from x/y/w/h every time it's needed, never stored. See
+`ctx/notes/260916-v0.1-spatial-containers.md` for the full rationale (the
+formal-ownership model needed a bespoke fix at every mutation path — drop,
+container creation, paste, duplicate, render order — and each one
+accumulated its own bug) and spec §2.3 for the corrected, authoritative
+behavior description.
+
 **Verified, as of this writing (all re-run fresh, not assumed) — every
 tier this migration planned to have is now real, run, and green, not just
 written:**
-- `pnpm test` — 190/190 passing.
+- `pnpm test` — 214/214 passing.
 - `pnpm typecheck` / `pnpm build` — clean.
 - `pnpm lint` — clean (a handful of pre-existing warnings only: one
   `noNonNullAssertion` in the Vite-generated `main.tsx`, a few CSS
   `noDescendingSpecificity` notices — none are errors).
 - `npx fallow audit --format json --quiet --gate-marker agent` — verdict
   `pass`, zero newly-introduced dead-code/complexity/duplication findings.
-- **`pnpm e2e` — 63/63 passing, against a real browser** (the full
+- **`pnpm e2e` — 78/78 passing, against a real browser** (the full
   interaction e2e suite, `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md`'s
   entire interaction-tier scenario list, including every gap that
   checklist previously left unwritten — dragging/container geometry edge
@@ -158,11 +167,13 @@ date (e.g. `260427-pdf-render.md`), never last-edited date.
 - If asked to investigate something, report findings and stop — do not
   proceed to fix what you found without being told to.
 - The corrected v0 data model (see spec §2) introduces real changes to the
-  prototype's shape (discriminated card kinds, formal container ownership,
-  stored card height, schema versioning). These are intentional and
-  in-scope; everything else about the data model that isn't called out as
-  corrected should be treated as the target shape for the new schema once
-  phase 2 (schema alignment) concludes.
+  prototype's shape (discriminated card kinds, stored card height, schema
+  versioning) — container membership was one such change (formal
+  `parentId` ownership) but was reverted in v0.1 back to the prototype's
+  spatial model, see spec §2.3 and `ctx/notes/260916-v0.1-spatial-containers.md`.
+  These are intentional and in-scope; everything else about the data model
+  that isn't called out as corrected should be treated as the target shape
+  for the new schema once phase 2 (schema alignment) concludes.
 
 ## Stack (resolved in prototype-migration phase 3)
 

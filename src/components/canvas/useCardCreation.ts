@@ -5,7 +5,7 @@
 // is Stage 7's `clipboard/` module; this hook only owns what's inseparable
 // from card-kind behavior itself.
 
-import { useSetAtom } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import type { RefObject } from 'react'
 import { useEffect } from 'react'
 import { applyLinkMetadata } from '../../cards/applyLinkMetadata'
@@ -22,6 +22,7 @@ import {
 } from '../../cards/imageFile'
 import { newImageCard, newLinkCard, newTextCard } from '../../cards/newCard'
 import { isPlainUrl } from '../../cards/urlSlurp'
+import { hasNodeClipboardContentAtom } from '../../clipboard/nodeClipboard'
 import { generateId } from '../../schema/legacy'
 import type { CardNode, Node, NodeId } from '../../schema/node'
 import {
@@ -46,6 +47,7 @@ export function useCardCreation({
   const addNode = useSetAtom(addNodeAtom)
   const replaceNode = useSetAtom(replaceNodeAtom)
   const updateLink = useSetAtom(updateLinkAtom)
+  const hasNodeClipboardContent = useAtomValue(hasNodeClipboardContentAtom)
 
   function pointFromEvent(clientX: number, clientY: number) {
     return worldPoint(
@@ -67,23 +69,27 @@ export function useCardCreation({
     )
   }
 
+  // Whichever card's caption is actively focused, if any — the strongest,
+  // most unambiguous "convert this one" signal (the user's cursor is
+  // literally in its text), unlike merely having it selected (spec
+  // §5.3/§5.4).
+  function focusedTargetCard(): { id: NodeId; node: CardNode } | undefined {
+    const focusedId = (
+      document.activeElement as HTMLElement | null
+    )?.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId
+    if (!focusedId) return undefined
+    const node = nodesById.get(focusedId)
+    return node?.type === 'card' ? { id: focusedId, node } : undefined
+  }
+
   // The card a paste should convert in place, per spec §5.3/§5.4: whichever
   // card's caption is actively focused, else the single selected card, if
   // any — never a container (containers aren't convertible) or a
   // multi-selection (ambiguous).
-  // CRAP scoring penalizes this hook's functions for 0% coverage —
-  // component/interaction tests aren't a required tier for v0 (spec §13);
-  // real coverage comes from e2e (e2e/*.spec.ts), which fallow's static
-  // analysis can't see. Same precedent as useBoardInteraction.ts (Stage 5).
   // fallow-ignore-next-line complexity
   function pasteTargetCard(): { id: NodeId; node: CardNode } | undefined {
-    const focusedId = (
-      document.activeElement as HTMLElement | null
-    )?.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId
-    if (focusedId) {
-      const node = nodesById.get(focusedId)
-      if (node?.type === 'card') return { id: focusedId, node }
-    }
+    const focused = focusedTargetCard()
+    if (focused) return focused
     if (selection.size === 1) {
       const [id] = selection
       const node = id !== undefined ? nodesById.get(id) : undefined
@@ -157,6 +163,20 @@ export function useCardCreation({
     function onPaste(e: ClipboardEvent) {
       const clipboardData = e.clipboardData
       if (!clipboardData) return
+      // A populated in-app node clipboard (a deliberate, just-performed
+      // ⌘/Ctrl+C) takes priority over incidental OS-clipboard image/URL
+      // content, unless a card's caption is *actively focused* — the only
+      // signal unambiguous enough to mean "convert this specific card"
+      // rather than "restore what I just copied." Merely having a card
+      // *selected* isn't enough to override it: copying a card leaves it
+      // selected, so without this the "single selected card" fallback in
+      // `pasteTargetCard` would convert the very card the user just copied
+      // instead of ever reaching the in-app paste. Otherwise a stale link
+      // or image sitting on the OS clipboard from outside the app would
+      // silently hijack every paste instead of restoring what was just
+      // copied in-app (spec §7; see useClipboardShortcuts.ts's
+      // `handlePaste` for the other half of this priority order).
+      if (hasNodeClipboardContent && !focusedTargetCard()) return
       const imageFile = getImageFileFromClipboard(clipboardData)
       if (imageFile) {
         e.preventDefault()

@@ -68,29 +68,57 @@ Rules to preserve from current behavior:
 - A card of any kind may have caption text (`content`); image/link cards
   hide the caption textarea when empty and not selected.
 
-### 2.3 Container nesting — formal ownership (per Q5)
+### 2.3 Container nesting — spatial ("sticky") membership (v0.1, reverting Q5)
 
-Current behavior is purely spatial (no `parentId`): dragging a container
-carries along whatever overlaps it at drag-start, with no stored
-relationship. The corrected v0 model **adds an explicit ownership
-relationship** (e.g. `parentId` on a node), while preserving the exact UX:
+**v0.1 supersedes this section's original v0 decision.** v0 added a formal,
+stored `parentId` ownership field (per Q5, see
+`ctx/notes/260915-prototype-migration-phase1-questionnaire.md`), assigned
+explicitly on drop, on ctrl/cmd-drag container creation, and remapped on
+copy/paste and ⌘/Ctrl+D duplicate. In practice this needed bespoke
+assignment/remapping logic at every one of those mutation sites, and each
+one accumulated its own bug independently (auto-parenting on drag-in,
+z-order at container creation, relationship-loss on paste, the same on
+duplicate, duplicate z-order interleaving, and a dragged node's z-order
+during the gesture) over the course of implementing and fixing it. The
+`parentId` field is **removed from the schema entirely** (schema v2,
+"v0.1" — see `ctx/notes/260916-v0.1-spatial-containers.md` for the full
+write-up and rationale) and container membership reverts to the original
+prototype's model: **purely spatial, re-derived fresh every time it's
+needed, never stored**.
 
-- When a node is dropped such that it overlaps a container, it becomes a
-  child of the container it overlaps *most* (by overlap area), with no
-  additional UI and no user-facing concept of "assigning a parent."
-- Dragging a container moves all of its formal descendants (recursively).
+- What "contains" what is answered by bounding-box geometry alone
+  (`containers/containment.ts`), computed at the moment it's needed — e.g.
+  once, at the start of a drag (`computeCarryIds`) — never continuously and
+  never persisted.
+- Dragging a container carries along every node whose box overlaps its own,
+  except a container that *fully encloses* it (the ancestor-exclusion fix:
+  an ancestor "overlaps" a descendant just as much as the reverse, so
+  fully-enclosing containers are excluded from what a dragged node carries).
+  This is a single flat pass over every other node, not a tree walk — a
+  card nested several containers deep is picked up directly because its box
+  geometrically overlaps the outermost dragged container's rect too.
 - Dragging a container that is itself nested inside another container moves
-  only that container and its own descendants — never its ancestor(s) —
-  matching the deeply-nested-group bug fix already made in the prototype
-  (dev-input.json, 2026-09-11 19:30).
-- A node with no container overlapping it at drop time has no parent (sits
-  on the raw canvas).
-- Paste always lands outside of any container (never adopted on paste), per
-  existing behavior — see §7.
-- No-fly-zone, containment-test, and other spatially-derived behaviors from
-  the prototype should be re-derived from this explicit relationship rather
-  than recomputed by bounding-box overlap, but must produce the same
-  observable behavior as today.
+  only that container and whatever it spatially contains — never its
+  enclosing container(s) — matching the deeply-nested-group bug fix already
+  made in the prototype (dev-input.json, 2026-09-11 19:30).
+- Paste and ⌘/Ctrl+D duplicate need no explicit relationship-preservation
+  logic at all: both already apply one uniform offset to every copied/
+  duplicated node's position (not a per-node recompute), which by itself
+  preserves relative spatial arrangement — and so, automatically, whatever
+  was spatially contained stays spatially contained.
+- Paste still always lands outside of any *existing* container (never
+  adopted on paste) — see §7 — by checking the whole copied set's bounding
+  box against existing containers, same as before.
+- Container render/paint order (DOM order is the only z-index mechanism —
+  see §4.5) is a depth-first walk derived from the same geometry: a
+  container's "parent," for ordering purposes, is whichever other container
+  most tightly (smallest-area) encloses it. This still keeps a newly-drawn
+  or newly-duplicated container's whole subtree painting cleanly above
+  everything before it, exactly as the formal-ownership version did — see
+  `containers/renderOrder.ts`.
+- No-fly-zone and other spatially-derived behaviors were never migrated
+  away from bounding-box overlap in the first place (per this reversal),
+  so they're already consistent with the model above.
 
 ### 2.4 Card geometry — height is stored (per Q4)
 
@@ -264,9 +292,9 @@ respect.
   cell of clearance above and below). It can still be placed fully inside
   the container (below the zone) or fully above the container (above the
   zone).
-- Dragging a container carries its formal descendants (§2.3) and, when the
-  container is part of a multi-selection, the rest of that selection too —
-  merged so nothing double-moves.
+- Dragging a container carries everything spatially inside it (§2.3) and,
+  when the container is part of a multi-selection, the rest of that
+  selection too — merged so nothing double-moves.
 - Dragging any node that's part of a multi-selection carries the whole
   selection, preserving relative positions.
 - A container's body is not itself a drag surface — only its top handle bar
@@ -424,11 +452,17 @@ Two independent, coexisting paste paths:
    **not** currently carried over on copy/paste — preserve this limitation.
    - Each repeated paste of the same copy offsets further (a staircase),
      matching repeated duplicate behavior.
-   - A paste always lands outside of every existing container — group
-     membership is spatial/formal-child-on-drop (§2.3), and an unintended
-     "adopted by a container" result on paste is explicitly avoided by
-     pushing the paste position out along the staircase diagonal until clear
-     of every container's bounds.
+   - A paste never gets adopted by an *existing* container it happens to
+     land on or near — group membership is purely spatial (§2.3), and that
+     unintended result is explicitly avoided by pushing the paste position
+     out along the staircase diagonal until clear of every existing
+     container's bounds. This is about *existing* containers only, though:
+     if a container was copied together with its own spatially-contained
+     child, the paste preserves that relationship between the two pasted
+     copies automatically — one uniform offset is applied to the whole
+     copied set (not a per-node recompute), so their relative positions,
+     and so their spatial containment, survive with fresh ids and no
+     explicit relationship-tracking needed.
    - If the paste lands outside the current viewport, the view pans (without
      changing zoom) to bring it fully into view.
 2. **System clipboard integration**, layered on top of #1:

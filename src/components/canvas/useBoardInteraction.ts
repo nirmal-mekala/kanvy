@@ -1,16 +1,20 @@
 // Selection, dragging, resizing, marquee-select, and Ctrl/Cmd+drag
 // container creation (spec §4.3, §4.4, §4.5) — extracted out of Canvas.tsx
 // to keep that component's cognitive complexity manageable. Ported from
-// the prototype's Board.jsx/Card.jsx/Group.jsx pointer-event dance, but
-// re-derives container membership from the formal `parentId` relationship
-// (spec §2.3) rather than a spatial overlap test performed at drag-start.
+// the prototype's Board.jsx/Card.jsx/Group.jsx pointer-event dance,
+// including its spatial ("sticky") container membership model (v0.1,
+// ctx/notes/260915-kanvy-spec.md §2.3): there's no stored ownership field —
+// what a dragged container carries along is recomputed fresh at drag-start
+// from x/y/w/h, every time.
 
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { RefObject } from 'react'
 import { useMemo, useRef, useState } from 'react'
-import { computeParentIdOnDrop } from '../../containers/assignParent'
+import {
+  computeCarryIds,
+  containersContainingPoint,
+} from '../../containers/containment'
 import { createContainer } from '../../containers/createContainer'
-import { getDescendantIds } from '../../containers/descendants'
 import {
   BIG_TEXT_MIN_H,
   BIG_TEXT_MIN_W,
@@ -25,11 +29,11 @@ import {
   snapToGridMidpoint,
   snapY,
 } from '../../geometry/snap'
-import type { CardNode, ContainerNode, Node, NodeId } from '../../schema/node'
+import type { CardNode, Node, NodeId } from '../../schema/node'
 import {
   addNodeAtom,
+  bringToFrontAtom,
   moveNodesAtom,
-  setParentIdAtom,
   updateNodeAtom,
 } from '../../state/atoms/nodes'
 import {
@@ -74,6 +78,7 @@ interface DragState {
   carryOrigins: Map<NodeId, { x: number; y: number }>
   lastX: number
   lastY: number
+  broughtToFront: boolean
 }
 
 interface ResizeState {
@@ -148,6 +153,34 @@ export function resizeRect(
   return { x, y, w: Math.max(minW, w), h: Math.max(minH, h) }
 }
 
+/**
+ * Brings the grabbed node (and whatever it's carrying) to the front the
+ * moment a drag actually starts moving, so it paints above whatever it
+ * crosses for the whole gesture — container render order (renderOrder.ts)
+ * only gets recomputed when geometry actually changes, so without this a
+ * dragged container would keep its pre-drag DOM position (and so z-order)
+ * the entire time it's being moved, letting it visually disappear behind
+ * unrelated content it's dragged over. A no-op after the first call for a
+ * given `state`.
+ */
+function bringDragToFrontOnce(
+  state: DragState,
+  bringToFront: (ids: readonly NodeId[]) => void,
+) {
+  if (state.broughtToFront) return
+  state.broughtToFront = true
+  bringToFront([state.grabId, ...state.carryOrigins.keys()])
+}
+
+// This hook's cognitive-complexity score is driven almost entirely by its
+// hook-call count (one `useSetAtom`/`useAtomValue` per board action it
+// exposes), not by nested branching — `bringToFrontAtom` (added for the
+// drag z-order fix above) tipped it from just-under to just-over the
+// threshold. Splitting it further would fight the "extracted out of
+// Canvas.tsx to keep complexity manageable" boundary this file already is;
+// same 0%-unit-coverage precedent as its handlers below (spec §13, real
+// coverage is e2e's).
+// fallow-ignore-next-line complexity
 export function useBoardInteraction({
   nodes,
   view,
@@ -163,7 +196,7 @@ export function useBoardInteraction({
   const moveNodes = useSetAtom(moveNodesAtom)
   const updateNode = useSetAtom(updateNodeAtom)
   const addNode = useSetAtom(addNodeAtom)
-  const setParentId = useSetAtom(setParentIdAtom)
+  const bringToFront = useSetAtom(bringToFrontAtom)
 
   const nodesById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
@@ -203,19 +236,8 @@ export function useBoardInteraction({
   // Every container whose bounds contain a world point, innermost first —
   // geometric rather than DOM hit-testing, so which one "wins" doesn't
   // depend on paint order (see the prototype's `groupsContainingPoint`).
-  // fallow-ignore-next-line complexity
-  function containersContainingPoint(worldX: number, worldY: number) {
-    return nodes
-      .filter(
-        // fallow-ignore-next-line complexity
-        (node): node is ContainerNode =>
-          node.type === 'container' &&
-          worldX >= node.x &&
-          worldX <= node.x + node.w &&
-          worldY >= node.y &&
-          worldY <= node.y + node.h,
-      )
-      .sort((a, b) => a.w * a.h - b.w * b.h)
+  function containersAtPoint(worldX: number, worldY: number) {
+    return containersContainingPoint({ x: worldX, y: worldY }, nodes)
   }
 
   // An edge is select-only (spec §4.3: "click a card/container/edge:
@@ -229,27 +251,35 @@ export function useBoardInteraction({
 
   // ---- Node drag: a card's whole body, or a container's drag handle ----
 
-  // The rest of a multi-selection (and, for a container, its descendants)
-  // carries along with the grabbed node once a drag actually starts (spec
-  // §4.4/§4.5) — split out of handleNodePointerDown purely to keep that
-  // function's complexity under Biome's threshold.
+  // The rest of a multi-selection (and, for a container, whatever it
+  // spatially encloses) carries along with the grabbed node once a drag
+  // actually starts (spec §4.4/§4.5) — split out of handleNodePointerDown
+  // purely to keep that function's complexity under Biome's threshold.
+  // Computed once, here, at drag-start — never recomputed mid-drag (matches
+  // the prototype's `getContainedOrigins`/`Group.jsx` exactly).
   function beginNodeDrag(id: NodeId, node: Node, nextSelection: Set<NodeId>) {
-    const descendantIds =
+    const spatialCarryIds =
       node.type === 'container'
-        ? getDescendantIds(id, nodes)
+        ? new Set(
+            computeCarryIds(
+              { x: node.x, y: node.y, w: node.w, h: node.h },
+              id,
+              nodes,
+            ),
+          )
         : new Set<NodeId>()
     const selectionCarryIds =
       nextSelection.size > 1 && nextSelection.has(id)
         ? [...nextSelection].filter(
             (otherId): otherId is NodeId =>
               otherId !== id &&
-              !descendantIds.has(otherId) &&
+              !spatialCarryIds.has(otherId) &&
               nodesById.has(otherId),
           )
         : []
 
     const origins = new Map<NodeId, { x: number; y: number }>()
-    for (const carryId of [...descendantIds, ...selectionCarryIds]) {
+    for (const carryId of [...spatialCarryIds, ...selectionCarryIds]) {
       const carried = nodesById.get(carryId)
       if (carried) origins.set(carryId, { x: carried.x, y: carried.y })
     }
@@ -285,6 +315,7 @@ export function useBoardInteraction({
       carryOrigins,
       lastX: node.x,
       lastY: node.y,
+      broughtToFront: false,
     }
     e.currentTarget.setPointerCapture(e.pointerId)
   }
@@ -336,6 +367,8 @@ export function useBoardInteraction({
     const state = dragRef.current
     if (!state) return
 
+    bringDragToFrontOnce(state, bringToFront)
+
     const dx = (e.clientX - state.startX) / view.zoom
     const dy = (e.clientY - state.startY) / view.zoom
     const { x: finalX, y: finalY } = dragTargetPosition(
@@ -365,18 +398,8 @@ export function useBoardInteraction({
     } catch {
       // ignore
     }
-
-    // Drop-by-largest-overlap parent (re)assignment (spec §2.3) — only for
-    // the node actually grabbed. A container's carried descendants keep
-    // their existing parent (they moved along, not independently); other
-    // multi-selection siblings get re-evaluated on their own drag.
-    const rect: Rect = {
-      x: state.lastX,
-      y: state.lastY,
-      w: state.w,
-      h: state.h,
-    }
-    setParentId(state.grabId, computeParentIdOnDrop(state.grabId, rect, nodes))
+    // Nothing to assign on drop (spec §2.3, v0.1) — container membership is
+    // purely spatial, re-derived fresh the next time anything needs it.
   }
 
   // ---- Resize: container border/corner handles (always), big-text card handles ----
@@ -452,7 +475,7 @@ export function useBoardInteraction({
       const target = e.target as HTMLElement
       const clickNodeId =
         target.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId ??
-        containersContainingPoint(worldPt.x, worldPt.y)[0]?.id ??
+        containersAtPoint(worldPt.x, worldPt.y)[0]?.id ??
         null
       creatingContainerRef.current = {
         startScreenX: screenX,
@@ -464,7 +487,7 @@ export function useBoardInteraction({
     }
 
     const worldPt = toWorld(e.clientX, e.clientY)
-    const containing = containersContainingPoint(worldPt.x, worldPt.y)
+    const containing = containersAtPoint(worldPt.x, worldPt.y)
     marqueeRef.current = {
       startScreenX: screenX,
       startScreenY: screenY,
@@ -524,7 +547,6 @@ export function useBoardInteraction({
     updateMarquee(e)
   }
 
-  // fallow-ignore-next-line complexity
   function finishCreatingContainer() {
     const state = creatingContainerRef.current
     if (!state) return
@@ -538,6 +560,11 @@ export function useBoardInteraction({
         w: finalRect.w / view.zoom,
         h: finalRect.h / view.zoom,
       }
+      // Whatever the drawn box spatially swept up is automatically "in" the
+      // new container from now on (spec §2.3/§4.5, v0.1) — nothing to
+      // record; the next drag of either one re-derives it fresh from
+      // geometry (containers/containment.ts's `computeCarryIds`), and it
+      // renders beneath what it encloses immediately (renderOrder.ts).
       const container = createContainer(worldRect)
       addNode(container)
       setSelection(new Set([container.id]))

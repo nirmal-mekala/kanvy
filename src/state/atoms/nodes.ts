@@ -32,13 +32,14 @@ import { atomFamily } from './atomFamily'
 import { pruneOrphanedImages } from './images'
 
 /**
- * Fields common to every node kind (position/size, accent color, container
- * membership, task status). Kind-specific fields (`content`, `size`,
- * `imageId`, `link`, `pattern`) aren't patchable here — `keyof Node` for the
- * CardNode/ContainerNode union only includes what's common to all variants
- * anyway, and kind-specific edits (a card's caption, a kind conversion) get
- * their own actions in a later stage (cards/, Stage 6) rather than a loose
- * generic patch.
+ * Fields common to every node kind (position/size, accent color, task
+ * status). Kind-specific fields (`content`, `size`, `imageId`, `link`,
+ * `pattern`) aren't patchable here — `keyof Node` for the CardNode/
+ * ContainerNode union only includes what's common to all variants anyway,
+ * and kind-specific edits (a card's caption, a kind conversion) get their
+ * own actions in a later stage (cards/, Stage 6) rather than a loose
+ * generic patch. Container membership isn't a field at all (v0.1, spec
+ * §2.3) — it's derived purely from x/y/w/h, so there's nothing to patch.
  */
 interface NodeCommonPatch {
   x?: number
@@ -46,7 +47,6 @@ interface NodeCommonPatch {
   w?: number
   h?: number
   color?: ColorKey
-  parentId?: NodeId
   task?: { status: TaskStatus }
 }
 
@@ -60,12 +60,6 @@ export const nodeFamily = atomFamily((id: NodeId) =>
 
 function nowISO(): string {
   return new Date().toISOString()
-}
-
-/** Returns `node` with `parentId` removed entirely (not set to `undefined` — exactOptionalPropertyTypes). */
-function withoutParent(node: Node): Node {
-  const { parentId: _parentId, ...rest } = node
-  return rest as Node
 }
 
 /** Returns `node` with `task` removed entirely (not set to `undefined` — exactOptionalPropertyTypes). */
@@ -239,34 +233,6 @@ export const moveNodesAtom = atom(
 )
 
 /**
- * Sets or clears `parentId` for one node (drop-by-largest-overlap
- * assignment, spec §2.3) — a dedicated action rather than folding into
- * `updateNodeAtom`'s patch, since clearing a parent means removing the
- * field entirely (`exactOptionalPropertyTypes`), not patching it to
- * `undefined`.
- */
-export const setParentIdAtom = atom(
-  null,
-  (_get, set, id: NodeId, parentId: NodeId | undefined) => {
-    const now = nowISO()
-    set(updateBoardAtom, (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id || node.parentId === parentId) return node
-        changed = true
-        const next = parentId === undefined ? withoutParent(node) : node
-        return {
-          ...next,
-          ...(parentId !== undefined ? { parentId } : {}),
-          updatedAt: now,
-        }
-      })
-      return changed ? { ...board, nodes } : board
-    })
-  },
-)
-
-/**
  * Patches a link card's fetched-metadata fields once a `fetchLinkMetadata`
  * call (spec §5.4) resolves or fails — a no-op if the card was converted
  * away from `kind: 'link'` (or deleted) before the fetch settled.
@@ -284,6 +250,33 @@ export const updateLinkAtom = atom(
         return { ...node, link: { ...node.link, ...patch }, updatedAt: now }
       })
       return changed ? { ...board, nodes } : board
+    })
+  },
+)
+
+/**
+ * Moves `ids` to the end of `nodes` (array order doubles as z-index — phase2
+ * schema §1), preserving the relative order of the moved set and of
+ * everyone left behind. Used to bring a node (and whatever it's carrying)
+ * to the front the moment a drag actually starts, so it paints above
+ * whatever it's dragged over for the *whole* gesture — container render
+ * order (renderOrder.ts) only gets recomputed as geometry actually
+ * changes, so without this a dragged container could visually sit
+ * *behind* unrelated content it passes over the entire time it's moving.
+ */
+export const bringToFrontAtom = atom(
+  null,
+  (_get, set, ids: readonly NodeId[]) => {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    set(updateBoardAtom, (board: Board) => {
+      if (!board.nodes.some((node) => idSet.has(node.id))) return board
+      const rest = board.nodes.filter((node) => !idSet.has(node.id))
+      const front = board.nodes.filter((node) => idSet.has(node.id))
+      const alreadyAtEnd = board.nodes
+        .slice(board.nodes.length - front.length)
+        .every((node) => idSet.has(node.id))
+      return alreadyAtEnd ? board : { ...board, nodes: [...rest, ...front] }
     })
   },
 )
@@ -306,11 +299,11 @@ export const reorderNodesAtom = atom(
  * Removes a mixed set of node/edge ids in one step (spec §4.2's
  * Backspace/Delete). Deleting a container does not cascade-delete its
  * descendants — matching the prototype's `removeItems`
- * (ctx/support/260915-prototype-source/src/state/useBoard.js) — but a
- * surviving child's now-dangling `parentId` is cleared so it isn't left
- * referencing a deleted node. Also drops any edge touching a removed node
- * and prunes orphaned images (spec §2.6). Records the removed ids as the
- * undo step's `restoreSelection` (spec §8/Q11).
+ * (ctx/support/260915-prototype-source/src/state/useBoard.js) — and, with
+ * no stored ownership field (v0.1, spec §2.3), there's nothing left
+ * dangling to clean up on a survivor either. Also drops any edge touching a
+ * removed node and prunes orphaned images (spec §2.6). Records the removed
+ * ids as the undo step's `restoreSelection` (spec §8/Q11).
  */
 export const removeEntitiesAtom = atom(
   null,
@@ -319,13 +312,7 @@ export const removeEntitiesAtom = atom(
     set(
       updateBoardAtom,
       (board: Board) => {
-        const nodes = board.nodes
-          .filter((node) => !idSet.has(node.id))
-          .map((node) =>
-            node.parentId && idSet.has(node.parentId)
-              ? withoutParent(node)
-              : node,
-          )
+        const nodes = board.nodes.filter((node) => !idSet.has(node.id))
         const edges = board.edges.filter(
           (edge) =>
             !idSet.has(edge.id) &&

@@ -110,7 +110,47 @@ describe('nodes atoms', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 
-  it('removeEntitiesAtom drops a node, its edges, and orphaned images, and clears dangling parentId', async () => {
+  it('bringToFrontAtom moves the given ids to the end, preserving relative order of both groups', async () => {
+    const { store, addNodeAtom, bringToFrontAtom, boardAtom } =
+      await freshState()
+    for (const id of ['a', 'b', 'c', 'd']) store.set(addNodeAtom, textNode(id))
+
+    store.set(bringToFrontAtom, ['b', 'd'])
+
+    const ids = new Set(['a', 'b', 'c', 'd'])
+    expect(
+      store
+        .get(boardAtom)
+        .nodes.map((n) => n.id)
+        .filter((id) => ids.has(id)),
+    ).toEqual(['a', 'c', 'b', 'd'])
+  })
+
+  it('bringToFrontAtom is a no-op given an empty id list', async () => {
+    const { store, addNodeAtom, bringToFrontAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('a'))
+    const before = store.get(boardAtom)
+
+    store.set(bringToFrontAtom, [])
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('bringToFrontAtom is a no-op (no board reference change) when the ids are already at the end', async () => {
+    const { store, addNodeAtom, bringToFrontAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('a'))
+    store.set(addNodeAtom, textNode('b'))
+    store.set(bringToFrontAtom, ['b'])
+    const before = store.get(boardAtom)
+
+    store.set(bringToFrontAtom, ['b'])
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('removeEntitiesAtom drops a node, its edges, and orphaned images (but not a spatially-contained survivor, per spec §2.3 v0.1: no cascade, nothing to clean up)', async () => {
     const { store, addNodeAtom, addEdgeAtom, removeEntitiesAtom, boardAtom } =
       await freshState()
 
@@ -126,7 +166,7 @@ describe('nodes atoms', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     }
-    const child = textNode('child1', { parentId: 'container1' })
+    const child = textNode('child1')
     store.set(addNodeAtom, container)
     store.set(addNodeAtom, child)
     store.set(addEdgeAtom, {
@@ -146,7 +186,6 @@ describe('nodes atoms', () => {
     const ids = board.nodes.map((n) => n.id)
     expect(ids).not.toContain('container1')
     expect(ids).toContain('child1')
-    expect(board.nodes.find((n) => n.id === 'child1')?.parentId).toBeUndefined()
     expect(board.edges).toEqual([])
   })
 

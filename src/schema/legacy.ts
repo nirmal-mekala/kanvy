@@ -12,8 +12,11 @@
 //      src/state/useBoard.js (`normalizeBoard`) for the shape this
 //      normalizes away from.
 //   2. Legacy v0-shaped documents (already `nodes`/`edges`/`images`) that
-//      are simply missing `version` or per-entity timestamps — backfilled
-//      in place rather than reconstructed.
+//      are simply missing `version` or per-entity timestamps, OR are a
+//      pre-v0.1 (`version: 1`) document still carrying the formal `parentId`
+//      ownership field that v0.1 (spec §2.3) removed — backfilled/stripped
+//      in place rather than reconstructed, and always stamped with the
+//      current `SCHEMA_VERSION` regardless of what version they arrived as.
 
 import { customAlphabet } from 'nanoid'
 import { SCHEMA_VERSION } from './board'
@@ -108,7 +111,6 @@ function normalizeLegacyCard(
     w: base.w,
     h,
     color: base.color ?? 'gray',
-    ...(base.parentId !== undefined ? { parentId: base.parentId } : {}),
     ...(task !== undefined ? { task } : {}),
     createdAt: base.createdAt,
     updatedAt: base.updatedAt,
@@ -136,7 +138,6 @@ function normalizeLegacyGroup(
     w: base.w,
     h: base.h,
     color: base.color ?? 'gray',
-    ...(base.parentId !== undefined ? { parentId: base.parentId } : {}),
     ...(task !== undefined ? { task } : {}),
     createdAt: base.createdAt,
     updatedAt: base.updatedAt,
@@ -197,6 +198,16 @@ function normalizePreV0Board(
   }
 }
 
+/**
+ * Drops a v1 document's `parentId` (schema v2/"v0.1" removed formal
+ * container ownership — see ctx/notes/260915-kanvy-spec.md §2.3). Container
+ * membership re-derives purely from x/y/w/h, still present and untouched.
+ */
+function stripParentId(node: Record<string, unknown>): Record<string, unknown> {
+  const { parentId: _parentId, ...rest } = node
+  return rest
+}
+
 function backfillV0Board(
   parsed: Record<string, unknown>,
   now: string,
@@ -204,10 +215,11 @@ function backfillV0Board(
   const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
   const edges = Array.isArray(parsed.edges) ? parsed.edges : []
   return {
-    version:
-      typeof parsed.version === 'number' ? parsed.version : SCHEMA_VERSION,
+    // Always stamp the current version — a v1 document migrating here has
+    // just had `parentId` stripped, so it's no longer meaningfully "v1".
+    version: SCHEMA_VERSION,
     nodes: nodes.map((node) =>
-      isRecord(node) ? backfillTimestamps(node, now) : node,
+      isRecord(node) ? stripParentId(backfillTimestamps(node, now)) : node,
     ),
     edges: edges.map((edge) =>
       isRecord(edge) ? backfillTimestamps(edge, now) : edge,

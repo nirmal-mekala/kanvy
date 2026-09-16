@@ -20,6 +20,18 @@ interface ClipboardState {
 /** `null` when nothing's been copied yet this session. Not exported — only read/written via the two actions below. */
 const nodeClipboardAtom = atom<ClipboardState | null>(null)
 
+/**
+ * Whether the in-app node clipboard currently has anything to paste — read
+ * by both paste-handling hooks so a populated clipboard (a deliberate,
+ * just-performed ⌘/Ctrl+C) takes priority over incidental OS-clipboard
+ * content (an unrelated image/URL sitting there from outside the app),
+ * rather than the OS-clipboard branches silently winning every time.
+ */
+export const hasNodeClipboardContentAtom = atom((get) => {
+  const clip = get(nodeClipboardAtom)
+  return !!clip && clip.nodes.length > 0
+})
+
 /** Copies `nodes` (a snapshot, not a live reference) — returns `false` (a no-op) if `nodes` is empty. */
 export const copyToNodeClipboardAtom = atom(
   null,
@@ -33,7 +45,16 @@ export const copyToNodeClipboardAtom = atom(
   },
 )
 
-/** Returns `withoutParent`-ed, freshly-id'd, offset copies of the clipboard's nodes, or `[]` if nothing's copied. */
+/**
+ * Freshly-id'd, offset copies of the clipboard's nodes, or `[]` if
+ * nothing's copied. One uniform offset is applied to every copied node
+ * (not a per-node recompute), which preserves relative positions — and so,
+ * with no stored ownership field to worry about, spatial containment
+ * relationships *within* the copied set survive automatically (spec
+ * §2.3/§7, v0.1). Since the whole set always lands clear of every existing
+ * container (`computePasteOffset`'s push-until-clear loop), a paste never
+ * gets spatially adopted by something that was already on the board.
+ */
 export const pasteFromNodeClipboardAtom = atom(
   null,
   (get, set, containers: readonly Rect[]): Node[] => {
@@ -53,19 +74,15 @@ export const pasteFromNodeClipboardAtom = atom(
     set(nodeClipboardAtom, { ...clip, pasteCount })
 
     const now = new Date().toISOString()
-    return clip.nodes.map((node) => {
-      // Paste always lands outside of every existing container (spec
-      // §2.3/§7) — group membership is formal-child-on-drop only, and paste
-      // never triggers a drop, so no pasted node keeps a `parentId`.
-      const { parentId: _parentId, ...withoutParent } = node
-      return {
-        ...withoutParent,
-        id: generateId(),
-        x: node.x + offset,
-        y: node.y + offset,
-        createdAt: now,
-        updatedAt: now,
-      } as Node
-    })
+    const idMap = new Map(clip.nodes.map((node) => [node.id, generateId()]))
+
+    return clip.nodes.map((node) => ({
+      ...node,
+      id: idMap.get(node.id) as string,
+      x: node.x + offset,
+      y: node.y + offset,
+      createdAt: now,
+      updatedAt: now,
+    }))
   },
 )

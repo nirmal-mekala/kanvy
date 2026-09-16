@@ -15,6 +15,7 @@ import { isEditableTarget } from '../../clipboard/dom'
 import { duplicateNodes } from '../../clipboard/duplicateNodes'
 import {
   copyToNodeClipboardAtom,
+  hasNodeClipboardContentAtom,
   pasteFromNodeClipboardAtom,
 } from '../../clipboard/nodeClipboard'
 import { panIntoView } from '../../clipboard/panIntoView'
@@ -49,6 +50,7 @@ export function useClipboardShortcuts({
   boardElRef: RefObject<HTMLDivElement | null>
 }) {
   const selection = useAtomValue(selectionAtom)
+  const hasNodeClipboardContent = useAtomValue(hasNodeClipboardContentAtom)
   const addNodes = useSetAtom(addNodesAtom)
   const removeEntities = useSetAtom(removeEntitiesAtom)
   const copyToNodeClipboard = useSetAtom(copyToNodeClipboardAtom)
@@ -64,10 +66,13 @@ export function useClipboardShortcuts({
       .map((node) => ({ x: node.x, y: node.y, w: node.w, h: node.h }))
   }
 
-  function panPastedIntoView(pasted: readonly Node[]) {
+  // Shared by paste and ⌘/Ctrl+D duplicate (spec §7's "snap to what just
+  // landed" behavior) — whatever new nodes just got added, pan the
+  // viewport to keep them fully visible without changing zoom.
+  function panNewNodesIntoView(newNodes: readonly Node[]) {
     const rect = boardElRef.current?.getBoundingClientRect()
-    if (!rect || pasted.length === 0) return
-    const box = boundingBox(pasted)
+    if (!rect || newNodes.length === 0) return
+    const box = boundingBox(newNodes)
     setView((v) =>
       panIntoView(box, v, { width: rect.width, height: rect.height }),
     )
@@ -78,13 +83,19 @@ export function useClipboardShortcuts({
     if (e.defaultPrevented) return // image/URL branches (useCardCreation.ts) already handled it
     if (isEditableTarget(e.target)) return // native textarea paste
 
-    if (selection.size > 0) {
+    // The in-app clipboard's own populated state gates this, not the
+    // *current* selection — copying, then deselecting before pasting (a
+    // completely normal flow) must still paste what was copied, and for a
+    // container (or anything else writing no text to the system clipboard)
+    // the old `selection.size > 0` gate meant paste silently did nothing at
+    // all once deselected.
+    if (hasNodeClipboardContent) {
       e.preventDefault()
       const pasted = pasteFromNodeClipboard(containerRects())
       if (pasted.length === 0) return
       addNodes(pasted)
       setSelection(pasted.map((node) => node.id))
-      panPastedIntoView(pasted)
+      panNewNodesIntoView(pasted)
       return
     }
 
@@ -167,10 +178,11 @@ export function useClipboardShortcuts({
   function tryDuplicate(e: KeyboardEvent, mod: boolean, key: string): boolean {
     if (!mod || key !== 'd') return false
     e.preventDefault()
-    const duplicates = duplicateNodes(selectedNodesSnapshot())
+    const duplicates = duplicateNodes(selectedNodesSnapshot(), containerRects())
     if (duplicates.length === 0) return true
     addNodes(duplicates)
     setSelection(duplicates.map((node) => node.id))
+    panNewNodesIntoView(duplicates)
     // "immediately focused for editing (single-card case)" — spec §4.2.
     if (duplicates.length === 1 && duplicates[0]?.type === 'card') {
       setFocusNodeId(duplicates[0].id)

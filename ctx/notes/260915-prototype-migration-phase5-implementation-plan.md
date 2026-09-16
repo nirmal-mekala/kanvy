@@ -100,7 +100,9 @@ src/
   colors/              # ColorKey/task-status/recency palette resolution (pure)
   cards/               # per-kind behavior: kind-conversion rules, URL-slurp detection,
                         # link-metadata fetch + retry/timeout
-  containers/          # parentId assignment on drop, descendant traversal, no-fly-zone
+  containers/          # spatial membership/carry, render-order nesting, no-fly-zone
+                        # (v0.1, spec §2.3 — was parentId assignment/traversal;
+                        # see ctx/notes/260916-v0.1-spatial-containers.md)
   clipboard/           # in-app node clipboard + OS clipboard integration, priority order
   components/
     canvas/            # Board surface, viewport pan/zoom, grid background
@@ -168,8 +170,9 @@ and later stages depend on earlier ones being correct.
 - `geometry/` : grid/snap math (X-axis grid snap, Y-axis gutter snap,
   `Y_SNAP_THRESHOLD`/`Y_SNAP_GUTTER`), anchor-point/side selection for
   edges, bezier curve generation with stable id-hashed bow, bounding-box/
-  overlap/containment tests re-derived from `parentId` (spec §2.3) rather
-  than recomputed spatially, no-fly-zone math (spec §4.4).
+  overlap/containment tests (spec §2.3 — originally re-derived from
+  `parentId`, since reverted to pure spatial recomputation, v0.1), no-fly-zone
+  math (spec §4.4).
 - `colors/` : `ColorKey` resolution incl. `gray`'s light/dark split,
   task-status palette, recency palette + threshold evaluation (spec §3,
   §6.3).
@@ -197,8 +200,10 @@ and later stages depend on earlier ones being correct.
   descendant drag (recursive, ancestor-excluding), multi-selection drag
   merge.
 - Resize (8-way handles): containers always, big-text cards only.
-- `containers/` : formal `parentId` assignment on drop-by-largest-overlap
-  (spec §2.3), recomputed only on drop, not continuously.
+- `containers/` : originally formal `parentId` assignment on drop-by-
+  largest-overlap (spec §2.3); v0.1 reverted this to spatial carry
+  computed fresh at drag-start (`computeCarryIds`) — see
+  ctx/notes/260916-v0.1-spatial-containers.md.
 
 ### Stage 6 — card-kind behavior & connections
 - `cards/` : kind-conversion rules (text↔image↔link, `size` reset to

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Board } from '../../schema/board'
+import { SCHEMA_VERSION } from '../../schema/board'
 import { exportBoard, parseImportedBoard } from './import'
 
 const board: Board = {
-  version: 1,
+  version: SCHEMA_VERSION,
   nodes: [],
   edges: [],
   images: {},

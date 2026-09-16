@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Board } from '../../schema/board'
+import { SCHEMA_VERSION } from '../../schema/board'
 import {
   createDebouncedSaver,
   loadBoard,
@@ -24,7 +25,7 @@ class MemoryStorage {
 }
 
 const validBoard: Board = {
-  version: 1,
+  version: SCHEMA_VERSION,
   nodes: [
     {
       id: 'c1',
@@ -113,17 +114,21 @@ describe('createDebouncedSaver', () => {
   })
 
   it('coalesces rapid saves into a single write after the delay', () => {
+    const boardWithContent = (content: string): Board => ({
+      ...validBoard,
+      nodes: [{ ...validBoard.nodes[0], content } as Board['nodes'][number]],
+    })
     const saver = createDebouncedSaver(400)
-    saver.save({ ...validBoard, version: 1 })
-    saver.save({ ...validBoard, version: 2 })
-    saver.save({ ...validBoard, version: 3 })
+    saver.save(boardWithContent('v1'))
+    saver.save(boardWithContent('v2'))
+    saver.save(boardWithContent('v3'))
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
 
     vi.advanceTimersByTime(400)
 
     const result = loadBoard()
     expect(result.ok).toBe(true)
-    expect(result.board.version).toBe(3)
+    expect(result.board.nodes[0]).toMatchObject({ content: 'v3' })
   })
 
   it('flush writes immediately and cancel drops the pending save', () => {
@@ -133,7 +138,15 @@ describe('createDebouncedSaver', () => {
     expect(loadBoard()).toEqual({ ok: true, board: validBoard })
 
     const saver2 = createDebouncedSaver(400)
-    saver2.save({ ...validBoard, version: 99 })
+    saver2.save({
+      ...validBoard,
+      nodes: [
+        {
+          ...validBoard.nodes[0],
+          content: 'never written',
+        } as Board['nodes'][number],
+      ],
+    })
     saver2.cancel()
     vi.advanceTimersByTime(400)
     expect(loadBoard()).toEqual({ ok: true, board: validBoard })

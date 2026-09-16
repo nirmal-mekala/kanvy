@@ -6,6 +6,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { ZoomIn, ZoomOut } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { sortContainersForRender } from '../../containers/renderOrder'
 import { anchorPoint } from '../../geometry/anchor'
 import { boundingBox } from '../../geometry/containment'
 import { GRID_SIZE } from '../../geometry/snap'
@@ -361,37 +362,48 @@ export function Canvas() {
         }}
       >
         {/* Containers render first so cards always paint on top of them
-            (plain DOM order, per array-order-as-z-index — phase2 schema §1). */}
-        {board.nodes
-          .filter((node) => node.type === 'container')
-          .map((node) => (
-            <Container
-              key={node.id}
-              node={node}
-              theme={theme}
-              viewMode={viewMode}
-              selected={selection.has(node.id)}
-              connectorsVisible={
-                connectingFromId === node.id || connectingHoverId === node.id
-              }
-              connectorActiveSide={
-                connectingFromId === node.id
-                  ? connectingFromSide
-                  : connectingHoverId === node.id
-                    ? connectingHoverSide
-                    : null
-              }
-              onDragHandlePointerDown={handleNodePointerDown}
-              onDragHandlePointerMove={handleNodePointerMove}
-              onDragHandlePointerUp={handleNodePointerUp}
-              onResizePointerDown={handleResizePointerDown}
-              onResizePointerMove={handleResizePointerMove}
-              onResizePointerUp={handleResizePointerUp}
-              onConnectorPointerDown={handleConnectorPointerDown}
-              onConnectorPointerMove={handleConnectingPointerMove}
-              onConnectorPointerUp={handlePointerUp}
-            />
-          ))}
+            (plain DOM order, per array-order-as-z-index — phase2 schema §1).
+            Among containers themselves, render order is a depth-first walk
+            of GEOMETRIC nesting (each subtree contiguous, in original array
+            order) — v0.1, spec §2.3: there's no stored parentId, so "who's
+            nested in whom" is derived fresh from x/y/w/h every render
+            (containers/renderOrder.ts). A flat depth sort isn't enough
+            either way — it would let a newly-created/duplicated container's
+            own subtree interleave with unrelated existing containers at the
+            same nesting depth, instead of that whole new subtree painting
+            cleanly above everything before it. */}
+        {sortContainersForRender(
+          board.nodes.filter(
+            (node): node is ContainerNode => node.type === 'container',
+          ),
+        ).map((node) => (
+          <Container
+            key={node.id}
+            node={node}
+            theme={theme}
+            viewMode={viewMode}
+            selected={selection.has(node.id)}
+            connectorsVisible={
+              connectingFromId === node.id || connectingHoverId === node.id
+            }
+            connectorActiveSide={
+              connectingFromId === node.id
+                ? connectingFromSide
+                : connectingHoverId === node.id
+                  ? connectingHoverSide
+                  : null
+            }
+            onDragHandlePointerDown={handleNodePointerDown}
+            onDragHandlePointerMove={handleNodePointerMove}
+            onDragHandlePointerUp={handleNodePointerUp}
+            onResizePointerDown={handleResizePointerDown}
+            onResizePointerMove={handleResizePointerMove}
+            onResizePointerUp={handleResizePointerUp}
+            onConnectorPointerDown={handleConnectorPointerDown}
+            onConnectorPointerMove={handleConnectingPointerMove}
+            onConnectorPointerUp={handlePointerUp}
+          />
+        ))}
 
         <EdgeLayer
           edges={board.edges}

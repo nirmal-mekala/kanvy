@@ -12,7 +12,7 @@ import { makeImageDataUri } from './fixtures/testImage'
 // for rendered edges, `.edge-direction-control__btn` for the minimal
 // direction toggle.
 //
-// Run and passing (all 15) via the playwright-remote-browser skill. This
+// Run and passing (all 18) via the playwright-remote-browser skill. This
 // run caught a real bug: the edge direction-toggle buttons had no click
 // at all (missing `stopPropagation`, same class of bug as the zoom/help
 // buttons — see AGENTS.md). The direction-toggle spec also had to stop
@@ -20,7 +20,12 @@ import { makeImageDataUri } from './fixtures/testImage'
 // curved bezier path) and dispatch straight to `.edge__hit` instead. A
 // later pass added the `image cards` and `big-text cards` describe
 // blocks (previously unwritten scenarios) — both passed cleanly, no app
-// bugs found there.
+// bugs found there. A later pass added a "node creation lands inside a
+// container" block, verifying a card created (double-click) or an image
+// dropped inside a container's bounds is carried along when that
+// container is later dragged — v0.1 (spec §2.3) made this automatic:
+// there's no `parentId` to assign at creation time, containment is purely
+// spatial (x/y/w/h), re-derived fresh whenever something is dragged.
 
 function textCard(id: string, x: number, y: number, content = '') {
   return {
@@ -56,6 +61,20 @@ function containerNode(id: string, x: number, y: number, w: number, h: number) {
 
 async function seed(page: import('@playwright/test').Page, board: unknown) {
   await seedBoard(page, board, 'kanvy.board')
+}
+
+// Autosave is debounced (500ms — state/persistence/storage.ts's
+// `createDebouncedSaver`), so reading node state back out of localStorage
+// right after a gesture needs to wait past it.
+async function readBoardNodes(
+  page: import('@playwright/test').Page,
+): Promise<{ id: string; type: string }[]> {
+  await page.waitForTimeout(600)
+  const raw = await page.evaluate(() => localStorage.getItem('kanvy.board'))
+  const board = JSON.parse(raw ?? '{"nodes":[]}') as {
+    nodes: { id: string; type: string }[]
+  }
+  return board.nodes
 }
 
 test.describe('card-kind behavior (spec §5)', () => {
@@ -464,5 +483,112 @@ test.describe('big-text cards (spec §5.2)', () => {
     expect(size.h % 16).toBe(0)
     expect(size.w).toBeGreaterThan(320)
     expect(size.h).toBeGreaterThan(240)
+  })
+})
+
+test.describe('node creation lands inside a container it is drawn/dropped in (spec §2.3, v0.1)', () => {
+  test('double-click on blank canvas creates a new text card', async ({
+    page,
+  }) => {
+    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
+    await page.goto('/')
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    await page.mouse.dblclick(boardBox.x + 200, boardBox.y + 200)
+
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+  })
+
+  test('double-clicking inside a container creates a card that is carried along when the container is later dragged', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [containerNode('c1', 100, 100, 300, 300)],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const box = await page
+      .locator('[data-node-id="c1"]:not(.node-connector)')
+      .boundingBox()
+    if (!box) throw new Error('container not rendered')
+
+    await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
+
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+    const nodes = await readBoardNodes(page)
+    const card = nodes.find((n) => n.type === 'card')
+
+    // Carried along when the container is dragged — the only observable
+    // proof of spatial containment there is, with no stored parentId.
+    const cardLoc = page.locator(
+      `[data-node-id="${card?.id}"]:not(.node-connector)`,
+    )
+    const before = await cardLoc.boundingBox()
+    if (!before) throw new Error('card not rendered')
+    const handle = page.locator(
+      '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
+    )
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    await page.mouse.move(handleBox.x + 10, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 10 + 60, handleBox.y + 5 + 60, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    const after = await cardLoc.boundingBox()
+    if (!after) throw new Error('card not rendered')
+    expect(after.x - before.x).toBeGreaterThan(30)
+    expect(after.y - before.y).toBeGreaterThan(30)
+  })
+
+  test('dropping an image file inside a container creates a card that is carried along when the container is later dragged', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [containerNode('c1', 100, 100, 300, 300)],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const box = await page
+      .locator('[data-node-id="c1"]:not(.node-connector)')
+      .boundingBox()
+    if (!box) throw new Error('container not rendered')
+
+    const dataUri = await makeImageDataUri(page, 100, 60)
+    await dispatchImageFileDrop(
+      page,
+      dataUri,
+      box.x + box.width / 2,
+      box.y + box.height / 2,
+    )
+
+    await expect(page.locator('.card--image')).toHaveCount(1)
+    const cardLoc = page.locator('.card--image')
+    const before = await cardLoc.boundingBox()
+    if (!before) throw new Error('card not rendered')
+    const handle = page.locator(
+      '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
+    )
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    await page.mouse.move(handleBox.x + 10, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 10 + 60, handleBox.y + 5 + 60, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    const after = await cardLoc.boundingBox()
+    if (!after) throw new Error('card not rendered')
+    expect(after.x - before.x).toBeGreaterThan(30)
+    expect(after.y - before.y).toBeGreaterThan(30)
   })
 })

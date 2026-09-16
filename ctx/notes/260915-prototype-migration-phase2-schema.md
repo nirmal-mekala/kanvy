@@ -37,7 +37,9 @@ interface NodeBase {
   w: number
   h: number                      // stored per prototype-migration phase 1 §2.4; rendered content is source of truth
   color: ColorKey                 // 'gray' | 'coral' | 'orange' | 'amber' | 'lime' | 'teal' | 'sky' | 'violet' | 'pink'
-  parentId?: NodeId                // formal ownership, prototype-migration phase 1 §2.3
+  // parentId?: NodeId was here (formal ownership, phase 1 §2.3) — removed
+  // in schema v2 ("v0.1"); superseded by spec §2.3's spatial-membership
+  // reversal, see ctx/notes/260916-v0.1-spatial-containers.md.
   task?: { status: 'todo' | 'blocked' | 'in_progress' | 'done' }  // (confirmed) nested shape
   createdAt: string                // ISO-8601
   updatedAt: string
@@ -192,9 +194,11 @@ Consequences of this choice, to carry into prototype-migration phase 2+/implemen
 
 - JSON Canvas's `group` node type has no formal parent/child relationship —
   containment is purely visual/geometric, matching the *prototype's*
-  pre-migration behavior. prototype-migration phase 1 §2.3 already decided to add `parentId`
-  formal ownership to containers — this is an intentional improvement over
-  JSON Canvas, not an alignment gap to close.
+  pre-migration behavior. prototype-migration phase 1 §2.3 decided to add
+  `parentId` formal ownership to containers as an intentional improvement
+  over JSON Canvas — since reverted in schema v2 ("v0.1", spec §2.3) back to
+  spatial/geometric containment, i.e. back in line with JSON Canvas after
+  all; see ctx/notes/260916-v0.1-spatial-containers.md.
 - JSON Canvas's `color` is a loose `canvasColor` (hex or one of 6 numbered
   presets). Kanvy's `ColorKey` stays the existing fixed 9-color Nord-derived
   palette (prototype-migration phase 1 §3) — no free-hex colors, no renumbering to match JSON
