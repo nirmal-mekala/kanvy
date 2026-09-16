@@ -9,7 +9,7 @@ export function CardLinkMeta({ link }: { link: LinkCard['link'] }) {
   return (
     <div className="card__link-meta">
       <a
-        className="card__link-title"
+        className="card__link-title no-drag"
         href={link.url}
         target="_blank"
         rel="noreferrer noopener"

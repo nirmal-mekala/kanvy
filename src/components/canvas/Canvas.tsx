@@ -16,11 +16,11 @@ import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { imagesAtom } from '../../state/atoms/images'
 import {
   setColorAtom,
+  setNodeHeightAtom,
   setPatternAtom,
   setTaskKindAtom,
   setTaskStatusAtom,
   setTextSizeAtom,
-  updateNodeAtom,
 } from '../../state/atoms/nodes'
 import { themeAtom } from '../../state/atoms/theme'
 import { viewModeAtom } from '../../state/atoms/viewMode'
@@ -61,7 +61,7 @@ export function Canvas() {
   const images = useAtomValue(imagesAtom)
   const theme = useAtomValue(themeAtom)
   const viewMode = useAtomValue(viewModeAtom)
-  const updateNode = useSetAtom(updateNodeAtom)
+  const setNodeHeight = useSetAtom(setNodeHeightAtom)
   const setEdgeDirection = useSetAtom(setEdgeDirectionAtom)
   const setColor = useSetAtom(setColorAtom)
   const setPattern = useSetAtom(setPatternAtom)
@@ -426,9 +426,7 @@ export function Canvas() {
               }
               autoFocus={focusNodeId === node.id}
               onAutoFocusHandled={() => setFocusNodeId(null)}
-              onHeightChange={(h) => {
-                if (h !== node.h) updateNode(node.id, { h })
-              }}
+              onHeightChange={(h) => setNodeHeight(node.id, h)}
               onContentChange={handleContentChange}
               onContentBlur={handleContentBlur}
               onPointerDown={handleNodePointerDown}

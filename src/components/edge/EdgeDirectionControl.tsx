@@ -25,7 +25,11 @@ export function EdgeDirectionControl({
   onChange: (direction: EdgeDirection) => void
 }) {
   return (
-    <div className="edge-direction-control" style={{ left: x, top: y }}>
+    <div
+      className="edge-direction-control"
+      style={{ left: x, top: y }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       {OPTIONS.map((option) => (
         <button
           key={option.value}

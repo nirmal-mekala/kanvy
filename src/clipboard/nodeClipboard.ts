@@ -40,12 +40,17 @@ export const pasteFromNodeClipboardAtom = atom(
     const clip = get(nodeClipboardAtom)
     if (!clip || clip.nodes.length === 0) return []
 
+    // The prototype increments its paste count *before* computing the
+    // staircase offset (Board.jsx's `pasteClipboard`), so the very first
+    // paste already lands one step off the original instead of exactly on
+    // top of it.
+    const pasteCount = clip.pasteCount + 1
     const offset = computePasteOffset(
-      clip.pasteCount,
+      pasteCount,
       boundingBox(clip.nodes),
       containers,
     )
-    set(nodeClipboardAtom, { ...clip, pasteCount: clip.pasteCount + 1 })
+    set(nodeClipboardAtom, { ...clip, pasteCount })
 
     const now = new Date().toISOString()
     return clip.nodes.map((node) => {

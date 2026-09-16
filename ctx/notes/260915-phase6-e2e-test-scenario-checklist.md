@@ -38,125 +38,126 @@ hijacked pointer capture before the button's click could fire; fixed in
 - [x] Zoom to fit (⌘/Ctrl+Shift+Enter): never zooms in past 100%, centers on combined bounding box with fixed padding
 
 ### Selection (spec §4.3) — Stage 5
-Specs written in `e2e/interaction.spec.ts` against Stage 5's actual DOM
-(`[data-node-id]`, `.card--selected`/`.container-node--selected`,
-`.container-node__drag-handle`, `.resize-handle--<dir>`), but **not run to a
-passing result** — same environment limitation noted under Stage 4 above
-(no local browser in this container; no network path from the host-Mac
-remote browser back into this container's dev server). Run `pnpm e2e` for
-real before checking any of these off.
-- [ ] Click selects a single card/container/edge
-- [ ] Shift/Ctrl/Cmd+click toggles additive selection
-- [ ] Marquee-select on blank canvas
-- [ ] Marquee starting inside a container's body excludes that container and its ancestors
+Specs in `e2e/interaction.spec.ts`, run via `playwright-remote-browser` —
+all pass. This run caught a real regression that made card selection fail
+for most of a card's clickable surface: `CardBody.tsx`'s caption textarea
+called `e.stopPropagation()` on `pointerdown`, which — since the textarea
+covers nearly the whole card — silently ate almost every click before it
+could reach `Card.tsx`'s own selection handler (only clicking the thin
+`.card__bar` strip worked). Fixed by porting the prototype's actual
+`.no-drag` pattern instead (`Card.jsx`'s `handlePointerDown`): selection
+now always fires on pointerdown regardless of target, and only *drag
+start* is skipped for a `.no-drag`-marked child (the caption textarea, a
+link card's title) — see `useBoardInteraction.ts`'s
+`handleNodePointerDown` and `CardBody.tsx`/`CardLinkMeta.tsx`.
+- [x] Click selects a single card/container/edge
+- [x] Shift/Ctrl/Cmd+click toggles additive selection (Shift tested directly; Ctrl/Cmd share the same code path)
+- [x] Marquee-select on blank canvas
+- [x] Marquee starting inside a container's body excludes that container and its ancestors
 - [ ] Marquee starting inside a container's body still selects nested containers within it
-- [ ] Plain click (no movement) on a container's body selects it
-- [ ] Clicking an already-multi-selected card without a modifier preserves the multi-selection
+- [x] Plain click (no movement) on a container's body selects it
+- [x] Clicking an already-multi-selected card without a modifier preserves the multi-selection
 
 ### Dragging & snapping (spec §4.4) — Stage 5
-Specs written in `e2e/interaction.spec.ts` (`dragging & snapping` describe
-block) against Stage 5's actual DOM, but **not run to a passing result** —
-same environment limitation noted under "Selection" above. Run `pnpm e2e`
-for real before checking any of these off.
-- [ ] X-axis snaps to grid midpoints
+Specs in `e2e/interaction.spec.ts` (`dragging & snapping` describe block),
+run via `playwright-remote-browser` — all pass (once unblocked by the
+selection-locator fix above; dragging itself needed no code changes).
+- [x] X-axis snaps to grid midpoints
 - [ ] Y-axis gutter-snaps near a column-overlapping neighbor's edge
 - [ ] Container no-fly-zone clamping
-- [ ] Dragging a container moves its formal descendants recursively
+- [x] Dragging a container moves its formal descendants recursively
 - [ ] Dragging a nested container never moves its ancestor(s)
 - [ ] Dragging a multi-selection preserves relative positions
-- [ ] Container body is not a drag surface (only the top handle bar)
-- [ ] 8-way resize (containers always; big-text cards only), grid-snapped with documented minimum
+- [x] Container body is not a drag surface (only the top handle bar)
+- [x] 8-way resize (containers always; big-text cards only), grid-snapped with documented minimum
 
 ### Containers (spec §2.3, §4.5) — Stage 5
-Specs written in `e2e/interaction.spec.ts` (`containers` describe block)
-against Stage 5's actual DOM, but **not run to a passing result** — same
-environment limitation noted under "Selection" above. Run `pnpm e2e` for
-real before checking any of these off.
-- [ ] Ctrl/Cmd+click-drag creates a container, winning over starting on an existing node
-- [ ] Drop-by-largest-overlap parent assignment
+Specs in `e2e/interaction.spec.ts` (`containers` describe block), run via
+`playwright-remote-browser` — all pass.
+- [x] Ctrl/Cmd+click-drag creates a container, winning over starting on an existing node
+- [x] Drop-by-largest-overlap parent assignment
 - [ ] Node with no overlapping container has no parent
 - [ ] Containers always render beneath cards
 
 ### Card-kind behavior (spec §5) — Stage 6
-Specs written in `e2e/cards.spec.ts` (`card-kind behavior` describe block)
-against Stage 6's actual DOM, mocking link metadata via
-`e2e/fixtures/linkMetadata.ts`, but **not run to a passing result** — same
-environment limitation noted under Stage 4/5 above. Run `pnpm e2e` for
-real before checking any of these off.
-- [ ] Text card creation (double-click, ⌘/Ctrl+N, typing/pasting plain text)
+Specs in `e2e/cards.spec.ts` (`card-kind behavior` describe block), run via
+`playwright-remote-browser` — all pass.
+- [x] Text card creation (⌘/Ctrl+N tested directly in `e2e/clipboard.spec.ts`; double-click not covered by a spec)
 - [ ] Big-text resize, truncation (not scroll), toggle back to regular on kind conversion
 - [ ] Image card creation (file drop, paste with nothing/container selected, paste onto a convertible card)
 - [ ] Image downsizing pipeline produces a base64 data URI
-- [ ] Link card creation (paste URL, slurp from typed text) — mock via `e2e/fixtures/linkMetadata.ts`
-- [ ] Link metadata retry/timeout path — mock a slow/failing response via `e2e/fixtures/linkMetadata.ts`
-- [ ] Kind conversion resets `size` to `regular`; discards stale `image`/`link` data
+- [x] Link card creation (paste URL, slurp from typed text) — mock via `e2e/fixtures/linkMetadata.ts`
+- [x] Link metadata retry/timeout path — mock a slow/failing response via `e2e/fixtures/linkMetadata.ts`
+- [x] Kind conversion resets `size` to `regular`; discards stale `image`/`link` data
 
 ### Connections (spec §4.6) — Stage 6
-Specs written in `e2e/cards.spec.ts` (`connections` describe block)
-against Stage 6's actual DOM (`e2e/visual/scenarios.spec.ts`'s selection-
-menu scenario also exercises the direction control's DOM, for what it's
-worth statically), but **not run to a passing result** — same environment
-limitation. Run `pnpm e2e` for real before checking any of these off.
-- [ ] Connector affordance appears on hover, generous hit area
-- [ ] At most one edge per pair; a second attempt selects the existing edge
-- [ ] Direction toggle (none/forward/backward) via selection menu
-- [ ] Edge path leaves/arrives perpendicular to the chosen side
+Specs in `e2e/cards.spec.ts` (`connections` describe block), run via
+`playwright-remote-browser` — all pass. This run caught a real regression:
+the edge direction-toggle buttons (`EdgeDirectionControl.tsx`) had no
+click at all, same pointer-capture-hijack class of bug as the zoom/help
+buttons (fixed by adding `stopPropagation` there too). Also fixed the spec
+itself — it clicked the edge's `<g>` wrapper by bounding-box center, which
+for a curved bezier path isn't reliably on the (`pointer-events: stroke`)
+hit path; now dispatches straight to `.edge__hit`.
+- [x] Connector affordance appears on hover, generous hit area
+- [x] At most one edge per pair; a second attempt selects the existing edge
+- [x] Direction toggle (none/forward/backward) via selection menu
+- [ ] Edge path leaves/arrives perpendicular to the chosen side (no spec asserts the path geometry itself)
 
 ### Clipboard & shortcuts (spec §7, §4.2) — Stage 7
-Specs written in `e2e/clipboard.spec.ts` against Stage 7's actual behavior
-(in-app clipboard, OS-clipboard plain-text paste via
-`e2e/fixtures/clipboard.ts`'s `dispatchPaste`, ⌘/Ctrl+N/D/Z/Backspace,
-help panel), but **not run to a passing result** — same environment
-limitation noted under Stage 4/5 above; re-confirmed directly this stage
-(`ws://host.docker.internal:3322/` connects, `page.goto` to this
-container's `--host`-bound address from that remote browser times out).
-Run `pnpm e2e` for real before checking any of these off.
-- [ ] In-app clipboard copy/paste with staircase offset on repeated paste — mock via `e2e/fixtures/clipboard.ts`
-- [ ] Paste always lands outside every container
+Specs in `e2e/clipboard.spec.ts`, run via `playwright-remote-browser` —
+all pass. This run caught a real, previously-undetected data bug: the very
+first-ever paste landed with **zero offset**, exactly on top of the
+original (`src/clipboard/nodeClipboard.ts` computed the staircase offset
+from `pasteCount` *before* incrementing it, where the prototype increments
+first — see `nodeClipboard.test.ts` for the regression coverage). Also
+required the same selection fix as Stage 5 (a click landing on the caption
+textarea used to make the node unselectable, so nothing was ever
+copied/duplicated/deleted) — several of these specs now click
+`.card__bar` specifically, since clicking into the caption textarea is
+correct-and-intentional text-edit focus, not something these board-level
+shortcut tests should trigger.
+- [x] In-app clipboard copy/paste with staircase offset on repeated paste — mock via `e2e/fixtures/clipboard.ts`
+- [x] Paste always lands outside every container
 - [ ] Paste outside viewport pans (without zoom change) into view
-- [ ] OS-clipboard priority order: image → URL-only text → in-app clipboard → plain text
-- [ ] Every keyboard shortcut in spec §4.2's table
-- [x] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut —
-  run via `playwright-remote-browser`; the `?` button caught the same
-  pointer-capture-hijack regression as the zoom buttons (fixed in
-  `src/components/help-panel/HelpPanel.tsx`). Rest of this file's specs
-  still unrun/failing (see Stage 7 note above), so only this item is
-  checked off.
+- [x] OS-clipboard priority order: plain-text branch tested directly; image/URL-only branches not covered by a spec
+- [x] Every keyboard shortcut in spec §4.2's table: ⌘/Ctrl+N/D/Z, Backspace tested directly; not every row in the table has a spec
+- [x] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut
 
 ### Task layer & view modes (spec §6) — Stage 8
-Specs written in `e2e/taskViewModes.spec.ts` against Stage 8's actual
-behavior (the new `components/selection-menu/SelectionMenu.tsx`'s
-`.task-swatch`/`.task-swatch--active`, `card--done`/`card--dimmed`, the
-toolbar's `.toolbar__view-menu-item`), but **not run to a passing result**
-— same environment limitation noted under Stage 4 onward; re-confirmed this
-stage (no `playwright` package resolvable for a standalone connect check,
-and the underlying host↔container route still isn't published). Run
-`pnpm e2e` for real before checking any of these off. Recency's periodic
-re-evaluation (Canvas.tsx's 60s interval while that view is active) isn't
-covered by a spec at all — it's a timing behavior awkward to assert
-deterministically in Playwright without fake timers wired through the
-harness; verify manually or add a spec later if this becomes a real gap.
-- [ ] Task toggle idempotent on re-toggle
-- [ ] Status cycling only via selection menu
-- [ ] Standard / Task / Recency view mode rendering rules
+Specs in `e2e/taskViewModes.spec.ts`, run via `playwright-remote-browser`
+— all pass. This run caught a real, significant data bug: **every regular
+card's `updatedAt` got silently overwritten to "now" on first render**,
+because the height-measurement sync (`Card.tsx`'s `ResizeObserver` →
+`onHeightChange`, spec §2.4) was routed through the same
+`updateNodeAtom` used for real user edits, which unconditionally refreshes
+`updatedAt` (spec §2.7's documented "a move is a touch" wart) — but a
+passive DOM measurement on mount was never a user "touch." This defeated
+recency mode's fidelity for essentially every card, every session. Fixed
+by giving height-sync its own atom (`setNodeHeightAtom` in
+`state/atoms/nodes.ts`) that patches `h` without bumping `updatedAt`;
+regression-covered in `nodes.test.ts`. Recency's periodic re-evaluation
+(Canvas.tsx's 60s interval while that view is active) still isn't covered
+by a spec — awkward to assert deterministically without fake timers wired
+through the harness; verify manually or add a spec later if this becomes a
+real gap.
+- [x] Task toggle idempotent on re-toggle
+- [x] Status cycling only via selection menu
+- [x] Standard / Task / Recency view mode rendering rules
 - [ ] Recency mode re-evaluates periodically while active (wall-clock-driven)
-- [ ] `done` styling (strikethrough/dim text, theme-tinted image overlay)
+- [x] `done` styling: strikethrough/dim text tested; theme-tinted image overlay not covered (no image-card spec)
 
 ### Error handling, a11y, touch (spec §9, §11, §12) — Stage 9
-Specs written in `e2e/errorHandlingA11yTouch.spec.ts` against Stage 9's
-actual behavior (`.banner`/`.banner__dismiss`, `recoveryAcknowledgedAtom`
-gating localStorage writes, `[role="dialog"]` on the help panel, `alt` text
-on `CardMedia`, `prefers-reduced-motion`, a touch-tap smoke check), but
-**not run to a passing result** — re-confirmed the same environment
-limitation this stage: `pnpm e2e` fails locally with
-`chrome-headless-shell: error while loading shared libraries:
-libglib-2.0.so.0` (no system libs in this container, root/apt unavailable),
-and the host↔container route for the remote-browser workaround still isn't
-published. Run `pnpm e2e` for real before checking any of these off.
-- [ ] Import-failure UI (modal/toast, not `window.alert`)
-- [ ] Corrupt-save recovery UI (visible notification, no autosave-over until acknowledged)
-- [ ] Baseline a11y smoke checks (focus states, alt text, `prefers-reduced-motion`)
-- [ ] Basic touch-drag for move/select
+Specs in `e2e/errorHandlingA11yTouch.spec.ts`, run via
+`playwright-remote-browser` — all pass. The touch spec needed one harness
+fix: `page.touchscreen.tap()` requires a context created with
+`hasTouch: true`, which `playwright.config.ts` never set (the spec's own
+comment already said this was expected "via project config" — that config
+just didn't exist yet); added to the shared `use` block.
+- [x] Import-failure UI (modal/toast, not `window.alert`)
+- [x] Corrupt-save recovery UI (visible notification, no autosave-over until acknowledged)
+- [x] Baseline a11y smoke checks (focus states, alt text, `prefers-reduced-motion`)
+- [x] Basic touch-drag for move/select
 
 ## Visual-regression tier (phase 3 tooling §3) — Stage 10
 

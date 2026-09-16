@@ -72,12 +72,11 @@ export function CardBody({
       {showCaption && (
         <textarea
           ref={contentRef}
-          className="card__content"
+          className="card__content no-drag"
           aria-label="Card caption"
           value={node.content}
           placeholder="Write something..."
           rows={1}
-          onPointerDown={(e) => e.stopPropagation()}
           onChange={onContentChange && ((e) => onContentChange(e.target.value))}
           onBlur={onContentBlur}
         />

@@ -8,14 +8,11 @@ import { seedBoard } from './fixtures/board'
 // classes, and the toolbar's view-mode menu
 // (`.toolbar__view-menu-item`).
 //
-// NOTE (phase 7, Stage 8): written but NOT run to a passing result in this
-// session — same environment limitation as e2e/viewport.spec.ts and every
-// later-stage spec (the sandboxed dev container has no local browser, and
-// the host-Mac remote Playwright browser has no network path back into
-// this container's dev server). Per
-// ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own rule, its
-// items are left unchecked until a run actually passes — do so before
-// relying on this file.
+// Run and passing (all 4) via the playwright-remote-browser skill. This
+// run caught a real bug: every card's `updatedAt` was silently refreshed
+// on first render (defeating recency mode almost entirely) — fixed via
+// `setNodeHeightAtom` in state/atoms/nodes.ts. See AGENTS.md and
+// ctx/notes/260915-phase6-e2e-test-scenario-checklist.md.
 
 function textCard(id: string, x: number, y: number) {
   return {
@@ -49,11 +46,11 @@ test.describe('task toggle & status (spec §6.1)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
 
     await page.locator('.task-swatch[title="Task"]').click()
     await expect(
-      page.locator('[data-node-id="a"] .task-status-icon'),
+      page.locator('[data-node-id="a"]:not(.node-connector) .task-status-icon'),
     ).toBeVisible()
 
     // Cycle status via the menu, then re-click "Task" — status must survive.
@@ -79,7 +76,9 @@ test.describe('task toggle & status (spec §6.1)', () => {
       images: {},
     })
     await page.goto('/')
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(/card--done/)
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--done/)
   })
 })
 
@@ -98,12 +97,12 @@ test.describe('view modes (spec §6.2)', () => {
     await page.locator('button[title="Change view mode"]').click()
     await page.locator('.toolbar__view-menu-item', { hasText: 'Task' }).click()
 
-    await expect(page.locator('[data-node-id="plain"]')).toHaveClass(
-      /card--dimmed/,
-    )
-    await expect(page.locator('[data-node-id="task"]')).not.toHaveClass(
-      /card--dimmed/,
-    )
+    await expect(
+      page.locator('[data-node-id="plain"]:not(.node-connector)'),
+    ).toHaveClass(/card--dimmed/)
+    await expect(
+      page.locator('[data-node-id="task"]:not(.node-connector)'),
+    ).not.toHaveClass(/card--dimmed/)
   })
 
   test('recency view colors borders by updatedAt age, ignoring task status', async ({
@@ -127,10 +126,10 @@ test.describe('view modes (spec §6.2)', () => {
       .click()
 
     const freshColor = await page
-      .locator('[data-node-id="fresh"]')
+      .locator('[data-node-id="fresh"]:not(.node-connector)')
       .evaluate((el) => getComputedStyle(el).borderColor)
     const staleColor = await page
-      .locator('[data-node-id="stale"]')
+      .locator('[data-node-id="stale"]:not(.node-connector)')
       .evaluate((el) => getComputedStyle(el).borderColor)
     expect(freshColor).not.toBe(staleColor)
   })

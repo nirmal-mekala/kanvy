@@ -16,45 +16,56 @@ pass (import-failure banner, corrupt-save recovery notification, alt
 text/focus-visible/`prefers-reduced-motion`, touch-action tuning).
 
 **Verified, as of this writing (all re-run fresh, not assumed):**
-- `pnpm test` — 181/181 passing.
+- `pnpm test` — 185/185 passing.
 - `pnpm typecheck` / `pnpm build` — clean.
 - `pnpm lint` — clean (a handful of pre-existing warnings only: one
   `noNonNullAssertion` in the Vite-generated `main.tsx`, a few CSS
   `noDescendingSpecificity` notices — none are errors).
 - `npx fallow audit --format json --quiet --gate-marker agent` — verdict
   `pass`, zero newly-introduced dead-code/complexity/duplication findings.
+- **`pnpm e2e` — 48/48 passing, against a real browser**, via the
+  `playwright-remote-browser` skill (a Playwright server on the developer's
+  host Mac, connected from this container over
+  `ws://host.docker.internal:3322/`). The dev server previously used the
+  default port 5173, which the host couldn't route back to; the developer
+  confirmed ports 1993–1997 are published from this container, and
+  pointing the dev server (`KANVY_E2E_PORT`) and the remote browser
+  (`KANVY_E2E_HOST=localhost`) at one of those unblocked the whole run —
+  the earlier "no published port" note below was accurate for 5173, just
+  not for every port.
+  `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md` now reflects
+  real, passing runs per scenario. This first real run found and fixed
+  four genuine bugs static review had missed:
+  - The color/big-text/convert-to-task **selection menu**, the **zoom
+    controls**, the **help button**, and the **edge direction-toggle
+    control** all silently did nothing when clicked — each sits inside
+    `.board`'s own `pointerdown`-handling root, and none of them stopped
+    propagation, so the click either hijacked the board's pointer capture
+    or got treated as a canvas-level marquee/deselect gesture before the
+    button's own `click` could fire.
+  - Clicking a **card's caption text** (almost the entire visible card
+    surface) failed to select it at all — `CardBody.tsx`'s textarea called
+    `stopPropagation()` on `pointerdown`, blocking the click from ever
+    reaching `Card.tsx`'s selection handler. Fixed by porting the
+    prototype's actual `.no-drag` pattern: selection always fires; only
+    *drag start* is skipped for interactive children.
+  - The very **first in-app paste** landed with zero offset, exactly on
+    top of the original (`nodeClipboard.ts` computed the staircase offset
+    before incrementing `pasteCount`, not after, unlike the prototype).
+  - Every card's **`updatedAt` got silently refreshed to "now" on first
+    render**, because the height-measurement sync (`ResizeObserver` →
+    `onHeightChange`) was routed through the same atom used for real user
+    edits, which always bumps `updatedAt` — defeating recency mode almost
+    entirely. Fixed with a dedicated `setNodeHeightAtom` that doesn't.
 
-**NOT verified — a real, outstanding gap, not just an administrative
-loose end:** this repo was implemented inside a sandboxed Debian container
-with no display server and no working local Chromium (missing system
-libs, no root/`apt`), and while a Playwright server on the developer's
-host Mac is reachable from the container over `ws://host.docker.internal`,
-that remote browser cannot route back into the container's own dev server
-(no published port / Docker Desktop network asymmetry). Net effect:
-- Every Playwright **e2e interaction spec** in `e2e/` (selection, dragging/
-  snapping, containers, card-kind behavior, connections, clipboard/
-  shortcuts, task/view-mode, error-handling/a11y/touch) and every
-  **visual-regression scenario** in `e2e/visual/scenarios.spec.ts` (default
-  board light/dark, each card kind, each container pattern, task view,
-  recency across all 4 thresholds, done styling, help panel, mixed-
-  selection menu) exists as real, code-reviewed spec code, but **has never
-  actually been run against a live browser**. `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md`
-  reflects this honestly — every item is unchecked per the checklist's
-  own rule ("check off only once a spec exists and passes"), even though
-  specs now exist for nearly the full list.
-- Concretely: this means pixel-parity with the prototype and real
-  pointer-driven canvas interactions (drag, resize, marquee, connect,
-  paste) are unconfirmed by anything other than static code review against
-  the spec/prototype source and the pure-function unit-test suite (which
-  *is* fully green and covers the geometry/color/urlSlurp logic those
-  interactions depend on).
-- **Before treating phase 7 as fully closed**, run `pnpm e2e` and
-  `pnpm e2e:visual` (after `pnpm e2e:visual:setup`) on a machine with a
-  working local browser (or a container with real host↔container
-  networking to a Playwright server) and fix whatever that first real run
-  surfaces — some drift between "should work per the code" and "actually
-  renders/behaves correctly" should be expected the first time a UI this
-  size gets an actual browser pointed at it.
+**Still NOT verified:** the **visual-regression tier**
+(`e2e/visual/scenarios.spec.ts`, diffing against the live prototype) needs
+a second dev server (the vendored prototype under
+`ctx/support/260915-prototype-source/`) and its own port-forwarding setup
+(`pnpm e2e:visual:setup` then `pnpm e2e:visual`) — not yet attempted with
+the working remote-browser setup above. Pixel-parity with the prototype
+remains unconfirmed by anything beyond static review; do this before
+treating phase 7 as fully closed.
 
 Before making any change, check `ctx/prompt/260915-migration-process.md` for
 which prototype-migration phase is currently active, and re-read this file —

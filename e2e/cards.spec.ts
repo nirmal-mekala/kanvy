@@ -4,21 +4,18 @@ import { dispatchPaste } from './fixtures/clipboard'
 import { mockLinkMetadata } from './fixtures/linkMetadata'
 
 // Stage 6 (card-kind behavior & connections) — spec §4.6, §5.
-// Written against the actual DOM contract: `[data-node-id]` on every
+// Written against the actual DOM contract: `[data-node-id]:not(.node-connector)` on every
 // card/container root, `.card--image`/`.card--link` kind classes,
 // `.node-connector--<side>` connector affordances, `.edge` / `[data-edge-id]`
 // for rendered edges, `.edge-direction-control__btn` for the minimal
 // direction toggle.
 //
-// NOTE (phase 7, Stage 6): written but NOT run to a passing result in this
-// session — same environment limitation as e2e/viewport.spec.ts and
-// e2e/interaction.spec.ts (confirmed again here: a Playwright server on the
-// host Mac IS reachable from this container over
-// ws://host.docker.internal:3322/, but page.goto() to the container's own
-// dev-server address from that remote browser times out — the host has no
-// route back into the container's bridge network without a published
-// port). Per ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own
-// rule, its items are left unchecked until a run actually passes.
+// Run and passing (all 9) via the playwright-remote-browser skill. This
+// run caught a real bug: the edge direction-toggle buttons had no click
+// at all (missing `stopPropagation`, same class of bug as the zoom/help
+// buttons — see AGENTS.md). The direction-toggle spec also had to stop
+// clicking the edge's `<g>` by bounding-box center (unreliable for a
+// curved bezier path) and dispatch straight to `.edge__hit` instead.
 
 function textCard(id: string, x: number, y: number, content = '') {
   return {
@@ -67,13 +64,17 @@ test.describe('card-kind behavior (spec §5)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"] .card__content').focus()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__content')
+      .focus()
     await dispatchPaste(
       page,
       { text: 'https://example.com' },
-      '[data-node-id="a"]',
+      '[data-node-id="a"]:not(.node-connector)',
     )
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(/card--link/)
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--link/)
   })
 
   test('a slow link-metadata response eventually resolves via retry', async ({
@@ -105,10 +106,14 @@ test.describe('card-kind behavior (spec §5)', () => {
       images: {},
     })
     await page.goto('/')
-    const textarea = page.locator('[data-node-id="a"] .card__content')
+    const textarea = page.locator(
+      '[data-node-id="a"]:not(.node-connector) .card__content',
+    )
     await textarea.click()
     await textarea.fill('hello https://example.com ')
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(/card--link/)
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--link/)
   })
 
   test('kind conversion resets size to regular', async ({ page }) => {
@@ -127,15 +132,15 @@ test.describe('card-kind behavior (spec §5)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
     await dispatchPaste(
       page,
       { text: 'https://example.com' },
-      '[data-node-id="a"]',
+      '[data-node-id="a"]:not(.node-connector)',
     )
-    await expect(page.locator('[data-node-id="a"]')).not.toHaveClass(
-      /card--big/,
-    )
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).not.toHaveClass(/card--big/)
   })
 })
 
@@ -148,9 +153,11 @@ test.describe('connections (spec §4.6)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').hover()
+    await page.locator('[data-node-id="a"]:not(.node-connector)').hover()
     await expect(
-      page.locator('[data-node-id="a"] .node-connector--right'),
+      page.locator(
+        '[data-node-id="a"]:not(.node-connector) .node-connector--right',
+      ),
     ).toBeVisible()
   })
 
@@ -164,12 +171,14 @@ test.describe('connections (spec §4.6)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').hover()
+    await page.locator('[data-node-id="a"]:not(.node-connector)').hover()
     const connector = page.locator(
-      '[data-node-id="a"].node-connector--right, [data-node-id="a"] .node-connector--right',
+      '[data-node-id="a"]:not(.node-connector) .node-connector--right',
     )
     const box = await connector.boundingBox()
-    const targetBox = await page.locator('[data-node-id="b"]').boundingBox()
+    const targetBox = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
     if (!box || !targetBox) throw new Error('missing bounding box')
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
@@ -204,10 +213,14 @@ test.describe('connections (spec §4.6)', () => {
     await page.goto('/')
     await expect(page.locator('[data-edge-id]')).toHaveCount(1)
     // Re-drawing the same pair should not add a second edge.
-    await page.locator('[data-node-id="a"]').hover()
-    const connector = page.locator('[data-node-id="a"] .node-connector--right')
+    await page.locator('[data-node-id="a"]:not(.node-connector)').hover()
+    const connector = page.locator(
+      '[data-node-id="a"]:not(.node-connector) .node-connector--right',
+    )
     const box = await connector.boundingBox()
-    const targetBox = await page.locator('[data-node-id="b"]').boundingBox()
+    const targetBox = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
     if (!box || !targetBox) throw new Error('missing bounding box')
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
@@ -240,7 +253,15 @@ test.describe('connections (spec §4.6)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-edge-id="e1"]').click()
+    // A plain `.click()` targets the `<g>`'s bounding-box center, which
+    // for a curved bezier edge isn't reliably on the stroke (the only
+    // part of the path that's actually hit-testable — see
+    // `.edge__hit`'s `pointer-events: stroke` in index.css). Dispatch
+    // straight to the hit path instead, matching the real
+    // `onPointerDown`-based selection handler it carries.
+    await page
+      .locator('[data-edge-id="e1"] .edge__hit')
+      .dispatchEvent('pointerdown', { button: 0 })
     await page.locator('.edge-direction-control__btn', { hasText: '→' }).click()
     await expect(
       page.locator('[data-edge-id="e1"] .edge__line'),

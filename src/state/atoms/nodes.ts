@@ -169,6 +169,30 @@ export const updateCardContentAtom = atom(
 )
 
 /**
+ * Syncs a regular card's rendered height into `h` (spec §2.4) — deliberately
+ * *not* routed through `updateNodeAtom`: this fires from a `ResizeObserver`
+ * whenever the DOM measurement differs from the stored value (including on
+ * first mount, before anything has been touched), so treating it as a
+ * `updatedAt`-refreshing "mutation" like §2.7's move-is-a-touch wart would
+ * make recency mode's "fresh" reflect mere rendering, not anything the user
+ * did.
+ */
+export const setNodeHeightAtom = atom(
+  null,
+  (_get, set, id: NodeId, h: number) => {
+    set(updateBoardAtom, (board: Board) => {
+      let changed = false
+      const nodes = board.nodes.map((node) => {
+        if (node.id !== id || node.h === h) return node
+        changed = true
+        return { ...node, h }
+      })
+      return changed ? { ...board, nodes } : board
+    })
+  },
+)
+
+/**
  * Shallow-patches one node by id and refreshes `updatedAt` — a move with no
  * content change still counts as a touch (spec §2.7, an intentional wart).
  * No-ops (unknown id) leave the board reference unchanged so the history

@@ -229,16 +229,11 @@ export function useBoardInteraction({
 
   // ---- Node drag: a card's whole body, or a container's drag handle ----
 
-  // fallow-ignore-next-line complexity
-  function handleNodePointerDown(id: NodeId, e: React.PointerEvent) {
-    if (e.button !== 0 || e.ctrlKey || e.metaKey) return
-    e.stopPropagation()
-    const node = nodesById.get(id)
-    if (!node) return
-
-    const nextSelection = computeSelectionAfterClick(selection, id, e.shiftKey)
-    setSelection(nextSelection)
-
+  // The rest of a multi-selection (and, for a container, its descendants)
+  // carries along with the grabbed node once a drag actually starts (spec
+  // §4.4/§4.5) — split out of handleNodePointerDown purely to keep that
+  // function's complexity under Biome's threshold.
+  function beginNodeDrag(id: NodeId, node: Node, nextSelection: Set<NodeId>) {
     const descendantIds =
       node.type === 'container'
         ? getDescendantIds(id, nodes)
@@ -259,6 +254,25 @@ export function useBoardInteraction({
       if (carried) origins.set(carryId, { x: carried.x, y: carried.y })
     }
 
+    return origins
+  }
+
+  function handleNodePointerDown(id: NodeId, e: React.PointerEvent) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey) return
+    e.stopPropagation()
+    const node = nodesById.get(id)
+    if (!node) return
+
+    const nextSelection = computeSelectionAfterClick(selection, id, e.shiftKey)
+    setSelection(nextSelection)
+
+    // A click starting on an interactive child (a card's caption textarea,
+    // a link card's title) still selects the node above, but never starts a
+    // drag from it — ported from the prototype's `.no-drag` check in
+    // Card.jsx's handlePointerDown.
+    if ((e.target as HTMLElement).closest('.no-drag')) return
+
+    const carryOrigins = beginNodeDrag(id, node, nextSelection)
     dragRef.current = {
       grabId: id,
       isContainer: node.type === 'container',
@@ -268,7 +282,7 @@ export function useBoardInteraction({
       originY: node.y,
       w: node.w,
       h: node.h,
-      carryOrigins: origins,
+      carryOrigins,
       lastX: node.x,
       lastY: node.y,
     }

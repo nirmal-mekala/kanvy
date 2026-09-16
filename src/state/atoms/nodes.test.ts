@@ -83,6 +83,33 @@ describe('nodes atoms', () => {
     expect(store.get(nodeFamily('n1'))?.color).toBe('coral')
   })
 
+  it('setNodeHeightAtom updates h without refreshing updatedAt (recency mode must not see a mere render as a touch)', async () => {
+    const { store, addNodeAtom, setNodeHeightAtom, nodeFamily } =
+      await freshState()
+    store.set(
+      addNodeAtom,
+      textNode('n1', { h: 90, updatedAt: '2026-01-01T00:00:00.000Z' }),
+    )
+    vi.setSystemTime(new Date('2026-06-01T00:00:00.000Z'))
+
+    store.set(setNodeHeightAtom, 'n1', 120)
+
+    const node = store.get(nodeFamily('n1'))
+    expect(node?.h).toBe(120)
+    expect(node?.updatedAt).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('setNodeHeightAtom is a no-op (no board reference change) when h is unchanged', async () => {
+    const { store, addNodeAtom, setNodeHeightAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { h: 90 }))
+    const before = store.get(boardAtom)
+
+    store.set(setNodeHeightAtom, 'n1', 90)
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
   it('removeEntitiesAtom drops a node, its edges, and orphaned images, and clears dangling parentId', async () => {
     const { store, addNodeAtom, addEdgeAtom, removeEntitiesAtom, boardAtom } =
       await freshState()

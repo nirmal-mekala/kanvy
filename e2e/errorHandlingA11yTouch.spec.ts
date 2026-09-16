@@ -3,13 +3,10 @@ import { seedBoard } from './fixtures/board'
 
 // Stage 9 (error handling, a11y, touch) — spec §9, §11, §12.
 //
-// NOTE (phase 7, Stage 9): written but NOT run to a passing result in this
-// session — same host↔container Playwright networking gap every prior
-// stage hit (no local browser in this sandboxed container, and no route
-// from a remote host-Mac browser back into the container's dev server).
-// Per ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own rule,
-// its items stay unchecked until a run actually passes — do so before
-// relying on this file.
+// Run and passing (all 4) via the playwright-remote-browser skill — see
+// AGENTS.md and ctx/notes/260915-phase6-e2e-test-scenario-checklist.md.
+// The touch-drag spec needed `hasTouch: true` added to
+// playwright.config.ts's `use` block, which wasn't set anywhere before.
 
 test.describe('import-failure UI (spec §9/Q14)', () => {
   test('shows a dismissible banner, not window.alert, on a bad import file', async ({
@@ -108,7 +105,7 @@ test.describe('baseline a11y (spec §11)', () => {
     )
     await page.goto('/')
     const alt = await page
-      .locator('[data-node-id="img-1"] img')
+      .locator('[data-node-id="img-1"]:not(.node-connector) img')
       .getAttribute('alt')
     expect(alt).toBe('A photo of a cat')
   })
@@ -158,14 +155,15 @@ test.describe('basic touch support (spec §12)', () => {
     )
     await page.goto('/')
 
-    const card = page.locator('[data-node-id="touch-a"]')
+    const card = page.locator('[data-node-id="touch-a"]:not(.node-connector)')
     const box = await card.boundingBox()
     if (!box) throw new Error('card not rendered')
 
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
     // Playwright's touchscreen API has no drag primitive, so this exercises
-    // pointer-event handling in touch mode (hasTouch: true, set via project
-    // config) rather than a full native touch gesture — see
+    // pointer-event handling in touch mode (hasTouch: true, set in
+    // playwright.config.ts's `use` block) rather than a full native touch
+    // gesture — see
     // useBoardInteraction.ts, which is Pointer-Event-based and therefore
     // already touch-capable without touch-specific code.
     const newBox = await card.boundingBox()

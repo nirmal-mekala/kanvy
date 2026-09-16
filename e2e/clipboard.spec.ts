@@ -4,14 +4,14 @@ import { dispatchPaste } from './fixtures/clipboard'
 
 // Stage 7 (clipboard, keyboard shortcuts, toolbar/help) — spec §7, §4.2.
 //
-// NOTE (phase 7, Stage 7): written but NOT run to a passing result in this
-// session — same environment limitation as e2e/viewport.spec.ts and
-// e2e/interaction.spec.ts (the sandboxed dev container has no local
-// browser, and the host-Mac remote Playwright browser has no network path
-// back into this container's dev server). Per
-// ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own rule, its
-// items are left unchecked until a run actually passes — do so before
-// relying on this file.
+// Run and passing (all 10) via the playwright-remote-browser skill. This
+// run caught two real bugs: the first-ever in-app paste landed with zero
+// offset (fixed in clipboard/nodeClipboard.ts), and clicking a card's
+// caption text failed to select it at all (see e2e/interaction.spec.ts's
+// note) — several tests here deliberately click `.card__bar` instead of
+// the card body, since clicking into the caption is correct text-edit
+// focus, not something these board-level shortcut tests should trigger.
+// See AGENTS.md and ctx/notes/260915-phase6-e2e-test-scenario-checklist.md.
 
 function textCard(id: string, x: number, y: number, content = id) {
   return {
@@ -60,10 +60,14 @@ test.describe('in-app clipboard (spec §7)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+c')
     await page.keyboard.press('ControlOrMeta+v')
-    await expect(page.locator('[data-node-id]')).toHaveCount(2)
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(2)
   })
 
   test('repeated paste offsets further each time (staircase)', async ({
@@ -76,12 +80,18 @@ test.describe('in-app clipboard (spec §7)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+c')
     await page.keyboard.press('ControlOrMeta+v')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+v')
-    await expect(page.locator('[data-node-id]')).toHaveCount(3)
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(3)
   })
 
   test('paste always lands outside every container', async ({ page }) => {
@@ -95,12 +105,16 @@ test.describe('in-app clipboard (spec §7)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+c')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+v')
     const pasted = page
-      .locator('[data-node-id]')
+      .locator('[data-node-id]:not(.node-connector)')
       .filter({ hasNot: page.locator('.container-node') })
       .last()
     await expect(pasted).not.toHaveAttribute('data-node-id', 'a')
@@ -119,7 +133,9 @@ test.describe('OS clipboard priority (spec §7)', () => {
     await seed(page, { version: 1, nodes: [], edges: [], images: {} })
     await page.goto('/')
     await dispatchPaste(page, { text: 'hello from the OS clipboard' })
-    await expect(page.locator('[data-node-id]')).toHaveCount(1)
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(1)
     await expect(page.locator('textarea.card__content')).toHaveValue(
       'hello from the OS clipboard',
     )
@@ -131,7 +147,9 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
     await seed(page, { version: 1, nodes: [], edges: [], images: {} })
     await page.goto('/')
     await page.keyboard.press('ControlOrMeta+n')
-    await expect(page.locator('[data-node-id]')).toHaveCount(1)
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(1)
     await expect(page.locator('textarea.card__content')).toBeFocused()
   })
 
@@ -145,10 +163,16 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('ControlOrMeta+d')
-    await expect(page.locator('[data-node-id]')).toHaveCount(2)
-    await expect(page.locator('textarea.card__content')).toBeFocused()
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(2)
+    // Two cards now share the `textarea.card__content` selector — narrow
+    // to the one that's actually focused (the duplicate).
+    await expect(page.locator('textarea.card__content:focus')).toHaveCount(1)
   })
 
   test('Backspace deletes the selection', async ({ page }) => {
@@ -159,9 +183,13 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('Backspace')
-    await expect(page.locator('[data-node-id]')).toHaveCount(0)
+    await expect(
+      page.locator('[data-node-id]:not(.node-connector)'),
+    ).toHaveCount(0)
   })
 
   test('⌘/Ctrl+Z undoes a delete and restores the selection', async ({
@@ -174,12 +202,14 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     await page.keyboard.press('Backspace')
     await page.keyboard.press('ControlOrMeta+z')
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(
-      /card--selected/,
-    )
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
   })
 })
 

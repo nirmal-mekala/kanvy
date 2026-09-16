@@ -3,18 +3,20 @@ import { seedBoard } from './fixtures/board'
 
 // Stage 5 (selection, dragging, resizing) — spec §2.3, §4.3, §4.4, §4.5.
 // Written against components/canvas/useBoardInteraction.ts's actual DOM
-// contract: `[data-node-id]` on every card/container root, `.card--selected`
+// contract: `[data-node-id]:not(.node-connector)` on every card/container root, `.card--selected`
 // / `.container-node--selected` for selection state, `.container-node__drag-handle`
 // as the only container drag surface, `.resize-handle--<dir>` for the 8-way
 // handles.
 //
-// NOTE (phase 7, Stage 5): written but NOT run to a passing result in this
-// session — same environment limitation as e2e/viewport.spec.ts (the
-// sandboxed dev container has no local browser, and the host-Mac remote
-// Playwright browser has no network path back into this container's dev
-// server). Per ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own
-// rule, its items are left unchecked until a run actually passes — do so
-// before relying on this file.
+// Run and passing (all 14) via the playwright-remote-browser skill. This
+// run caught a real, significant bug: clicking a card's caption text
+// (nearly its entire visible surface) failed to select it at all —
+// `CardBody.tsx`'s textarea called `stopPropagation()` on `pointerdown`,
+// blocking the click before it reached `Card.tsx`'s selection handler.
+// Fixed by porting the prototype's actual `.no-drag` pattern (selection
+// always fires on pointerdown; only *drag start* is skipped for
+// interactive children) — see `useBoardInteraction.ts`'s
+// `handleNodePointerDown` and AGENTS.md.
 
 function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   return {
@@ -69,13 +71,13 @@ test.describe('selection (spec §4.3)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(
-      /card--selected/,
-    )
-    await expect(page.locator('[data-node-id="b"]')).not.toHaveClass(
-      /card--selected/,
-    )
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
+    await expect(
+      page.locator('[data-node-id="b"]:not(.node-connector)'),
+    ).not.toHaveClass(/card--selected/)
   })
 
   test('shift+click toggles additive selection', async ({ page }) => {
@@ -86,19 +88,23 @@ test.describe('selection (spec §4.3)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
-    await page.locator('[data-node-id="b"]').click({ modifiers: ['Shift'] })
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(
-      /card--selected/,
-    )
-    await expect(page.locator('[data-node-id="b"]')).toHaveClass(
-      /card--selected/,
-    )
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
+    await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .click({ modifiers: ['Shift'] })
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
+    await expect(
+      page.locator('[data-node-id="b"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
 
-    await page.locator('[data-node-id="b"]').click({ modifiers: ['Shift'] })
-    await expect(page.locator('[data-node-id="b"]')).not.toHaveClass(
-      /card--selected/,
-    )
+    await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .click({ modifiers: ['Shift'] })
+    await expect(
+      page.locator('[data-node-id="b"]:not(.node-connector)'),
+    ).not.toHaveClass(/card--selected/)
   })
 
   test('a plain click on a container body (not the handle) selects it', async ({
@@ -111,7 +117,7 @@ test.describe('selection (spec §4.3)', () => {
       images: {},
     })
     await page.goto('/')
-    const container = page.locator('[data-node-id="c1"]')
+    const container = page.locator('[data-node-id="c1"]:not(.node-connector)')
     const box = await container.boundingBox()
     if (!box) throw new Error('container not rendered')
     // Click well below the drag handle, inside the body.
@@ -138,12 +144,12 @@ test.describe('selection (spec §4.3)', () => {
     await page.mouse.move(boardBox.x + 700, boardBox.y + 400, { steps: 10 })
     await page.mouse.up()
 
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(
-      /card--selected/,
-    )
-    await expect(page.locator('[data-node-id="b"]')).toHaveClass(
-      /card--selected/,
-    )
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
+    await expect(
+      page.locator('[data-node-id="b"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
   })
 
   test('a marquee started inside a container body never selects that container', async ({
@@ -159,7 +165,9 @@ test.describe('selection (spec §4.3)', () => {
       images: {},
     })
     await page.goto('/')
-    const container = page.locator('[data-node-id="outer"]')
+    const container = page.locator(
+      '[data-node-id="outer"]:not(.node-connector)',
+    )
     const box = await container.boundingBox()
     if (!box) throw new Error('container not rendered')
 
@@ -169,9 +177,9 @@ test.describe('selection (spec §4.3)', () => {
     await page.mouse.move(box.x + 400, box.y + 300, { steps: 10 })
     await page.mouse.up()
 
-    await expect(page.locator('[data-node-id="inner"]')).toHaveClass(
-      /card--selected/,
-    )
+    await expect(
+      page.locator('[data-node-id="inner"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
     await expect(container).not.toHaveClass(/container-node--selected/)
   })
 
@@ -185,16 +193,18 @@ test.describe('selection (spec §4.3)', () => {
       images: {},
     })
     await page.goto('/')
-    await page.locator('[data-node-id="a"]').click()
-    await page.locator('[data-node-id="b"]').click({ modifiers: ['Shift'] })
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
+    await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .click({ modifiers: ['Shift'] })
     // A plain click (no modifier) on a member of the multi-selection.
-    await page.locator('[data-node-id="a"]').click()
-    await expect(page.locator('[data-node-id="a"]')).toHaveClass(
-      /card--selected/,
-    )
-    await expect(page.locator('[data-node-id="b"]')).toHaveClass(
-      /card--selected/,
-    )
+    await page.locator('[data-node-id="a"]:not(.node-connector)').click()
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
+    await expect(
+      page.locator('[data-node-id="b"]:not(.node-connector)'),
+    ).toHaveClass(/card--selected/)
   })
 })
 
@@ -209,7 +219,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
       images: {},
     })
     await page.goto('/')
-    const card = page.locator('[data-node-id="a"]')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
     const box = await card.boundingBox()
     if (!box) throw new Error('card not rendered')
 
@@ -237,11 +247,13 @@ test.describe('dragging & snapping (spec §4.4)', () => {
       images: {},
     })
     await page.goto('/')
-    const container = page.locator('[data-node-id="parent"]')
+    const container = page.locator(
+      '[data-node-id="parent"]:not(.node-connector)',
+    )
     const handle = container.locator('.container-node__drag-handle')
     const handleBox = await handle.boundingBox()
     const childBefore = await page
-      .locator('[data-node-id="child"]')
+      .locator('[data-node-id="child"]:not(.node-connector)')
       .boundingBox()
     if (!handleBox || !childBefore) throw new Error('missing bounding box')
 
@@ -253,7 +265,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     await page.mouse.up()
 
     const childAfter = await page
-      .locator('[data-node-id="child"]')
+      .locator('[data-node-id="child"]:not(.node-connector)')
       .boundingBox()
     if (!childAfter) throw new Error('missing bounding box')
     expect(childAfter.x - childBefore.x).toBeGreaterThan(40)
@@ -268,7 +280,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
       images: {},
     })
     await page.goto('/')
-    const container = page.locator('[data-node-id="c1"]')
+    const container = page.locator('[data-node-id="c1"]:not(.node-connector)')
     const before = await container.boundingBox()
     if (!before) throw new Error('container not rendered')
 
@@ -307,7 +319,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     })
     await page.mouse.up()
 
-    const container = page.locator('[data-node-id="c1"]')
+    const container = page.locator('[data-node-id="c1"]:not(.node-connector)')
     const width = await container.evaluate(
       (el) => (el as HTMLElement).style.width,
     )
@@ -347,10 +359,12 @@ test.describe('containers (spec §2.3, §4.5)', () => {
       images: {},
     })
     await page.goto('/')
-    const card = page.locator('[data-node-id="a"]')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
     const cardBox = await card.boundingBox()
     if (!cardBox) throw new Error('card not rendered')
-    const containerBox = await page.locator('[data-node-id="c1"]').boundingBox()
+    const containerBox = await page
+      .locator('[data-node-id="c1"]:not(.node-connector)')
+      .boundingBox()
     if (!containerBox) throw new Error('container not rendered')
 
     await page.mouse.move(cardBox.x + 10, cardBox.y + 10)
@@ -365,7 +379,7 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     // A card with a parent moves with its container — verified indirectly
     // here by re-dragging the container and checking the card follows.
     const handle = page.locator(
-      '[data-node-id="c1"] .container-node__drag-handle',
+      '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
     )
     const handleBox = await handle.boundingBox()
     if (!handleBox) throw new Error('handle not rendered')

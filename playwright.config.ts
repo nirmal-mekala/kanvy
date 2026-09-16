@@ -35,6 +35,10 @@ export default defineConfig({
   use: {
     baseURL: `http://${HOST}:${PORT}`,
     trace: 'on-first-retry',
+    // Needed for e2e/errorHandlingA11yTouch.spec.ts's touch-drag spec,
+    // which uses page.touchscreen — Playwright refuses touchscreen calls
+    // on a context that wasn't created with this.
+    hasTouch: true,
   },
   webServer: {
     // --host binds all interfaces, not just loopback — needed so a
