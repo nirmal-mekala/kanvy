@@ -1,8 +1,9 @@
 // Kind-conversion rules (spec §2.2, §5.3, §5.4): a card converting between
 // `text`/`image`/`link` is a full object replacement at the type level, not
-// a field mutation — matches actual behavior (dropping `size: 'big'` back
-// to `'regular'`, discarding stale `link`/`imageId` data) rather than
-// fighting the discriminated union (phase2 schema §2's notes).
+// a field mutation — matches actual behavior (dropping any heading size
+// — h1/h2/h3 — back to `'regular'`, discarding stale `link`/`imageId`
+// data) rather than fighting the discriminated union (phase2 schema §2's
+// notes).
 
 import type { CardNode } from '../schema/node'
 

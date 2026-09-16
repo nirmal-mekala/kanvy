@@ -3,7 +3,15 @@
 // (Canvas.tsx). Ported from the prototype's inline selection-menu JSX in
 // Board.jsx onto Tailwind + this migration's discriminated `Node` union.
 
-import { Heading1, List, ListTodo, Type } from 'lucide-react'
+import {
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListTodo,
+  type LucideIcon,
+  Type,
+} from 'lucide-react'
 import {
   PATTERN_TINT,
   swatchBackground,
@@ -18,6 +26,8 @@ import {
   type PatternKey,
   PatternKeySchema,
   type TaskStatus,
+  type TextSize,
+  TextSizeSchema,
 } from '../../schema/node'
 import { TaskStatusIcon } from '../card/TaskStatusIcon'
 import { commonValue } from './commonValue'
@@ -25,6 +35,19 @@ import { commonValue } from './commonValue'
 const COLOR_KEYS = ColorKeySchema.options
 const PATTERN_KEYS = PatternKeySchema.options
 const TASK_STATUSES: TaskStatus[] = ['todo', 'blocked', 'in_progress', 'done']
+const TEXT_SIZES = TextSizeSchema.options
+const TEXT_SIZE_ICONS: Record<TextSize, LucideIcon> = {
+  regular: Type,
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+}
+const TEXT_SIZE_LABELS: Record<TextSize, string> = {
+  regular: 'Regular text',
+  h1: 'Heading 1',
+  h2: 'Heading 2',
+  h3: 'Heading 3',
+}
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage comes from
@@ -49,7 +72,7 @@ export function SelectionMenu({
   y: number
   onSetColor: (color: ColorKey) => void
   onSetPattern: (pattern: PatternKey) => void
-  onSetTextSize: (size: 'regular' | 'big') => void
+  onSetTextSize: (size: TextSize) => void
   onSetTaskKind: (kind: 'default' | 'task') => void
   onSetTaskStatus: (status: TaskStatus) => void
 }) {
@@ -119,22 +142,20 @@ export function SelectionMenu({
         <>
           <div className="selection-menu__divider" />
           <div className="selection-menu__grid">
-            <button
-              type="button"
-              className={`textsize-swatch${commonTextSize === 'regular' ? ' textsize-swatch--active' : ''}`}
-              title="Regular text"
-              onClick={() => onSetTextSize('regular')}
-            >
-              <Type size={14} strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className={`textsize-swatch${commonTextSize === 'big' ? ' textsize-swatch--active' : ''}`}
-              title="Big text"
-              onClick={() => onSetTextSize('big')}
-            >
-              <Heading1 size={14} strokeWidth={2} />
-            </button>
+            {TEXT_SIZES.map((size) => {
+              const Icon = TEXT_SIZE_ICONS[size]
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  className={`textsize-swatch${commonTextSize === size ? ' textsize-swatch--active' : ''}`}
+                  title={TEXT_SIZE_LABELS[size]}
+                  onClick={() => onSetTextSize(size)}
+                >
+                  <Icon size={14} strokeWidth={2} />
+                </button>
+              )
+            })}
           </div>
         </>
       )}

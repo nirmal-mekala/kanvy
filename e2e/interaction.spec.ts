@@ -8,7 +8,7 @@ import { seedBoard } from './fixtures/board'
 // as the only container drag surface, `.resize-handle--<dir>` for the 8-way
 // handles.
 //
-// Run and passing (all 78) via the playwright-remote-browser skill. This
+// Run and passing (all 81) via the playwright-remote-browser skill. This
 // run caught a real, significant bug: clicking a card's caption text
 // (nearly its entire visible surface) failed to select it at all —
 // `CardBody.tsx`'s textarea called `stopPropagation()` on `pointerdown`,

@@ -117,7 +117,7 @@ export function Card({
   onConnectorPointerMove?: (e: React.PointerEvent) => void
   onConnectorPointerUp?: (e: React.PointerEvent) => void
 }) {
-  const isBig = node.kind === 'text' && node.size === 'big'
+  const isHeading = node.kind === 'text' && node.size !== 'regular'
   const showCaption =
     (node.kind !== 'image' && node.kind !== 'link') ||
     node.content !== '' ||
@@ -131,15 +131,15 @@ export function Card({
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
   const [hovered, setHovered] = useState(false)
 
-  // Regular notes grow to fit their content; big text has an explicit,
-  // user-resized height instead (a later stage's resize handles), so it
-  // never participates in this.
-  useAutoGrowHeight(contentRef, isBig)
+  // Regular notes grow to fit their content; a heading-sized card (h1/h2/
+  // h3) has an explicit, user-resized height instead (a later stage's
+  // resize handles), so it never participates in this.
+  useAutoGrowHeight(contentRef, isHeading)
 
   // Stored height is the source of truth once measured (spec §2.4) — a
   // regular card's total rendered height (bar + content) only lives in the
   // DOM moment-to-moment, so this flows it one-way into the node.
-  useMeasuredHeight(cardElRef, isBig, onHeightChange)
+  useMeasuredHeight(cardElRef, isHeading, onHeightChange)
 
   useEffect(() => {
     if (!autoFocus) return
@@ -153,7 +153,7 @@ export function Card({
       data-node-id={node.id}
       data-testid="card"
       className={cardClassNames(node, {
-        isBig,
+        headingSize: node.kind === 'text' ? node.size : null,
         isDone,
         isDimmed: isDimmedByViewMode,
         selected,
@@ -162,7 +162,7 @@ export function Card({
         left: node.x,
         top: node.y,
         width: node.w,
-        height: isBig ? node.h : undefined,
+        height: isHeading ? node.h : undefined,
         borderColor,
       }}
       onPointerDown={onPointerDown && ((e) => onPointerDown(node.id, e))}
@@ -188,13 +188,13 @@ export function Card({
           ? { onContentBlur: () => onContentBlur(node.id) }
           : {})}
       />
-      {isBig &&
+      {isHeading &&
         onResizePointerDown &&
         onResizePointerMove &&
         onResizePointerUp && (
           <ResizeHandles
             id={node.id}
-            kind="bigText"
+            kind="heading"
             onPointerDown={onResizePointerDown}
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}

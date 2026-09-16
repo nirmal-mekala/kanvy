@@ -93,3 +93,90 @@ describe('normalizeLegacyBoard — v0.1 parentId removal (spec §2.3)', () => {
     }
   })
 })
+
+describe('normalizeLegacyBoard — big → h1 text-size rename', () => {
+  it('migrates a v0-shaped document\'s size: "big" text card to "h1"', () => {
+    const v1Doc = {
+      version: 1,
+      nodes: [
+        {
+          id: 'card1',
+          type: 'card',
+          kind: 'text',
+          size: 'big',
+          color: 'gray',
+          content: '',
+          x: 0,
+          y: 0,
+          w: 320,
+          h: 240,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      edges: [],
+      images: {},
+    }
+
+    const result = normalizeLegacyBoard(v1Doc) as {
+      nodes: Record<string, unknown>[]
+    }
+
+    expect(result.nodes[0]).toMatchObject({ size: 'h1' })
+  })
+
+  it('migrates a pre-v0 (prototype-shaped) document\'s legacy textSize: "big" card to "h1"', () => {
+    const preV0Doc = {
+      cards: [
+        {
+          id: 'c1',
+          x: 0,
+          y: 0,
+          w: 320,
+          color: 'gray',
+          content: 'hi',
+          textSize: 'big',
+        },
+      ],
+      groups: [],
+      edges: [],
+      images: {},
+    }
+
+    const result = normalizeLegacyBoard(preV0Doc) as {
+      nodes: Record<string, unknown>[]
+    }
+
+    expect(result.nodes[0]).toMatchObject({ size: 'h1' })
+  })
+
+  it('leaves an already-current h2/h3 size untouched', () => {
+    for (const size of ['h2', 'h3']) {
+      const v1Doc = {
+        version: 1,
+        nodes: [
+          {
+            id: 'card1',
+            type: 'card',
+            kind: 'text',
+            size,
+            color: 'gray',
+            content: '',
+            x: 0,
+            y: 0,
+            w: 320,
+            h: 240,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        edges: [],
+        images: {},
+      }
+      const result = normalizeLegacyBoard(v1Doc) as {
+        nodes: Record<string, unknown>[]
+      }
+      expect(result.nodes[0]).toMatchObject({ size })
+    }
+  })
+})

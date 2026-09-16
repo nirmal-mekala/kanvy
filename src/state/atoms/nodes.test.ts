@@ -110,6 +110,73 @@ describe('nodes atoms', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 
+  it('setTextSizeAtom regular → h1 seeds the heading default box', async () => {
+    const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { size: 'regular', w: 224, h: 90 }))
+
+    store.set(setTextSizeAtom, ['n1'], 'h1')
+
+    const node = store.get(nodeFamily('n1'))
+    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
+      'h1',
+    )
+    expect(node?.w).toBe(256) // HEADING_DEFAULT_W (GRID_SIZE * 16)
+    expect(node?.h).toBe(128) // HEADING_DEFAULT_H (GRID_SIZE * 8)
+  })
+
+  it('setTextSizeAtom h1 → h2 relabels size only, preserving the current (user-resized) box', async () => {
+    const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { size: 'h1', w: 500, h: 400 }))
+
+    store.set(setTextSizeAtom, ['n1'], 'h2')
+
+    const node = store.get(nodeFamily('n1'))
+    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
+      'h2',
+    )
+    expect(node?.w).toBe(500)
+    expect(node?.h).toBe(400)
+  })
+
+  it('setTextSizeAtom h2 → regular resets width only, leaving height for auto-grow', async () => {
+    const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { size: 'h2', w: 500, h: 400 }))
+
+    store.set(setTextSizeAtom, ['n1'], 'regular')
+
+    const node = store.get(nodeFamily('n1'))
+    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
+      'regular',
+    )
+    expect(node?.w).toBe(224) // CARD_WIDTH (GRID_SIZE * 14)
+    expect(node?.h).toBe(400) // untouched — auto-grow corrects it on next render
+  })
+
+  it('setTextSizeAtom is a no-op given the same size already set', async () => {
+    const { store, addNodeAtom, setTextSizeAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { size: 'h1' }))
+    const before = store.get(boardAtom)
+
+    store.set(setTextSizeAtom, ['n1'], 'h1')
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('setTextSizeAtom leaves an image/link card untouched', async () => {
+    const { store, addNodeAtom, setTextSizeAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1', { kind: 'image', imageId: 'img1' }))
+    const before = store.get(boardAtom)
+
+    store.set(setTextSizeAtom, ['n1'], 'h1')
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
   it('bringToFrontAtom moves the given ids to the end, preserving relative order of both groups', async () => {
     const { store, addNodeAtom, bringToFrontAtom, boardAtom } =
       await freshState()

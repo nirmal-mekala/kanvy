@@ -440,9 +440,37 @@ test('selection menu anchored to a mixed selection', async ({ browser }) => {
     await newAppMenu.waitFor()
     await prototypeMenu.waitFor()
 
+    // The text-size section's *option count* is intentionally different
+    // between the two apps (this app added h2/h3 alongside the renamed
+    // h1/"big" — the prototype only ever had the one regular/big toggle),
+    // so the menu wraps to an extra row and is taller here even though the
+    // shared chrome (swatch grid styling, dividers) is identical. Same fix
+    // as the help-panel scenario above: clip both screenshots to their
+    // shared height instead of asserting exact pixel dimensions.
+    const [newBox, protoBox] = await Promise.all([
+      newAppMenu.boundingBox(),
+      prototypeMenu.boundingBox(),
+    ])
+    if (!newBox || !protoBox) throw new Error('selection menu not rendered')
+    const sharedHeight = Math.floor(Math.min(newBox.height, protoBox.height))
+
     const [actual, expected] = await Promise.all([
-      newAppMenu.screenshot(),
-      prototypeMenu.screenshot(),
+      newAppPage.screenshot({
+        clip: {
+          x: newBox.x,
+          y: newBox.y,
+          width: newBox.width,
+          height: sharedHeight,
+        },
+      }),
+      prototypePage.screenshot({
+        clip: {
+          x: protoBox.x,
+          y: protoBox.y,
+          width: protoBox.width,
+          height: sharedHeight,
+        },
+      }),
     ])
     const result = diffScreenshots(actual, expected, {
       maxDiffPixelRatio: 0.08,

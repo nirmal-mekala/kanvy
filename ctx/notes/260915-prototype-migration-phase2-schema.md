@@ -52,7 +52,7 @@ interface CardBase extends NodeBase {
 
 interface TextCard extends CardBase {
   kind: 'text'
-  size: 'regular' | 'big'
+  size: 'regular' | 'h1' | 'h2' | 'h3'   // 'h1' renamed from the original 'big'; h2/h3 added alongside it
 }
 
 interface ImageCard extends CardBase {
@@ -103,7 +103,7 @@ Notes:
 - `CardNode` is a discriminated union over `kind` (`TextCard | ImageCard |
   LinkCard`), not one interface with optional `size`/`imageId`/`link`
   fields. This makes the invalid combinations prototype-migration phase 1 explicitly forbids —
-  `kind: 'image'` with `size: 'big'`, `kind: 'link'` with `imageId` set,
+  `kind: 'image'` with `size: 'h1'`, `kind: 'link'` with `imageId` set,
   etc. — unrepresentable in the type system rather than merely
   undocumented. `size` only exists on `TextCard`; `imageId` only on
   `ImageCard`; `link` only on `LinkCard`. A `switch (node.kind)` narrows to
@@ -112,8 +112,8 @@ Notes:
   - Converting a card between kinds (per prototype-migration phase 1 §2.2/§5.3/§5.4 — e.g. a
     text card becoming an image card on paste) is therefore a full object
     replacement at the type level, not a field mutation — matches the
-    actual behavior (dropping `size: 'big'` back to `'regular'`, discarding
-    stale `link`/`imageId` data) rather than fighting it.
+    actual behavior (dropping any heading size back to `'regular'`,
+    discarding stale `link`/`imageId` data) rather than fighting it.
 - `link` is nested rather than flat `linkUrl`/`linkTitle`/`linkImageUrl`/
   `linkStatus` — groups the fields that only make sense together.
 - `w`/`h`/`x`/`y` keep the prototype's short names rather than JSON Canvas's

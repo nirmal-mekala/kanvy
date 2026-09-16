@@ -12,7 +12,7 @@ import { makeImageDataUri } from './fixtures/testImage'
 // for rendered edges, `.edge-direction-control__btn` for the minimal
 // direction toggle.
 //
-// Run and passing (all 18) via the playwright-remote-browser skill. This
+// Run and passing (all 21) via the playwright-remote-browser skill. This
 // run caught a real bug: the edge direction-toggle buttons had no click
 // at all (missing `stopPropagation`, same class of bug as the zoom/help
 // buttons — see AGENTS.md). The direction-toggle spec also had to stop
@@ -26,6 +26,14 @@ import { makeImageDataUri } from './fixtures/testImage'
 // container is later dragged — v0.1 (spec §2.3) made this automatic:
 // there's no `parentId` to assign at creation time, containment is purely
 // spatial (x/y/w/h), re-derived fresh whenever something is dragged.
+// A later pass renamed the single "big text" size to `h1` and added `h2`/
+// `h3` — same free-8-way-resize/truncate/image-link-incompatible mechanics
+// across all three, only the rendered font size differs (spec §5.2). The
+// `big-text cards` describe block became `heading cards`, parametrized
+// across all three levels, plus a new test proving the selection menu's
+// heading-to-heading switches (e.g. h1 → h2) preserve the current
+// user-resized box instead of resetting it — only regular↔heading
+// transitions touch width/height.
 
 function textCard(id: string, x: number, y: number, content = '') {
   return {
@@ -162,7 +170,7 @@ test.describe('card-kind behavior (spec §5)', () => {
       nodes: [
         {
           ...textCard('a', 100, 100),
-          size: 'big',
+          size: 'h1',
           w: 320,
           h: 240,
         },
@@ -179,7 +187,7 @@ test.describe('card-kind behavior (spec §5)', () => {
     )
     await expect(
       page.locator('[data-node-id="a"]:not(.node-connector)'),
-    ).not.toHaveClass(/card--big/)
+    ).not.toHaveClass(/card--h1/)
   })
 })
 
@@ -422,67 +430,130 @@ test.describe('image cards (spec §5.3)', () => {
   })
 })
 
-test.describe('big-text cards (spec §5.2)', () => {
-  test('resizes via its handles, grid-snapped, and truncates overflow instead of scrolling', async ({
+test.describe('heading cards (spec §5.2)', () => {
+  for (const size of ['h1', 'h2', 'h3'] as const) {
+    test(`${size}: resizes via its handles, grid-snapped, and truncates overflow instead of scrolling`, async ({
+      page,
+    }) => {
+      await seed(page, {
+        version: 1,
+        nodes: [
+          {
+            ...textCard(
+              'a',
+              100,
+              100,
+              'a '.repeat(200), // long enough to overflow the fixed height
+            ),
+            size,
+            w: 320,
+            h: 240,
+          },
+        ],
+        edges: [],
+        images: {},
+      })
+      await page.goto('/')
+      const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+      await expect(card).toHaveClass(new RegExp(`card--${size}`))
+
+      // Truncated, not scrolled: overflow hidden despite content taller
+      // than the fixed box — identical mechanics across every heading
+      // level, only the font size (CSS) differs.
+      const textarea = card.locator('.card__content')
+      const overflowsButHidden = await textarea.evaluate((el) => {
+        const style = getComputedStyle(el)
+        return {
+          overflowY: style.overflowY,
+          overflows: el.scrollHeight > el.clientHeight,
+        }
+      })
+      expect(overflowsButHidden.overflows).toBe(true)
+      expect(overflowsButHidden.overflowY).toBe('hidden')
+
+      // Resize via the se handle, grid-snapped, past the documented minimum.
+      const handle = page.locator(
+        '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
+      )
+      const handleBox = await handle.boundingBox()
+      if (!handleBox) throw new Error('handle not rendered')
+
+      await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+      await page.mouse.down()
+      await page.mouse.move(handleBox.x + 5 + 53, handleBox.y + 5 + 37, {
+        steps: 5,
+      })
+      await page.mouse.up()
+
+      const box = await card.evaluate((el) => ({
+        w: Number.parseFloat((el as HTMLElement).style.width),
+        h: Number.parseFloat((el as HTMLElement).style.height),
+      }))
+      expect(box.w % 16).toBe(0)
+      expect(box.h % 16).toBe(0)
+      expect(box.w).toBeGreaterThan(320)
+      expect(box.h).toBeGreaterThan(240)
+    })
+  }
+
+  test('the selection menu toggles between regular and each heading level, preserving size across heading-to-heading switches', async ({
     page,
   }) => {
     await seed(page, {
       version: 1,
-      nodes: [
-        {
-          ...textCard(
-            'a',
-            100,
-            100,
-            'a '.repeat(200), // long enough to overflow the fixed height
-          ),
-          size: 'big',
-          w: 320,
-          h: 240,
-        },
-      ],
+      nodes: [textCard('a', 100, 100)],
       edges: [],
       images: {},
     })
     await page.goto('/')
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
     const card = page.locator('[data-node-id="a"]:not(.node-connector)')
-    await expect(card).toHaveClass(/card--big/)
 
-    // Truncated, not scrolled: overflow hidden despite content taller than
-    // the fixed box.
-    const textarea = card.locator('.card__content')
-    const overflowsButHidden = await textarea.evaluate((el) => {
-      const style = getComputedStyle(el)
-      return {
-        overflowY: style.overflowY,
-        overflows: el.scrollHeight > el.clientHeight,
-      }
-    })
-    expect(overflowsButHidden.overflows).toBe(true)
-    expect(overflowsButHidden.overflowY).toBe('hidden')
+    // regular -> h1: seeds the heading default box (no prior heading size
+    // to preserve from).
+    await page.locator('.textsize-swatch[title="Heading 1"]').click()
+    await expect(card).toHaveClass(/card--h1/)
+    const afterH1 = await card.evaluate((el) => ({
+      w: Number.parseFloat((el as HTMLElement).style.width),
+      h: Number.parseFloat((el as HTMLElement).style.height),
+    }))
+    expect(afterH1.w).toBeGreaterThan(224) // wider than CARD_WIDTH
 
-    // Resize via the se handle, grid-snapped, past the documented minimum.
+    // Resize it by hand, then switch h1 -> h2: relabels only, keeps the box.
     const handle = page.locator(
       '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
     )
     const handleBox = await handle.boundingBox()
     if (!handleBox) throw new Error('handle not rendered')
-
     await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
     await page.mouse.down()
-    await page.mouse.move(handleBox.x + 5 + 53, handleBox.y + 5 + 37, {
+    await page.mouse.move(handleBox.x + 5 + 80, handleBox.y + 5 + 64, {
       steps: 5,
     })
     await page.mouse.up()
-
-    const size = await card.evaluate((el) => ({
+    const afterResize = await card.evaluate((el) => ({
       w: Number.parseFloat((el as HTMLElement).style.width),
       h: Number.parseFloat((el as HTMLElement).style.height),
     }))
-    expect(size.w % 16).toBe(0)
-    expect(size.h % 16).toBe(0)
-    expect(size.w).toBeGreaterThan(320)
-    expect(size.h).toBeGreaterThan(240)
+
+    await page.locator('.textsize-swatch[title="Heading 2"]').click()
+    await expect(card).toHaveClass(/card--h2/)
+    await expect(card).not.toHaveClass(/card--h1/)
+    const afterH2 = await card.evaluate((el) => ({
+      w: Number.parseFloat((el as HTMLElement).style.width),
+      h: Number.parseFloat((el as HTMLElement).style.height),
+    }))
+    expect(afterH2).toEqual(afterResize)
+
+    // h2 -> regular: resets width back to CARD_WIDTH.
+    await page.locator('.textsize-swatch[title="Regular text"]').click()
+    await expect(card).not.toHaveClass(/card--h2/)
+    const afterRegular = await card.evaluate(
+      (el) => (el as HTMLElement).style.width,
+    )
+    expect(Number.parseFloat(afterRegular)).toBe(224)
   })
 })
 

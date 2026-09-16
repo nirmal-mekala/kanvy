@@ -57,13 +57,14 @@ a card's kind explicitly:
 
 ```
 kind: 'text' | 'image' | 'link'
-size: 'regular' | 'big'   // valid only when kind === 'text'
+size: 'regular' | 'h1' | 'h2' | 'h3'   // valid only when kind === 'text'
 ```
 
 Rules to preserve from current behavior:
-- `size: 'big'` is only ever valid for `kind: 'text'`. Converting a big-text
-  card to `image` or `link` drops the big-text sizing and returns it to the
-  regular text card's fixed width / content-driven height.
+- A heading size (`h1`/`h2`/`h3`) is only ever valid for `kind: 'text'`.
+  Converting a heading-sized card to `image` or `link` drops the heading
+  sizing and returns it to the regular text card's fixed width /
+  content-driven height.
 - `image` and `link` are mutually exclusive — a card is never both.
 - A card of any kind may have caption text (`content`); image/link cards
   hide the caption textarea when empty and not selected.
@@ -301,8 +302,9 @@ respect.
   drags it. This is deliberate: it lets a click-drag starting inside a
   container's body become a marquee-select over its contents instead.
 - Resize: a container is resized by dragging its border/corner handles
-  (8-way) at any time, not gated on selection; a big-text card gets the same
-  8-way handles. Both snap size to the grid with a documented minimum.
+  (8-way) at any time, not gated on selection; a heading-sized text card
+  (h1/h2/h3) gets the same 8-way handles. Both snap size to the grid with
+  a documented minimum.
 
 ### 4.5 Containers
 
@@ -342,15 +344,27 @@ respect.
   content — no internal scroll, ever.
 - Not rich text.
 
-### 5.2 Text — big
+### 5.2 Text — headings (h1/h2/h3)
 
 - A `size` variant of a text card, not a separate kind (per current
-  implementation and Q2's discriminated-union framing).
-- User-resizable in any direction (8-way handles), independent of content
-  length.
-- Truncates (does not scroll) when content overflows; wraps if room allows.
-- Toggle between regular/big via the selection menu; switching to `image` or
-  `link` always forces `size` back to `regular`.
+  implementation and Q2's discriminated-union framing) — three levels
+  (`h1`/`h2`/`h3`), matching the familiar HTML-heading size progression
+  (`h1` largest, `h3` smallest). `h1` is the migrated name for what an
+  earlier revision called `'big'` (a single heading size) — legacy boards
+  are backfilled (`schema/legacy.ts`).
+- All three levels share identical mechanics, differing only in rendered
+  font size:
+  - User-resizable in any direction (8-way handles), independent of
+    content length; same minimum and default box across all three levels.
+  - Truncates (does not scroll) when content overflows; wraps if room
+    allows.
+- Toggle between regular/h1/h2/h3 via the selection menu. Switching
+  between two heading levels (e.g. h1 → h2) only relabels the size — a
+  user-resized box is preserved, not reset. Switching to `image` or `link`
+  always forces `size` back to `regular` (drops the heading sizing
+  entirely); switching *from* regular *to* a heading level seeds a fixed
+  default box (a regular card's dimensions aren't meaningful free-resize
+  ones).
 - Can connect to other nodes via edges, same as any card.
 
 ### 5.3 Image
@@ -364,7 +378,7 @@ respect.
 - Fixed card width; height derived from the image's intrinsic aspect ratio.
 - Caption textarea hidden when empty and the card isn't selected; visible
   (with placeholder) once selected, or whenever it has text.
-- Never has `size: 'big'`.
+- Never has a heading size (`h1`/`h2`/`h3`).
 - Typing/pasting plain text into an image card's caption never triggers link
   "slurping" — always stays literal text.
 - Pasting an image into an image or link card's caption does nothing.
@@ -374,7 +388,7 @@ respect.
 - Created by: pasting a URL (and nothing else — see `isPlainUrl`) with
   nothing/a container selected, with a non-image, non-link card
   focused/selected (converts in place), or by "slurping" a URL typed into a
-  regular/big text card's content.
+  regular or heading-sized text card's content.
 - **Slurp trigger:** a URL is removed from the text and the card converts to
   a link card (a) the moment a space/newline is typed immediately after it
   while live-typing, or (b) on blur, if it's the last thing in the text
@@ -390,7 +404,7 @@ respect.
   (with an external-link icon, underlined on hover) is actually clickable to
   navigate — the preview image behaves like an image card's image
   (draggable, click-to-select/edit).
-- Never has `size: 'big'`; mutually exclusive with `image`.
+- Never has a heading size (`h1`/`h2`/`h3`); mutually exclusive with `image`.
 - Limit of one link per card — a second URL typed into the same text is left
   as plain text, not slurped.
 

@@ -122,7 +122,12 @@ function buildOurCard(n: SceneCard) {
   return {
     ...base,
     kind: 'text' as const,
-    size: n.size ?? ('regular' as const),
+    // `SceneCard.size` stays 'regular' | 'big' — the shared, prototype
+    // vocabulary (the prototype has no h1/h2/h3 concept, only 'big'; see
+    // buildPrototypeBoard/legacyCard below, which sends 'big' unchanged).
+    // Our app's schema renamed 'big' to 'h1' — this is the one place that
+    // translation happens, isolated exactly like LEGACY_PATTERN_KEY below.
+    size: n.size === 'big' ? ('h1' as const) : ('regular' as const),
     content: n.content ?? '',
   }
 }

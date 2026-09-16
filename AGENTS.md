@@ -27,14 +27,14 @@ behavior description.
 **Verified, as of this writing (all re-run fresh, not assumed) — every
 tier this migration planned to have is now real, run, and green, not just
 written:**
-- `pnpm test` — 214/214 passing.
+- `pnpm test` — 224/224 passing.
 - `pnpm typecheck` / `pnpm build` — clean.
 - `pnpm lint` — clean (a handful of pre-existing warnings only: one
   `noNonNullAssertion` in the Vite-generated `main.tsx`, a few CSS
   `noDescendingSpecificity` notices — none are errors).
 - `npx fallow audit --format json --quiet --gate-marker agent` — verdict
   `pass`, zero newly-introduced dead-code/complexity/duplication findings.
-- **`pnpm e2e` — 78/78 passing, against a real browser** (the full
+- **`pnpm e2e` — 81/81 passing, against a real browser** (the full
   interaction e2e suite, `ctx/notes/260915-phase6-e2e-test-scenario-checklist.md`'s
   entire interaction-tier scenario list, including every gap that
   checklist previously left unwritten — dragging/container geometry edge

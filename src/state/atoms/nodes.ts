@@ -12,9 +12,9 @@
 
 import { atom } from 'jotai'
 import {
-  BIG_TEXT_DEFAULT_H,
-  BIG_TEXT_DEFAULT_W,
   CARD_WIDTH,
+  HEADING_DEFAULT_H,
+  HEADING_DEFAULT_W,
 } from '../../geometry/constants'
 import type { Board } from '../../schema/board'
 import type {
@@ -26,6 +26,7 @@ import type {
   PatternKey,
   TaskStatus,
   TextCard,
+  TextSize,
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
@@ -385,16 +386,22 @@ export const setPatternAtom = atom(
 )
 
 /**
- * Toggles `size` on every selected `kind: 'text'` card (spec §5.2) — any
- * image/link card in `ids` is left untouched (they're never `'big'`).
- * Switching to `'big'` seeds a fixed default box; switching back to
- * `'regular'` only resets `w` — `h` is left for the card's own auto-grow
- * measurement (spec §2.4) to correct on its next render, matching how a
- * freshly-created regular card's height is established.
+ * Sets `size` on every selected `kind: 'text'` card (spec §5.2) — any
+ * image/link card in `ids` is left untouched (they never carry a `size`
+ * at all). Three transition shapes:
+ * - `'regular'` → a heading level (h1/h2/h3): seeds a fixed default box —
+ *   a regular card's `w`/`h` aren't meaningful free-resize dimensions.
+ * - a heading level → `'regular'`: only resets `w` — `h` is left for the
+ *   card's own auto-grow measurement (spec §2.4) to correct on its next
+ *   render, matching how a freshly-created regular card's height is
+ *   established.
+ * - one heading level → another (e.g. h1 → h2): both are already
+ *   free-resize, so this only relabels `size` — whatever width/height the
+ *   user already set stays as-is, it isn't reset to the toggle-on default.
  */
 export const setTextSizeAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], size: 'regular' | 'big') => {
+  (_get, set, ids: readonly NodeId[], size: TextSize) => {
     patchSelectedNodes(
       set,
       ids,
@@ -403,15 +410,21 @@ export const setTextSizeAtom = atom(
       (node, now) => {
         // `skip` already guarantees `type === 'card', kind === 'text'` here.
         const card = node as TextCard
-        return size === 'big'
-          ? {
-              ...card,
-              size,
-              w: BIG_TEXT_DEFAULT_W,
-              h: BIG_TEXT_DEFAULT_H,
-              updatedAt: now,
-            }
-          : { ...card, size, w: CARD_WIDTH, updatedAt: now }
+        const wasHeading = card.size !== 'regular'
+        const becomingHeading = size !== 'regular'
+        if (becomingHeading && !wasHeading) {
+          return {
+            ...card,
+            size,
+            w: HEADING_DEFAULT_W,
+            h: HEADING_DEFAULT_H,
+            updatedAt: now,
+          }
+        }
+        if (!becomingHeading) {
+          return { ...card, size, w: CARD_WIDTH, updatedAt: now }
+        }
+        return { ...card, size, updatedAt: now }
       },
     )
   },

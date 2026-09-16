@@ -51,12 +51,12 @@ describe('BoardSchema', () => {
     expect(BoardSchema.safeParse(createSeedBoard()).success).toBe(true)
   })
 
-  it('rejects a big-size image card (invalid kind/size combination)', () => {
+  it('rejects a heading-size image card (invalid kind/size combination)', () => {
     const invalid = {
       ...validTextCard(),
       kind: 'image',
       imageId: 'img1',
-      size: 'big',
+      size: 'h1',
     }
     const board = {
       version: SCHEMA_VERSION,

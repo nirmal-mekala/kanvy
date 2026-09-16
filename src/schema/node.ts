@@ -76,10 +76,17 @@ const CardBaseSchema = NodeBaseSchema.extend({
   content: z.string(),
 })
 
+// Free 8-way-resizable heading levels (h1 largest, h3 smallest), matching
+// HTML heading conventions — spec §5.2. `h1` is the migrated name for what
+// v0 called `'big'` (schema/legacy.ts backfills the old spelling).
+// fallow-ignore-next-line unused-export
+export const TextSizeSchema = z.enum(['regular', 'h1', 'h2', 'h3'])
+export type TextSize = z.infer<typeof TextSizeSchema>
+
 // fallow-ignore-next-line unused-export
 export const TextCardSchema = CardBaseSchema.extend({
   kind: z.literal('text'),
-  size: z.enum(['regular', 'big']),
+  size: TextSizeSchema,
 }).strict()
 // fallow-ignore-next-line unused-type
 export type TextCard = z.infer<typeof TextCardSchema>

@@ -573,20 +573,37 @@ body {
   outline: none;
 }
 
-/* Big text: an explicit height (set inline from node.h) instead of growing
-   with content, a large font, truncated (not scrolled) on overflow. */
-.card--big .card__inner {
+/* Heading sizes (h1/h2/h3): an explicit height (set inline from node.h)
+   instead of growing with content, a large font, truncated (not scrolled)
+   on overflow — identical mechanics across all three levels, only the
+   font size differs (HTML-heading-like: h1 largest, h3 smallest). */
+.card--h1 .card__inner,
+.card--h2 .card__inner,
+.card--h3 .card__inner {
   position: relative;
   height: 100%;
 }
 
-.card--big .card__content {
+.card--h1 .card__content,
+.card--h2 .card__content,
+.card--h3 .card__content {
   position: absolute;
   inset: 17px 0 0 0;
   height: auto;
   overflow: hidden;
-  font-size: 3rem;
   line-height: 1.2;
+}
+
+.card--h1 .card__content {
+  font-size: 3rem;
+}
+
+.card--h2 .card__content {
+  font-size: 2.25rem;
+}
+
+.card--h3 .card__content {
+  font-size: 1.75rem;
 }
 
 /* ---------- container ---------- */

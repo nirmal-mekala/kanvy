@@ -14,13 +14,13 @@ export const CARD_WIDTH = GRID_SIZE * 14
  */
 export const NEW_CARD_HEIGHT_ESTIMATE = 90
 
-/** Minimum size for a big-text card's 8-way resize (spec §4.4), ported from the prototype. */
-export const BIG_TEXT_MIN_W = GRID_SIZE * 10
-export const BIG_TEXT_MIN_H = GRID_SIZE * 6
+/** Minimum size for a heading-sized (h1/h2/h3) card's 8-way resize (spec §4.4), ported from the prototype — shared by all three levels. */
+export const HEADING_MIN_W = GRID_SIZE * 10
+export const HEADING_MIN_H = GRID_SIZE * 6
 
-/** Starting size when a regular text card is switched to `size: 'big'` via the selection menu (spec §5.2). */
-export const BIG_TEXT_DEFAULT_W = GRID_SIZE * 16
-export const BIG_TEXT_DEFAULT_H = GRID_SIZE * 8
+/** Starting size when a regular text card is switched to a heading size (h1/h2/h3) via the selection menu (spec §5.2). */
+export const HEADING_DEFAULT_W = GRID_SIZE * 16
+export const HEADING_DEFAULT_H = GRID_SIZE * 8
 
 /** Minimum size for a container's 8-way resize (spec §4.4), ported from the prototype. */
 export const CONTAINER_MIN_W = GRID_SIZE * 8

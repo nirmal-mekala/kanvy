@@ -20,7 +20,7 @@
 
 import { customAlphabet } from 'nanoid'
 import { SCHEMA_VERSION } from './board'
-import type { PatternKey } from './node'
+import type { PatternKey, TextSize } from './node'
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12)
 
@@ -41,6 +41,14 @@ const LEGACY_PATTERN_MAP: Record<string, PatternKey> = {
   topography: 'topography',
   yyy: 'yyy',
   corkScrew: 'corkscrew',
+}
+
+/** `'big'` was v0's only heading size, renamed `'h1'` when h2/h3 were added. */
+const TEXT_SIZE_MAP: Record<string, TextSize> = {
+  big: 'h1',
+  h1: 'h1',
+  h2: 'h2',
+  h3: 'h3',
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -93,7 +101,7 @@ function legacyCardKindFields(
     }
   }
   const legacySize = card.textSize ?? card.size
-  return { kind: 'text', size: legacySize === 'big' ? 'big' : 'regular' }
+  return { kind: 'text', size: TEXT_SIZE_MAP[String(legacySize)] ?? 'regular' }
 }
 
 function normalizeLegacyCard(
@@ -208,6 +216,14 @@ function stripParentId(node: Record<string, unknown>): Record<string, unknown> {
   return rest
 }
 
+/** Remaps a legacy `size` value (e.g. `'big'` → `'h1'`) on an already v0-shaped node. No-op for a node with no `size` field (containers, image/link cards). */
+function migrateTextSize(
+  node: Record<string, unknown>,
+): Record<string, unknown> {
+  if (typeof node.size !== 'string') return node
+  return { ...node, size: TEXT_SIZE_MAP[node.size] ?? 'regular' }
+}
+
 function backfillV0Board(
   parsed: Record<string, unknown>,
   now: string,
@@ -219,7 +235,9 @@ function backfillV0Board(
     // just had `parentId` stripped, so it's no longer meaningfully "v1".
     version: SCHEMA_VERSION,
     nodes: nodes.map((node) =>
-      isRecord(node) ? stripParentId(backfillTimestamps(node, now)) : node,
+      isRecord(node)
+        ? migrateTextSize(stripParentId(backfillTimestamps(node, now)))
+        : node,
     ),
     edges: edges.map((edge) =>
       isRecord(edge) ? backfillTimestamps(edge, now) : edge,

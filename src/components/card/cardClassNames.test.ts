@@ -3,7 +3,7 @@ import type { CardNode } from '../../schema/node'
 import { cardClassNames } from './cardClassNames'
 
 const baseOpts = {
-  isBig: false,
+  headingSize: null,
   isDone: false,
   isDimmed: false,
   selected: false,
@@ -35,9 +35,20 @@ describe('cardClassNames', () => {
     expect(cardClassNames(textNode, baseOpts)).toBe('card')
   })
 
-  it('adds card--big when isBig', () => {
-    expect(cardClassNames(textNode, { ...baseOpts, isBig: true })).toContain(
-      'card--big',
+  it('adds card--h1/h2/h3 for the matching heading size', () => {
+    for (const size of ['h1', 'h2', 'h3'] as const) {
+      expect(
+        cardClassNames(textNode, { ...baseOpts, headingSize: size }),
+      ).toContain(`card--${size}`)
+    }
+  })
+
+  it('adds no heading class for regular size or no heading size at all', () => {
+    expect(
+      cardClassNames(textNode, { ...baseOpts, headingSize: 'regular' }),
+    ).toBe('card')
+    expect(cardClassNames(textNode, { ...baseOpts, headingSize: null })).toBe(
+      'card',
     )
   })
 
