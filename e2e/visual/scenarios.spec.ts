@@ -16,18 +16,18 @@ import {
 // (paired dev servers, playwright.visual.config.ts) and diffs a
 // screenshot of each via pixelmatch (e2e/visual/diff.ts).
 //
-// STATUS: written against the real seeding/schema/CSS-class contracts
-// established by Stages 1-9 (verified by reading src/schema/, src/state/
-// atoms/{theme,viewMode}.ts, and ctx/support/260915-prototype-source/src/
-// state/*.js directly — see e2e/visual/scenes.ts's comments for exact
-// evidence), but NOT executed end-to-end in this environment: this
-// container has no display server/system libraries for a local headless
-// browser, and while a Playwright server on the host Mac is reachable
-// over ws://host.docker.internal, that remote browser cannot route back
-// to page.goto() this container's own dev server (confirmed repeatedly
-// by every prior phase 7 stage). Run with `pnpm e2e:visual:setup` once,
-// then `pnpm e2e:visual`, in an environment where that networking path
-// works.
+// STATUS: run and passing (21/21) via the playwright-remote-browser skill
+// — both dev servers on two of this container's published ports, per
+// AGENTS.md. This tier's first-ever real run found and fixed three bugs:
+// a container pattern's tint color was theme-varying instead of the fixed
+// neutral it's supposed to be (Container.tsx/SelectionMenu.tsx), this
+// harness's own `scenes.ts` mismapped three pattern keys' casing against
+// the prototype's `PATTERNS` object (silently rendering blank patterns on
+// the prototype side), and the help-panel scenario assumed exact-pixel
+// screenshot dimensions despite the two apps' intentionally different
+// shortcut-list wording changing its wrapped height by a few px. See
+// ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's
+// "Visual-regression tier" section for the full writeup.
 
 const NEW_APP_URL = `http://localhost:${process.env.KANVY_VISUAL_NEW_APP_PORT ?? '5173'}`
 const PROTOTYPE_URL = `http://localhost:${process.env.KANVY_VISUAL_PROTOTYPE_PORT ?? '5174'}`
@@ -343,9 +343,39 @@ test('help panel open', async ({ browser }) => {
     await newAppPanel.waitFor()
     await prototypePanel.waitFor()
 
+    // The shortcut list's *wording* is intentionally different between the
+    // two apps (v0's approved "card"/"container" terminology rename vs.
+    // the prototype's original "note"/"grouping box" — see AGENTS.md), so
+    // the table's wrapped row heights can differ by a few px even though
+    // the dialog chrome itself (border, title, row styling) is identical.
+    // Clip both screenshots to their shared height instead of asserting
+    // exact pixel dimensions.
+    const [newBox, protoBox] = await Promise.all([
+      newAppPanel.boundingBox(),
+      prototypePanel.boundingBox(),
+    ])
+    if (!newBox || !protoBox) throw new Error('help panel not rendered')
+    const sharedHeight = Math.floor(Math.min(newBox.height, protoBox.height))
+
+    // `clip` is page-viewport-relative, not element-relative — only
+    // `page.screenshot()` supports it (`Locator.screenshot()` doesn't).
     const [actual, expected] = await Promise.all([
-      newAppPanel.screenshot(),
-      prototypePanel.screenshot(),
+      newAppPage.screenshot({
+        clip: {
+          x: newBox.x,
+          y: newBox.y,
+          width: newBox.width,
+          height: sharedHeight,
+        },
+      }),
+      prototypePage.screenshot({
+        clip: {
+          x: protoBox.x,
+          y: protoBox.y,
+          width: protoBox.width,
+          height: sharedHeight,
+        },
+      }),
     ])
     const result = diffScreenshots(actual, expected, {
       maxDiffPixelRatio: 0.05,

@@ -91,7 +91,7 @@ export function useClipboardShortcuts({
     // Plain OS-clipboard text as a new card, centered in the viewport,
     // stripped of any rich formatting (text/plain already is).
     const text = e.clipboardData?.getData('text/plain')
-    if (!text || !text.trim()) return
+    if (!text?.trim()) return
     e.preventDefault()
     const center = viewportCenter()
     const card = newTextCard(center.x, center.y, text)

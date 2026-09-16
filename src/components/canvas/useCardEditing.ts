@@ -31,7 +31,7 @@ export function useCardEditing({
   // fallow-ignore-next-line complexity
   function handleContentChange(id: NodeId, content: string) {
     const node = nodesById.get(id)
-    if (!node || node.type !== 'card') return
+    if (node?.type !== 'card') return
     updateCardContent(id, content)
 
     if (node.kind !== 'text') return
@@ -52,7 +52,7 @@ export function useCardEditing({
   // fallow-ignore-next-line complexity
   function handleContentBlur(id: NodeId) {
     const node = nodesById.get(id)
-    if (!node || node.type !== 'card' || node.kind !== 'text') return
+    if (node?.type !== 'card' || node.kind !== 'text') return
     const slurp = detectSlurpOnBlur(node.content)
     if (!slurp) return
     replaceNode(

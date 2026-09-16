@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   type ColorKey,
   isThemeDynamic,
+  PATTERN_TINT,
   resolveColorHex,
   swatchBackground,
 } from './colorKey'
@@ -44,6 +45,13 @@ describe('isThemeDynamic', () => {
     for (const color of nonGrayColors) {
       expect(isThemeDynamic(color)).toBe(false)
     }
+  })
+})
+
+describe('PATTERN_TINT', () => {
+  it("is gray's plain (dark-mode) hex, not the light-mode-only special case — a container pattern's tint never changes with theme", () => {
+    expect(PATTERN_TINT).toBe(resolveColorHex('gray', 'dark'))
+    expect(PATTERN_TINT).not.toBe(resolveColorHex('gray', 'light'))
   })
 })
 

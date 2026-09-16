@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
-import { resolveColorHex, type Theme } from '../../colors/colorKey'
+import { PATTERN_TINT, type Theme } from '../../colors/colorKey'
 import { patternBackgroundImage } from '../../colors/patterns'
 import type { Side } from '../../geometry/anchor'
 import type { ContainerNode } from '../../schema/node'
@@ -69,7 +69,7 @@ export function Container({
   const patternImage =
     viewMode === 'task'
       ? undefined
-      : patternBackgroundImage(node.pattern, resolveColorHex('gray', theme))
+      : patternBackgroundImage(node.pattern, PATTERN_TINT)
 
   const classNames = ['container-node', selected && 'container-node--selected']
     .filter(Boolean)

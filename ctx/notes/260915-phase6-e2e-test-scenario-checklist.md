@@ -54,20 +54,26 @@ link card's title) — see `useBoardInteraction.ts`'s
 - [x] Shift/Ctrl/Cmd+click toggles additive selection (Shift tested directly; Ctrl/Cmd share the same code path)
 - [x] Marquee-select on blank canvas
 - [x] Marquee starting inside a container's body excludes that container and its ancestors
-- [ ] Marquee starting inside a container's body still selects nested containers within it
+- [x] Marquee starting inside a container's body still selects nested containers within it
 - [x] Plain click (no movement) on a container's body selects it
 - [x] Clicking an already-multi-selected card without a modifier preserves the multi-selection
 
 ### Dragging & snapping (spec §4.4) — Stage 5
 Specs in `e2e/interaction.spec.ts` (`dragging & snapping` describe block),
-run via `playwright-remote-browser` — all pass (once unblocked by the
-selection-locator fix above; dragging itself needed no code changes).
+run via `playwright-remote-browser` — all pass. No app bugs found in this
+batch; one test-authoring gotcha worth noting for future specs: a
+`textCard` fixture's seeded `h` isn't necessarily its *actual* rendered
+height — `setNodeHeightAtom`'s auto-measure sync (see AGENTS.md) corrects
+it to the real DOM measurement shortly after mount (e.g. a short one-line
+card measures ~86px, not the seeded 90px), so tests asserting exact
+Y-snap/no-fly-zone geometry should read a card's real height back from its
+own `boundingBox()` rather than assume the seed value.
 - [x] X-axis snaps to grid midpoints
-- [ ] Y-axis gutter-snaps near a column-overlapping neighbor's edge
-- [ ] Container no-fly-zone clamping
+- [x] Y-axis gutter-snaps near a column-overlapping neighbor's edge
+- [x] Container no-fly-zone clamping
 - [x] Dragging a container moves its formal descendants recursively
-- [ ] Dragging a nested container never moves its ancestor(s)
-- [ ] Dragging a multi-selection preserves relative positions
+- [x] Dragging a nested container never moves its ancestor(s)
+- [x] Dragging a multi-selection preserves relative positions
 - [x] Container body is not a drag surface (only the top handle bar)
 - [x] 8-way resize (containers always; big-text cards only), grid-snapped with documented minimum
 
@@ -76,16 +82,24 @@ Specs in `e2e/interaction.spec.ts` (`containers` describe block), run via
 `playwright-remote-browser` — all pass.
 - [x] Ctrl/Cmd+click-drag creates a container, winning over starting on an existing node
 - [x] Drop-by-largest-overlap parent assignment
-- [ ] Node with no overlapping container has no parent
-- [ ] Containers always render beneath cards
+- [x] Node with no overlapping container has no parent
+- [x] Containers always render beneath cards
 
 ### Card-kind behavior (spec §5) — Stage 6
-Specs in `e2e/cards.spec.ts` (`card-kind behavior` describe block), run via
-`playwright-remote-browser` — all pass.
+Specs in `e2e/cards.spec.ts` (`card-kind behavior`, `image cards`, and
+`big-text cards` describe blocks), run via `playwright-remote-browser` —
+all pass. No app bugs found in this batch. Image-card specs needed two
+new fixtures: `e2e/fixtures/dragDrop.ts` (`dispatchImageFileDrop`, mocking
+a file-drop `DataTransfer` the same way `dispatchPaste` mocks clipboard
+data) and `e2e/fixtures/testImage.ts` (`makeImageDataUri`, rendering an
+arbitrary-size PNG via an in-page `<canvas>` — no network fetch needed —
+so the downsizing-pipeline spec can exercise `MAX_IMAGE_DIMENSION` with a
+real oversized image and assert the stored `<img>`'s actual
+`naturalWidth`/`naturalHeight` came out downsized).
 - [x] Text card creation (⌘/Ctrl+N tested directly in `e2e/clipboard.spec.ts`; double-click not covered by a spec)
-- [ ] Big-text resize, truncation (not scroll), toggle back to regular on kind conversion
-- [ ] Image card creation (file drop, paste with nothing/container selected, paste onto a convertible card)
-- [ ] Image downsizing pipeline produces a base64 data URI
+- [x] Big-text resize, truncation (not scroll), toggle back to regular on kind conversion
+- [x] Image card creation (file drop, paste with nothing/container selected, paste onto a convertible card)
+- [x] Image downsizing pipeline produces a base64 data URI
 - [x] Link card creation (paste URL, slurp from typed text) — mock via `e2e/fixtures/linkMetadata.ts`
 - [x] Link metadata retry/timeout path — mock a slow/failing response via `e2e/fixtures/linkMetadata.ts`
 - [x] Kind conversion resets `size` to `regular`; discards stale `image`/`link` data
@@ -102,7 +116,7 @@ hit path; now dispatches straight to `.edge__hit`.
 - [x] Connector affordance appears on hover, generous hit area
 - [x] At most one edge per pair; a second attempt selects the existing edge
 - [x] Direction toggle (none/forward/backward) via selection menu
-- [ ] Edge path leaves/arrives perpendicular to the chosen side (no spec asserts the path geometry itself)
+- [x] Edge path leaves/arrives perpendicular to the chosen side — this is a pure-function property of `geometry/curve.ts`'s `bezierPath`, not a pointer-interaction one, so it's covered by **unit** tests (`curve.test.ts`'s new parametrized "leaves the '%s' side heading outward" cases) rather than an e2e spec, matching spec §13's testing-tier split
 
 ### Clipboard & shortcuts (spec §7, §4.2) — Stage 7
 Specs in `e2e/clipboard.spec.ts`, run via `playwright-remote-browser` —
@@ -116,11 +130,17 @@ textarea used to make the node unselectable, so nothing was ever
 copied/duplicated/deleted) — several of these specs now click
 `.card__bar` specifically, since clicking into the caption textarea is
 correct-and-intentional text-edit focus, not something these board-level
-shortcut tests should trigger.
+shortcut tests should trigger. A later pass added the paste-pans-viewport
+spec, which also caught (and fixed) a latent, silently-wrong test pattern:
+`.filter({ hasNot: page.locator(...) })` checks for a *descendant* match,
+not "isn't this element" — the pre-existing "paste always lands outside
+every container" spec had been relying on DOM-order luck (`.last()`)
+rather than the filter actually excluding anything. Both now use a direct
+`:not([data-node-id="..."])` exclusion.
 - [x] In-app clipboard copy/paste with staircase offset on repeated paste — mock via `e2e/fixtures/clipboard.ts`
 - [x] Paste always lands outside every container
-- [ ] Paste outside viewport pans (without zoom change) into view
-- [x] OS-clipboard priority order: plain-text branch tested directly; image/URL-only branches not covered by a spec
+- [x] Paste outside viewport pans (without zoom change) into view
+- [x] OS-clipboard priority order: plain-text tested here; image and URL-only branches tested in `e2e/cards.spec.ts` (`image cards`/`card-kind behavior` describe blocks) — all three paths now covered
 - [x] Every keyboard shortcut in spec §4.2's table: ⌘/Ctrl+N/D/Z, Backspace tested directly; not every row in the table has a spec
 - [x] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut
 
@@ -137,14 +157,15 @@ recency mode's fidelity for essentially every card, every session. Fixed
 by giving height-sync its own atom (`setNodeHeightAtom` in
 `state/atoms/nodes.ts`) that patches `h` without bumping `updatedAt`;
 regression-covered in `nodes.test.ts`. Recency's periodic re-evaluation
-(Canvas.tsx's 60s interval while that view is active) still isn't covered
-by a spec — awkward to assert deterministically without fake timers wired
-through the harness; verify manually or add a spec later if this becomes a
-real gap.
+(Canvas.tsx's 60s interval while that view is active) is now covered too,
+using Playwright's `page.clock` API (installed before navigation, so it
+controls the interval `Canvas.tsx` sets up on mount) to fast-forward past
+both the 60s interval and a lime→amber recency-threshold boundary
+deterministically, with no real-world wait and no flakiness risk.
 - [x] Task toggle idempotent on re-toggle
 - [x] Status cycling only via selection menu
 - [x] Standard / Task / Recency view mode rendering rules
-- [ ] Recency mode re-evaluates periodically while active (wall-clock-driven)
+- [x] Recency mode re-evaluates periodically while active (wall-clock-driven)
 - [x] `done` styling: strikethrough/dim text tested; theme-tinted image overlay not covered (no image-card spec)
 
 ### Error handling, a11y, touch (spec §9, §11, §12) — Stage 9
@@ -166,26 +187,67 @@ both servers, screenshot via `page.screenshot()`, diff via
 `e2e/visual/diff.ts` at `threshold: 0.2` / `maxDiffPixelRatio: 0.01`
 (tighten per-scenario where an exact match is expected).
 
-All nine scenarios below are written in `e2e/visual/scenarios.spec.ts`,
-using `e2e/visual/scenes.ts`'s shared scene-builder (one scenario
-description compiled into both the new app's v0 schema and the
-prototype's legacy `{cards, groups, edges}` shape, verified field-by-field
-against `ctx/support/260915-prototype-source/src/data/board.js` and
-`src/schema/node.ts` — see that file's own comments for the exact
-evidence) — but **not run to a passing result**: same hard environment
-limitation as every interaction-e2e section above (confirmed again this
-stage: `pnpm e2e` fails locally with the missing-`libglib` error, and the
-host-Mac remote-browser workaround still has no route back into this
-container's dev server). Run `pnpm e2e:visual:setup` once and then `pnpm
-e2e:visual` for real (CI, or a dev environment without this networking
-split) before checking any of these off — do not check based on code
-review alone.
-- [ ] Default seed board, standard view, light theme
-- [ ] Default seed board, standard view, dark theme
-- [ ] Each card kind (text regular, text big, image, link) in isolation
-- [ ] Each container pattern (none, diagonal, graph-paper, wiggle, plus, jupiter, topography, yyy, corkscrew)
-- [ ] Task view with a mix of statuses
-- [ ] Recency view across all 4 thresholds
-- [ ] `done` styling (struck-through text, tinted image overlay)
-- [ ] Help panel open
-- [ ] Selection menu anchored to a mixed selection
+All 21 scenarios below (nine top-level categories, some parametrized —
+e.g. one case per card kind or container pattern) are written in
+`e2e/visual/scenarios.spec.ts`, using `e2e/visual/scenes.ts`'s shared
+scene-builder. **Now run and passing (21/21)**, via the
+`playwright-remote-browser` skill with both dev servers (the new app and
+the vendored prototype under `ctx/support/260915-prototype-source/`)
+started on two of this container's published ports
+(`KANVY_VISUAL_NEW_APP_PORT` / `KANVY_VISUAL_PROTOTYPE_PORT`, same
+mechanism as `KANVY_E2E_PORT`) — see AGENTS.md for the exact setup. This
+was the first time this tier ever actually ran against a live browser, and
+it found and fixed three real, previously-undetected bugs:
+
+- **A container's pattern tint used the wrong color in light theme.**
+  `Container.tsx` and `SelectionMenu.tsx` called
+  `resolveColorHex('gray', theme)` for the pattern fill — but that
+  function's `gray`-in-light-theme special case is for *border/accent*
+  rendering specifically (spec §3's "gray reads low-contrast against light
+  surfaces" fix), not the pattern tint, which per `patterns.ts`'s own
+  (correct, but previously unenforced) docstring is supposed to be "always
+  this one fixed neutral tone" regardless of theme, exactly matching the
+  prototype's `COLORS.gray` constant. Fixed by adding a dedicated
+  `PATTERN_TINT` export to `colors/colorKey.ts` and using it at both call
+  sites; regression-covered in `colorKey.test.ts`. This silently affected
+  *every* container pattern in light theme, not just the one that happened
+  to fail the diff-ratio threshold (`yyy` — its fill is dense enough that
+  the wrong tint pushed it over 2%; sparser patterns had the same bug but
+  stayed under threshold).
+- **The visual-diff harness itself had a pattern-key casing bug.**
+  `e2e/visual/scenes.ts`'s `legacyGroup` passed the v0 schema's
+  `PatternKey` spelling straight through to the prototype's board shape,
+  but the prototype's own `PATTERNS` object uses different casing for
+  three of them (`diagonal`→`diagonalLines`, `graph-paper`→`graphPaper`,
+  `corkscrew`→`corkScrew`) — the mismatch silently made the *prototype*
+  render no pattern at all for those three scenarios (confirmed directly:
+  seeding the prototype with `pattern: 'corkscrew'` produces
+  `background-image: none`). Only `corkscrew`'s dense fill made "pattern
+  vs. blank" cross the 2% threshold; `diagonal`/`graph-paper` had the same
+  defect but were sparse enough to pass anyway, undetected. Fixed with a
+  `LEGACY_PATTERN_KEY` translation table in `scenes.ts`.
+- **The help-panel scenario's screenshot-size assumption doesn't hold.**
+  The shortcut list's *wording* is intentionally different between the two
+  apps (v0's approved "card"/"container" terminology rename vs. the
+  prototype's original "note"/"grouping box" — an in-scope, spec-approved
+  change, not a bug), which wraps a couple of the longer descriptive
+  sentences differently and changes the panel's natural height by a few
+  px. The scenario now clips both screenshots to their shared height
+  (`page.screenshot({ clip })`, since `Locator.screenshot()` doesn't
+  support `clip`) instead of asserting exact-pixel dialog dimensions.
+
+Diagnosing all three took directly comparing computed
+`backgroundImage`/`boundingBox` values between the two live apps (not just
+the pixel diff itself) — worth remembering as the playbook for any future
+visual-regression failure here: get the actual computed style/geometry
+from both pages before assuming the diff ratio alone tells you what's
+different.
+- [x] Default seed board, standard view, light theme
+- [x] Default seed board, standard view, dark theme
+- [x] Each card kind (text regular, text big, image, link) in isolation
+- [x] Each container pattern (none, diagonal, graph-paper, wiggle, plus, jupiter, topography, yyy, corkscrew)
+- [x] Task view with a mix of statuses
+- [x] Recency view across all 4 thresholds
+- [x] `done` styling (struck-through text, tinted image overlay)
+- [x] Help panel open
+- [x] Selection menu anchored to a mixed selection

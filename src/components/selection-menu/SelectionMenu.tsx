@@ -5,7 +5,7 @@
 
 import { Heading1, List, ListTodo, Type } from 'lucide-react'
 import {
-  resolveColorHex,
+  PATTERN_TINT,
   swatchBackground,
   type Theme,
 } from '../../colors/colorKey'
@@ -103,7 +103,7 @@ export function SelectionMenu({
                 style={{
                   backgroundImage: patternBackgroundImage(
                     pattern,
-                    resolveColorHex('gray', theme),
+                    PATTERN_TINT,
                     1,
                   ),
                 }}

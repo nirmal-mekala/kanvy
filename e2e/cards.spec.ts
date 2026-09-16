@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { seedBoard } from './fixtures/board'
 import { dispatchPaste } from './fixtures/clipboard'
+import { dispatchImageFileDrop } from './fixtures/dragDrop'
 import { mockLinkMetadata } from './fixtures/linkMetadata'
+import { makeImageDataUri } from './fixtures/testImage'
 
 // Stage 6 (card-kind behavior & connections) — spec §4.6, §5.
 // Written against the actual DOM contract: `[data-node-id]:not(.node-connector)` on every
@@ -10,12 +12,15 @@ import { mockLinkMetadata } from './fixtures/linkMetadata'
 // for rendered edges, `.edge-direction-control__btn` for the minimal
 // direction toggle.
 //
-// Run and passing (all 9) via the playwright-remote-browser skill. This
+// Run and passing (all 15) via the playwright-remote-browser skill. This
 // run caught a real bug: the edge direction-toggle buttons had no click
 // at all (missing `stopPropagation`, same class of bug as the zoom/help
 // buttons — see AGENTS.md). The direction-toggle spec also had to stop
 // clicking the edge's `<g>` by bounding-box center (unreliable for a
-// curved bezier path) and dispatch straight to `.edge__hit` instead.
+// curved bezier path) and dispatch straight to `.edge__hit` instead. A
+// later pass added the `image cards` and `big-text cards` describe
+// blocks (previously unwritten scenarios) — both passed cleanly, no app
+// bugs found there.
 
 function textCard(id: string, x: number, y: number, content = '') {
   return {
@@ -29,6 +34,21 @@ function textCard(id: string, x: number, y: number, content = '') {
     h: 90,
     color: 'gray',
     content,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function containerNode(id: string, x: number, y: number, w: number, h: number) {
+  return {
+    id,
+    type: 'container',
+    pattern: 'none',
+    color: 'gray',
+    x,
+    y,
+    w,
+    h,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
@@ -266,5 +286,183 @@ test.describe('connections (spec §4.6)', () => {
     await expect(
       page.locator('[data-edge-id="e1"] .edge__line'),
     ).toHaveAttribute('marker-end', /edge-arrow/)
+  })
+})
+
+test.describe('image cards (spec §5.3)', () => {
+  test('dropping an image file onto blank canvas creates an image card', async ({
+    page,
+  }) => {
+    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
+    await page.goto('/')
+    const dataUri = await makeImageDataUri(page, 100, 60)
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    await dispatchImageFileDrop(
+      page,
+      dataUri,
+      boardBox.x + 200,
+      boardBox.y + 200,
+    )
+
+    const imageCard = page.locator('.card--image')
+    await expect(imageCard).toHaveCount(1)
+    await expect(imageCard.locator('img.card__image')).toBeVisible()
+  })
+
+  test('pasting an image with nothing selected creates a new image card', async ({
+    page,
+  }) => {
+    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
+    await page.goto('/')
+    const dataUri = await makeImageDataUri(page, 100, 60)
+    await dispatchPaste(page, { imageDataUri: dataUri })
+    await expect(page.locator('.card--image')).toHaveCount(1)
+  })
+
+  test('pasting an image with a container (not a card) selected still creates a new image card, not a conversion', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [containerNode('c1', 100, 100, 300, 300)],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    await page
+      .locator(
+        '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
+      )
+      .click()
+    await expect(
+      page.locator('[data-node-id="c1"]:not(.node-connector)'),
+    ).toHaveClass(/container-node--selected/)
+
+    const dataUri = await makeImageDataUri(page, 100, 60)
+    await dispatchPaste(page, { imageDataUri: dataUri })
+
+    await expect(page.locator('.card--image')).toHaveCount(1)
+    // The container itself never became an image card.
+    await expect(
+      page.locator('[data-node-id="c1"]:not(.node-connector)'),
+    ).toHaveClass(/container-node/)
+  })
+
+  test('pasting an image onto a focused text card converts it in place', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [textCard('a', 100, 100, 'hello')],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__content')
+      .focus()
+    const dataUri = await makeImageDataUri(page, 100, 60)
+    await dispatchPaste(
+      page,
+      { imageDataUri: dataUri },
+      '[data-node-id="a"]:not(.node-connector)',
+    )
+
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).toHaveClass(/card--image/)
+    await expect(page.locator('.card--image')).toHaveCount(1)
+  })
+
+  test('an oversized image is downsized before being stored (spec §2.6)', async ({
+    page,
+  }) => {
+    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
+    await page.goto('/')
+    // MAX_IMAGE_DIMENSION (cards/imageFile.ts) is 1200 — well past it on
+    // the long edge.
+    const dataUri = await makeImageDataUri(page, 2000, 1000)
+    await dispatchPaste(page, { imageDataUri: dataUri })
+
+    const img = page.locator('.card--image img.card__image')
+    await expect(img).toBeVisible()
+    const { naturalWidth, naturalHeight, src } = await img.evaluate(
+      (el: HTMLImageElement) => ({
+        naturalWidth: el.naturalWidth,
+        naturalHeight: el.naturalHeight,
+        src: el.src,
+      }),
+    )
+    expect(src.startsWith('data:')).toBe(true)
+    // 2000x1000 downsized to a long edge of 1200 → 1200x600.
+    expect(naturalWidth).toBe(1200)
+    expect(naturalHeight).toBe(600)
+  })
+})
+
+test.describe('big-text cards (spec §5.2)', () => {
+  test('resizes via its handles, grid-snapped, and truncates overflow instead of scrolling', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [
+        {
+          ...textCard(
+            'a',
+            100,
+            100,
+            'a '.repeat(200), // long enough to overflow the fixed height
+          ),
+          size: 'big',
+          w: 320,
+          h: 240,
+        },
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await expect(card).toHaveClass(/card--big/)
+
+    // Truncated, not scrolled: overflow hidden despite content taller than
+    // the fixed box.
+    const textarea = card.locator('.card__content')
+    const overflowsButHidden = await textarea.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return {
+        overflowY: style.overflowY,
+        overflows: el.scrollHeight > el.clientHeight,
+      }
+    })
+    expect(overflowsButHidden.overflows).toBe(true)
+    expect(overflowsButHidden.overflowY).toBe('hidden')
+
+    // Resize via the se handle, grid-snapped, past the documented minimum.
+    const handle = page.locator(
+      '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
+    )
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+
+    await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 5 + 53, handleBox.y + 5 + 37, {
+      steps: 5,
+    })
+    await page.mouse.up()
+
+    const size = await card.evaluate((el) => ({
+      w: Number.parseFloat((el as HTMLElement).style.width),
+      h: Number.parseFloat((el as HTMLElement).style.height),
+    }))
+    expect(size.w % 16).toBe(0)
+    expect(size.h % 16).toBe(0)
+    expect(size.w).toBeGreaterThan(320)
+    expect(size.h).toBeGreaterThan(240)
   })
 })

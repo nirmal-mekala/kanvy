@@ -4,7 +4,7 @@ import { dispatchPaste } from './fixtures/clipboard'
 
 // Stage 7 (clipboard, keyboard shortcuts, toolbar/help) — spec §7, §4.2.
 //
-// Run and passing (all 10) via the playwright-remote-browser skill. This
+// Run and passing (all 11) via the playwright-remote-browser skill. This
 // run caught two real bugs: the first-ever in-app paste landed with zero
 // offset (fixed in clipboard/nodeClipboard.ts), and clicking a card's
 // caption text failed to select it at all (see e2e/interaction.spec.ts's
@@ -113,16 +113,63 @@ test.describe('in-app clipboard (spec §7)', () => {
       .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
       .click()
     await page.keyboard.press('ControlOrMeta+v')
-    const pasted = page
-      .locator('[data-node-id]:not(.node-connector)')
-      .filter({ hasNot: page.locator('.container-node') })
-      .last()
-    await expect(pasted).not.toHaveAttribute('data-node-id', 'a')
+    // `.filter({ hasNot })` checks for a *descendant* match, not "isn't
+    // this element" — a card/container never nests another node inside
+    // it in the DOM, so that filter would be a no-op here. Exclude by
+    // node kind and id directly instead.
+    const pasted = page.locator('[data-testid="card"]:not([data-node-id="a"])')
+    await expect(pasted).toHaveCount(1)
     // The pasted card should not have been assigned the container as its
     // parent — verified indirectly by checking the board doesn't nest it
     // under the container's drag handle in the DOM (containers render
     // outside cards, so this is really just a smoke check that paste didn't
     // crash inside a giant container).
+  })
+
+  test('a paste that lands outside the viewport pans it into view, without changing zoom', async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [textCard('a', 100, 100)],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    await page
+      .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
+      .click()
+    await page.keyboard.press('ControlOrMeta+c')
+
+    // Pan far away so the paste (which lands near `a`'s world position)
+    // ends up off-screen.
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+    await page.mouse.move(boardBox.x + 200, boardBox.y + 200)
+    await page.mouse.down({ button: 'right' })
+    await page.mouse.move(boardBox.x + 200 - 2000, boardBox.y + 200 - 2000, {
+      steps: 10,
+    })
+    await page.mouse.up({ button: 'right' })
+    await expect(
+      page.locator('[data-node-id="a"]:not(.node-connector)'),
+    ).not.toBeInViewport()
+
+    const zoomBefore = await page
+      .locator('.board__layer')
+      .evaluate((el) => (el as HTMLElement).style.transform)
+
+    await page.keyboard.press('ControlOrMeta+v')
+
+    const pasted = page.locator('[data-testid="card"]:not([data-node-id="a"])')
+    await expect(pasted).toBeInViewport()
+
+    const zoomAfter = await page
+      .locator('.board__layer')
+      .evaluate((el) => (el as HTMLElement).style.transform)
+    const scaleOf = (t: string) => /scale\(([-\d.]+)\)/.exec(t)?.[1]
+    expect(scaleOf(zoomAfter)).toBe(scaleOf(zoomBefore))
   })
 })
 

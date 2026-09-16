@@ -8,7 +8,7 @@ import { seedBoard } from './fixtures/board'
 // classes, and the toolbar's view-mode menu
 // (`.toolbar__view-menu-item`).
 //
-// Run and passing (all 4) via the playwright-remote-browser skill. This
+// Run and passing (all 5) via the playwright-remote-browser skill. This
 // run caught a real bug: every card's `updatedAt` was silently refreshed
 // on first render (defeating recency mode almost entirely) — fixed via
 // `setNodeHeightAtom` in state/atoms/nodes.ts. See AGENTS.md and
@@ -132,5 +132,43 @@ test.describe('view modes (spec §6.2)', () => {
       .locator('[data-node-id="stale"]:not(.node-connector)')
       .evaluate((el) => getComputedStyle(el).borderColor)
     expect(freshColor).not.toBe(staleColor)
+  })
+
+  test("recency view re-evaluates periodically while active (Canvas.tsx's 60s interval)", async ({
+    page,
+  }) => {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000
+    const install = new Date('2026-06-01T00:00:00.000Z')
+    // Just inside the "lime" (<=1 day) threshold — 30s of headroom before
+    // it crosses into "amber".
+    const updatedAt = new Date(
+      install.getTime() - (ONE_DAY_MS - 30_000),
+    ).toISOString()
+
+    // Installed before navigation so the interval Canvas.tsx sets up on
+    // mount is one this fake clock actually controls.
+    await page.clock.install({ time: install })
+    await seed(page, {
+      version: 1,
+      nodes: [{ ...textCard('a', 100, 100), updatedAt }],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    await page.locator('button[title="Change view mode"]').click()
+    await page
+      .locator('.toolbar__view-menu-item', { hasText: 'Recency' })
+      .click()
+
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    const before = await card.evaluate((el) => getComputedStyle(el).borderColor)
+
+    // Past both the 60s re-evaluation interval and the lime→amber
+    // boundary — nothing else touches this node, so a color change can
+    // only come from the periodic re-evaluation actually firing.
+    await page.clock.fastForward(65_000)
+
+    const after = await card.evaluate((el) => getComputedStyle(el).borderColor)
+    expect(after).not.toBe(before)
   })
 })

@@ -145,6 +145,21 @@ export function buildOurBoard(scene: Scene) {
   }
 }
 
+// The prototype's own PATTERNS object (Board.jsx) keys three of these
+// differently than the v0 schema's `PatternKey` — passing the v0 spelling
+// straight through makes its `PATTERNS[key]` lookup miss, silently
+// rendering *no* pattern at all on the prototype side (a real bug this
+// harness caught: 'each container pattern > corkscrew' failed a live
+// visual diff because of exactly this, since corkscrew's dense fill made
+// "pattern vs. blank" cross the diff-ratio threshold — 'diagonal'/
+// 'graph-paper' have the same mismatch but are sparse enough to stay
+// under it undetected).
+const LEGACY_PATTERN_KEY: Partial<Record<PatternKey, string>> = {
+  diagonal: 'diagonalLines',
+  'graph-paper': 'graphPaper',
+  corkscrew: 'corkScrew',
+}
+
 function legacyGroup(n: SceneContainer) {
   return {
     id: n.id,
@@ -153,7 +168,7 @@ function legacyGroup(n: SceneContainer) {
     w: n.w,
     h: n.h,
     color: n.color,
-    pattern: n.pattern,
+    pattern: LEGACY_PATTERN_KEY[n.pattern] ?? n.pattern,
     ...(n.task ? { taskStatus: n.task } : {}),
     createdAt: n.updatedAt ?? now(),
     updatedAt: n.updatedAt ?? now(),
