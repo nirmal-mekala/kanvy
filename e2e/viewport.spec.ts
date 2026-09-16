@@ -6,15 +6,14 @@ import { seedBoard } from './fixtures/board'
 // is the pannable/zoomable `.board` element; `.board__layer`'s inline
 // `transform` carries the current pan/zoom as `translate(x, y) scale(z)`.
 //
-// NOTE (phase 7, Stage 4): written but NOT run to a passing result in this
-// session — the sandboxed dev container has no local browser and no
-// network path from the remote (host-Mac) Playwright browser back into the
-// container's dev server (tried the container's own --host-bound address;
-// connection timed out, not refused, suggesting the host cannot route to
-// the container's bridge IP in this environment). Per
-// ctx/notes/260915-phase6-e2e-test-scenario-checklist.md's own rule, its
-// items are left unchecked until a run actually passes — do so before
-// relying on this file.
+// Run and passing (all 6) via the playwright-remote-browser skill (host-Mac
+// Playwright server, container dev server published on a forwarded port —
+// see ctx/notes/260915-phase6-e2e-test-scenario-checklist.md for the
+// updated checklist state). The zoom-button/reset-readout tests caught a
+// real regression: the `.board` root's own pointerdown handler was
+// hijacking pointer capture before these buttons' click events could fire
+// — fixed in src/components/canvas/Canvas.tsx (`.board__zoom` now stops
+// propagation).
 
 const NODE_A = {
   id: 'node-a',

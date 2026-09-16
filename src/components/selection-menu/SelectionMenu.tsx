@@ -73,7 +73,11 @@ export function SelectionMenu({
   )
 
   return (
-    <div className="selection-menu" style={{ left: x, top: y }}>
+    <div
+      className="selection-menu"
+      style={{ left: x, top: y }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
       <div className="selection-menu__grid">
         {COLOR_KEYS.map((color) => (
           <button

@@ -523,7 +523,7 @@ export function Canvas() {
 
       <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
 
-      <div className="board__zoom">
+      <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button
           type="button"
           className="board__zoom-btn"

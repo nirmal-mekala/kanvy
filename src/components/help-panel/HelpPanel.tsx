@@ -44,13 +44,17 @@ export function HelpPanel({
         type="button"
         className="board__zoom-btn board__help"
         onClick={() => onOpenChange(!open)}
+        onPointerDown={(e) => e.stopPropagation()}
         title="Keyboard shortcuts"
       >
         <CircleHelp size={16} strokeWidth={2} />
       </button>
 
       {open && (
-        <div className="help-backdrop">
+        <div
+          className="help-backdrop"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {/* A real, keyboard-operable button standing in for the backdrop
               itself — clicking (or Enter/Space-activating) anywhere outside
               the panel dismisses it, same as Escape or the `?` button. */}

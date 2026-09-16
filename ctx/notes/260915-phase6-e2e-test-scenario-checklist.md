@@ -23,23 +23,19 @@ Playwright spec exists and passes — this file is not itself a spec.
 ## Interaction e2e (spec §4, §5, §6, §7) — maps to phase 5 §4 Stages 4–9
 
 ### Viewport (spec §4.1) — Stage 4
-Specs written in `e2e/viewport.spec.ts` against Stage 4's actual DOM, but
-**not run to a passing result** — this session's sandboxed dev container has
-no local browser (no display server, cached Chromium binaries fail to
-launch — see `playwright-remote-browser` skill) and, despite a Playwright
-server reachable on the host Mac (`ws://host.docker.internal:3322/`
-connects fine), the host has no route back into this container's bridge IP
-to load the dev server itself (`page.goto` to the container's own
-`--host`-bound address times out, not refused — consistent with Docker
-Desktop's asymmetric host↔container networking with no port published).
-Run `pnpm e2e` for real (CI, or a dev environment without this split) before
-checking any of these off — do not check based on code review alone.
-- [ ] Pan via right-click drag
-- [ ] Pan via two-finger scroll / mouse wheel (non-zoom axis)
-- [ ] Zoom via Ctrl/Cmd+scroll, keeping the point under the cursor fixed
-- [ ] Zoom via on-screen buttons, centered on viewport center
-- [ ] Click zoom-percentage readout resets to 100%
-- [ ] Zoom to fit (⌘/Ctrl+Shift+Enter): never zooms in past 100%, centers on combined bounding box with fixed padding
+Specs in `e2e/viewport.spec.ts`, run via the `playwright-remote-browser`
+skill (host-Mac Playwright server + container dev server published on a
+forwarded port) — all 6 pass. This run caught a real regression: the
+on-screen zoom buttons and the zoom-percentage reset readout didn't
+actually zoom, because the `.board` root's own pointerdown handler
+hijacked pointer capture before the button's click could fire; fixed in
+`src/components/canvas/Canvas.tsx`.
+- [x] Pan via right-click drag
+- [x] Pan via two-finger scroll / mouse wheel (non-zoom axis)
+- [x] Zoom via Ctrl/Cmd+scroll, keeping the point under the cursor fixed
+- [x] Zoom via on-screen buttons, centered on viewport center
+- [x] Click zoom-percentage readout resets to 100%
+- [x] Zoom to fit (⌘/Ctrl+Shift+Enter): never zooms in past 100%, centers on combined bounding box with fixed padding
 
 ### Selection (spec §4.3) — Stage 5
 Specs written in `e2e/interaction.spec.ts` against Stage 5's actual DOM
@@ -120,7 +116,12 @@ Run `pnpm e2e` for real before checking any of these off.
 - [ ] Paste outside viewport pans (without zoom change) into view
 - [ ] OS-clipboard priority order: image → URL-only text → in-app clipboard → plain text
 - [ ] Every keyboard shortcut in spec §4.2's table
-- [ ] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut
+- [x] Help panel open/close (`?`, Escape); no bare-key zoom-reset shortcut —
+  run via `playwright-remote-browser`; the `?` button caught the same
+  pointer-capture-hijack regression as the zoom buttons (fixed in
+  `src/components/help-panel/HelpPanel.tsx`). Rest of this file's specs
+  still unrun/failing (see Stage 7 note above), so only this item is
+  checked off.
 
 ### Task layer & view modes (spec §6) — Stage 8
 Specs written in `e2e/taskViewModes.spec.ts` against Stage 8's actual
