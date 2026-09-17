@@ -969,3 +969,58 @@ input:focus-visible,
     transition: none;
   }
 }
+
+/* ---------- breadcrumb (multiboard support) ---------- */
+
+.breadcrumb {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--color-paper);
+  border-bottom: 2px solid var(--color-border-soft);
+  color: var(--color-ink-soft);
+  font-size: 0.85rem;
+}
+
+.breadcrumb__home {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-ink-soft);
+}
+
+.breadcrumb__home:hover {
+  color: var(--color-ink);
+}
+
+.breadcrumb__chevron {
+  opacity: 0.6;
+}
+
+.breadcrumb__title {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--color-ink);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: text;
+  border-radius: 4px;
+}
+
+.breadcrumb__title:hover {
+  background: var(--color-surface-hover);
+}
+
+.breadcrumb__title-input {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: 4px;
+  padding: 2px 4px;
+}

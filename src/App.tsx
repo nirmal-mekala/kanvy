@@ -1,15 +1,16 @@
-// Boots the app: the full toolbar (Stage 7 — theme toggle/import/export/
-// view-mode menu), the corrupt-save recovery banner (Stage 9, spec
-// §9/Q12), and the canvas (Stage 4). Board load already fell back to the
-// seed board on corrupt data (see state/persistence/storage.ts); dismissing
-// the banner is the acknowledgement that resumes autosave
-// (`recoveryAcknowledgedAtom`).
+// Boots the app: theme wiring (global, mounted once regardless of route),
+// then hands off to the TanStack Router tree (router.tsx) — whose root
+// layout owns the toolbar (Stage 7), the corrupt-save recovery banner
+// (Stage 9, spec §9/Q12), and per-board routing (multiboard support,
+// ctx/notes/260917-multiboard-support-design.md §6). Board load already
+// fell back to the seed board on corrupt data (see
+// state/persistence/storage.ts); dismissing the banner is the
+// acknowledgement that resumes autosave (`recoveryAcknowledgedAtom`).
 
+import { RouterProvider } from '@tanstack/react-router'
 import { useAtomValue } from 'jotai'
 import { useEffect } from 'react'
-import { Canvas } from './components/canvas/Canvas'
-import { RecoveryBanner } from './components/notifications/RecoveryBanner'
-import { Toolbar } from './components/toolbar/Toolbar'
+import { router } from './router'
 import { themeAtom } from './state/atoms/theme'
 
 function App() {
@@ -22,13 +23,7 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
 
-  return (
-    <div className="app">
-      <RecoveryBanner />
-      <Toolbar />
-      <Canvas />
-    </div>
-  )
+  return <RouterProvider router={router} />
 }
 
 export default App

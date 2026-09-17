@@ -1,0 +1,150 @@
+import { createStore } from 'jotai'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Board } from '../../schema/board'
+import { SCHEMA_VERSION } from '../../schema/board'
+import { ROOT_BOARD_ID } from '../../schema/boardMeta'
+
+class MemoryStorage {
+  private store = new Map<string, string>()
+  getItem(key: string): string | null {
+    return this.store.has(key) ? (this.store.get(key) ?? null) : null
+  }
+  setItem(key: string, value: string): void {
+    this.store.set(key, value)
+  }
+  removeItem(key: string): void {
+    this.store.delete(key)
+  }
+  clear(): void {
+    this.store.clear()
+  }
+}
+
+const now = '2026-01-01T00:00:00.000Z'
+
+function boardWithChild(): Board {
+  return {
+    version: SCHEMA_VERSION,
+    nodes: [],
+    edges: [],
+    boards: [
+      {
+        id: ROOT_BOARD_ID,
+        title: 'Home',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'child-1',
+        title: 'Untitled board',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    images: {},
+  }
+}
+
+// See nodes.test.ts for why each test gets fresh atom modules + localStorage.
+async function freshState() {
+  vi.stubGlobal('localStorage', new MemoryStorage())
+  vi.resetModules()
+  const boardsModule = await import('./boards')
+  const historyModule = await import('../history/boardHistoryAtom')
+  const currentBoardModule = await import('./currentBoard')
+  const store = createStore()
+  return {
+    store,
+    ...boardsModule,
+    ...historyModule,
+    ...currentBoardModule,
+  }
+}
+
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
+describe('boardsAtom / boardFamily', () => {
+  it('boardsAtom reflects the loaded boards collection', async () => {
+    const { store, boardsAtom, loadImportedBoardAtom } = await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+    expect(store.get(boardsAtom).map((b) => b.id)).toEqual([
+      ROOT_BOARD_ID,
+      'child-1',
+    ])
+  })
+
+  it('boardFamily(id) looks up a single board by id', async () => {
+    const { store, boardFamily, loadImportedBoardAtom } = await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+    expect(store.get(boardFamily('child-1'))?.title).toBe('Untitled board')
+    expect(store.get(boardFamily('nonexistent'))).toBeUndefined()
+  })
+})
+
+describe('renameBoardAtom', () => {
+  it('renames the target board, independent of which board is currently being viewed', async () => {
+    const { store, boardFamily, renameBoardAtom, loadImportedBoardAtom } =
+      await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+
+    store.set(renameBoardAtom, 'child-1', 'My board')
+
+    expect(store.get(boardFamily('child-1'))?.title).toBe('My board')
+  })
+
+  it('is a no-op for the reserved root board (its title is fixed)', async () => {
+    const {
+      store,
+      boardFamily,
+      renameBoardAtom,
+      loadImportedBoardAtom,
+      boardAtom,
+    } = await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+    const before = store.get(boardAtom)
+
+    store.set(renameBoardAtom, ROOT_BOARD_ID, 'New home title')
+
+    expect(store.get(boardFamily(ROOT_BOARD_ID))?.title).toBe('Home')
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('is a no-op given the same title already set (no spurious history step)', async () => {
+    const { store, renameBoardAtom, loadImportedBoardAtom, boardAtom } =
+      await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+    const before = store.get(boardAtom)
+
+    store.set(renameBoardAtom, 'child-1', 'Untitled board')
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('records an undo step attributed to the current board, regardless of which board was renamed', async () => {
+    const {
+      store,
+      renameBoardAtom,
+      loadImportedBoardAtom,
+      boardFamily,
+      undoBoardAtom,
+      currentBoardIdAtom,
+    } = await freshState()
+    store.set(loadImportedBoardAtom, boardWithChild())
+
+    // Renaming a board-node's target board from root (Sub-phase 4's
+    // on-canvas rename) — attribution is root, the board acted *from*.
+    // Advance past the 400ms coalescing window so this doesn't merge with
+    // the import itself into a single undo step.
+    vi.advanceTimersByTime(1000)
+    store.set(currentBoardIdAtom, ROOT_BOARD_ID)
+    store.set(renameBoardAtom, 'child-1', 'Renamed from root')
+    expect(store.get(boardFamily('child-1'))?.title).toBe('Renamed from root')
+
+    store.set(undoBoardAtom)
+    expect(store.get(boardFamily('child-1'))?.title).toBe('Untitled board')
+  })
+})
