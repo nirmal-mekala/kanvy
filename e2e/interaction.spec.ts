@@ -31,6 +31,22 @@ import { seedBoard } from './fixtures/board'
 // starts moving (`bringToFrontAtom` in `state/atoms/nodes.ts`,
 // `useBoardInteraction.ts`'s `bringDragToFrontOnce`).
 //
+// A later pass found that same `bringToFrontAtom` mechanism was itself
+// the cause of a real, user-reported bug: reordering the underlying node
+// array the instant a drag started moving briefly moved the dragged
+// node's actual DOM position while it was still the active pointer-
+// capture target for that same gesture, which could make the browser
+// silently drop capture — the drag would end early, node frozen in
+// place, cursor moving free of it, as if released without a mouseup.
+// Replaced with a purely visual, transient z-index bump for the drag's
+// whole duration (`.card--dragging`/`.container-node--dragging` in
+// index.css, `useBoardInteraction.ts`'s `draggingIds`) that never touches
+// stored node order — restores the original prototype's own
+// `.card--dragging`/`.group--dragging` approach (Card.jsx/Group.jsx).
+// Also added `pointercancel` handling (`handleNodePointerCancel`/
+// `handleResizePointerCancel`), previously missing entirely, so a
+// cancelled gesture can't strand `dragRef`/`resizeRef` set forever either.
+//
 // v0.1 (spec §2.3): container membership was reverted from a formal, stored
 // `parentId` field back to the original prototype's purely spatial model —
 // what a dragged container carries is recomputed fresh from x/y/w/h every
@@ -49,6 +65,21 @@ import { seedBoard } from './fixtures/board'
 // fixtures needed widening to stay genuinely full-containment (they'd
 // been drawn/dropped just overlapping, not completely inside); a new test
 // proves a merely-straddling card is correctly left behind.
+//
+// A later pass fixed `snapY` (geometry/snap.ts): it used to return on the
+// *first* column-overlapping neighbor within threshold, with no grid
+// fallback at all, so a fast drag through several stacked cards could
+// lock onto a distant neighbor instead of the nearest one — visible as
+// the dragged card freezing for a frame while the cursor kept moving.
+// Fixed by having every candidate (the grid snap and each qualifying
+// neighbor gutter) compete on actual distance to the raw drop position,
+// closest wins. The gutter-snap test above was tightened to land at the
+// neighbor's actual gutter point instead of merely within the threshold,
+// and a new test drags fast through a column of neighbors, sampling the
+// dragged card's `style.top` every animation frame (not via
+// `boundingBox()` polling between moves, which can itself look "stuck"
+// from Playwright/render-timing artifacts even when the app updates
+// smoothly every frame) to prove it never stalls.
 
 function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   return {
@@ -310,9 +341,11 @@ test.describe('dragging & snapping (spec §4.4)', () => {
 
     await page.mouse.move(boxB.x + 10, boxB.y + 10)
     await page.mouse.down()
-    // Drag b's top edge to just past a's bottom edge — well within
-    // Y_SNAP_THRESHOLD (2 grid cells = 32px) of it.
-    await page.mouse.move(boxB.x + 10, boxA.y + boxA.height + 10, {
+    // Drag b's top edge to (approximately) a's own gutter point — close
+    // enough to it, not just within the wider Y_SNAP_THRESHOLD, that it
+    // beats the grid snap (grid and gutter now compete on actual distance
+    // from the raw drop position, whichever is closer wins).
+    await page.mouse.move(boxB.x + 10, boxA.y + boxA.height + 16 + 10, {
       steps: 10,
     })
     await page.mouse.up()
@@ -326,6 +359,93 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     // unzoomed initial view, per boxA.y) rather than assuming the seed
     // value.
     expect(Number.parseFloat(top)).toBe(100 + boxA.height + 16)
+  })
+
+  test('dragging fast through a column of several cards never stalls while the cursor keeps moving', async ({
+    page,
+  }) => {
+    // Regression: `snapY` returned on the *first* column-overlapping
+    // neighbor within threshold, with no grid fallback at all — dragging
+    // through several stacked cards could lock onto a distant one instead
+    // of the nearest, making the dragged card visibly freeze for a frame
+    // (while the cursor kept moving) before jumping to catch up. Sampled
+    // every animation frame (not polled via boundingBox(), which can
+    // itself look "stuck" between two Playwright-driven moves even when
+    // the app is behaving correctly) to catch a genuine zero-movement
+    // frame despite continuous cursor movement.
+    await seed(page, {
+      version: 1,
+      nodes: [
+        textCard('moving', 300, 600),
+        textCard('n1', 320, 100),
+        textCard('n2', 310, 250),
+        textCard('n3', 330, 400),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+
+    await page.evaluate(() => {
+      const w = window as unknown as {
+        __samples: number[]
+        __stopSampling: () => void
+      }
+      w.__samples = []
+      const el = document.querySelector(
+        '[data-node-id="moving"]',
+      ) as HTMLElement
+      let raf: number
+      function sample() {
+        w.__samples.push(Number.parseFloat(el.style.top))
+        raf = requestAnimationFrame(sample)
+      }
+      w.__stopSampling = () => cancelAnimationFrame(raf)
+      sample()
+    })
+
+    const card = page.locator('[data-node-id="moving"]:not(.node-connector)')
+    const before = await card.boundingBox()
+    if (!before) throw new Error('card not rendered')
+
+    await page.mouse.move(before.x + 100, before.y + 10)
+    await page.mouse.down()
+    let curY = before.y + 10
+    for (let i = 0; i < 10; i++) {
+      curY -= 50
+      await page.mouse.move(before.x + 100, curY, { steps: 1 })
+      await page.waitForTimeout(30)
+    }
+    await page.mouse.up()
+
+    const samples = (await page.evaluate(() => {
+      const w = window as unknown as {
+        __samples: number[]
+        __stopSampling: () => void
+      }
+      w.__stopSampling()
+      return w.__samples
+    })) as number[]
+    const deduped = samples.filter((v, i) => v !== samples[i - 1])
+
+    // Every step must move the card *upward* (never flat, never reversed)
+    // — a repeated value here would mean the drag stalled for a frame
+    // while the cursor kept moving.
+    for (let i = 1; i < deduped.length; i++) {
+      const prev = deduped[i - 1]
+      const curr = deduped[i]
+      if (prev === undefined || curr === undefined) {
+        throw new Error('missing sample')
+      }
+      expect(curr).toBeLessThan(prev)
+    }
+    // Sanity check: the card actually traveled a meaningful distance.
+    const first = deduped[0]
+    const last = deduped[deduped.length - 1]
+    if (first === undefined || last === undefined) {
+      throw new Error('missing sample')
+    }
+    expect(first - last).toBeGreaterThan(400)
   })
 
   test("a card dropped straddling a container's handle band gets pushed out (no-fly-zone clamping)", async ({
@@ -842,10 +962,14 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     // drop. A dragged container kept its pre-drag DOM position the entire
     // time it was moving, so it could visually vanish *behind* a later-
     // appended, unrelated container it was dragged over mid-gesture, even
-    // though the final, post-drop result looked correct. Fixed by bringing
-    // the grabbed node (and whatever it's carrying) to the front the
-    // moment a drag actually starts moving (`bringToFrontAtom`,
-    // `useBoardInteraction.ts`'s `bringDragToFrontOnce`).
+    // though the final, post-drop result looked correct. Originally fixed
+    // by bringing the grabbed node (and whatever it's carrying) to the
+    // front the moment a drag actually starts moving (`bringToFrontAtom`)
+    // — later replaced by a purely visual `.container-node--dragging`
+    // z-index bump (index.css) instead, once that array-reorder approach
+    // turned out to risk dropping pointer capture mid-drag (see the
+    // top-of-file comment) — the visible behavior this test checks is
+    // unchanged either way.
     await seed(page, {
       version: 1,
       nodes: [

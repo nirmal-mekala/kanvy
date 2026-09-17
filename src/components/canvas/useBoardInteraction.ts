@@ -32,7 +32,6 @@ import {
 import type { CardNode, Node, NodeId } from '../../schema/node'
 import {
   addNodeAtom,
-  bringToFrontAtom,
   moveNodesAtom,
   updateNodeAtom,
 } from '../../state/atoms/nodes'
@@ -78,7 +77,6 @@ interface DragState {
   carryOrigins: Map<NodeId, { x: number; y: number }>
   lastX: number
   lastY: number
-  broughtToFront: boolean
 }
 
 interface ResizeState {
@@ -153,33 +151,6 @@ export function resizeRect(
   return { x, y, w: Math.max(minW, w), h: Math.max(minH, h) }
 }
 
-/**
- * Brings the grabbed node (and whatever it's carrying) to the front the
- * moment a drag actually starts moving, so it paints above whatever it
- * crosses for the whole gesture — container render order (renderOrder.ts)
- * only gets recomputed when geometry actually changes, so without this a
- * dragged container would keep its pre-drag DOM position (and so z-order)
- * the entire time it's being moved, letting it visually disappear behind
- * unrelated content it's dragged over. A no-op after the first call for a
- * given `state`.
- */
-function bringDragToFrontOnce(
-  state: DragState,
-  bringToFront: (ids: readonly NodeId[]) => void,
-) {
-  if (state.broughtToFront) return
-  state.broughtToFront = true
-  bringToFront([state.grabId, ...state.carryOrigins.keys()])
-}
-
-// This hook's cognitive-complexity score is driven almost entirely by its
-// hook-call count (one `useSetAtom`/`useAtomValue` per board action it
-// exposes), not by nested branching — `bringToFrontAtom` (added for the
-// drag z-order fix above) tipped it from just-under to just-over the
-// threshold. Splitting it further would fight the "extracted out of
-// Canvas.tsx to keep complexity manageable" boundary this file already is;
-// same 0%-unit-coverage precedent as its handlers below (spec §13, real
-// coverage is e2e's).
 // fallow-ignore-next-line complexity
 export function useBoardInteraction({
   nodes,
@@ -196,7 +167,6 @@ export function useBoardInteraction({
   const moveNodes = useSetAtom(moveNodesAtom)
   const updateNode = useSetAtom(updateNodeAtom)
   const addNode = useSetAtom(addNodeAtom)
-  const bringToFront = useSetAtom(bringToFrontAtom)
 
   const nodesById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
@@ -210,6 +180,20 @@ export function useBoardInteraction({
   const [marqueeRect, setMarqueeRect] = useState<ScreenRect | null>(null)
   const [creatingContainerRect, setCreatingContainerRect] =
     useState<ScreenRect | null>(null)
+  // The currently-dragged node plus whatever it's carrying, purely so
+  // Canvas.tsx can apply a transient `--dragging` class (z-index bump —
+  // see index.css's `.card--dragging`/`.container-node--dragging`) for the
+  // whole gesture. Never touches stored node order/position: an earlier
+  // revision instead reordered the underlying node array the moment a
+  // drag started moving (`bringToFrontAtom`), which moved the dragged
+  // node's actual DOM position while it was still the active
+  // pointer-capture target for that same gesture — the kind of DOM
+  // mutation on a capturing element that risks the browser silently
+  // dropping capture, which looked like the drag ending early (the node
+  // stops following the cursor, as if released) on an ordinary drag.
+  const [draggingIds, setDraggingIds] = useState<ReadonlySet<NodeId> | null>(
+    null,
+  )
 
   // CRAP scoring penalizes this and the pointer-event handlers below for
   // 0% coverage — component/interaction tests aren't a required tier for
@@ -316,8 +300,8 @@ export function useBoardInteraction({
       carryOrigins,
       lastX: node.x,
       lastY: node.y,
-      broughtToFront: false,
     }
+    setDraggingIds(new Set([id, ...carryOrigins.keys()]))
     e.currentTarget.setPointerCapture(e.pointerId)
   }
 
@@ -368,8 +352,6 @@ export function useBoardInteraction({
     const state = dragRef.current
     if (!state) return
 
-    bringDragToFrontOnce(state, bringToFront)
-
     const dx = (e.clientX - state.startX) / view.zoom
     const dy = (e.clientY - state.startY) / view.zoom
     const { x: finalX, y: finalY } = dragTargetPosition(
@@ -394,6 +376,7 @@ export function useBoardInteraction({
     const state = dragRef.current
     if (!state) return
     dragRef.current = null
+    setDraggingIds(null)
     try {
       e.currentTarget.releasePointerCapture(e.pointerId)
     } catch {
@@ -401,6 +384,19 @@ export function useBoardInteraction({
     }
     // Nothing to assign on drop (spec §2.3, v0.1) — container membership is
     // purely spatial, re-derived fresh the next time anything needs it.
+  }
+
+  // A `pointercancel` (the browser can send one instead of `pointerup` —
+  // e.g. an OS-level gesture interruption) used to leave `dragRef`
+  // permanently set with nothing left to clear it: `handleNodePointerUp`
+  // was the only place that happened. That stranded state made the node
+  // look dropped (it silently stops following the cursor, since no more
+  // `pointermove`s are getting through) while quietly still "being
+  // dragged" internally until the next unrelated pointerdown on it reset
+  // the ref. Same fix for resize.
+  function handleNodePointerCancel() {
+    dragRef.current = null
+    setDraggingIds(null)
   }
 
   // ---- Resize: container border/corner handles (always), big-text card handles ----
@@ -457,6 +453,11 @@ export function useBoardInteraction({
     } catch {
       // ignore
     }
+  }
+
+  // See `handleNodePointerCancel`'s comment.
+  function handleResizePointerCancel() {
+    resizeRef.current = null
   }
 
   // ---- Canvas-level: marquee-select and Ctrl/Cmd+drag container creation ----
@@ -613,13 +614,16 @@ export function useBoardInteraction({
     selection,
     marqueeRect,
     creatingContainerRect,
+    draggingIds,
     handleEdgePointerDown,
     handleNodePointerDown,
     handleNodePointerMove,
     handleNodePointerUp,
+    handleNodePointerCancel,
     handleResizePointerDown,
     handleResizePointerMove,
     handleResizePointerUp,
+    handleResizePointerCancel,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,

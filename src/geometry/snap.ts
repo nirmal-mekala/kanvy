@@ -36,24 +36,46 @@ function columnsOverlap(a: Rect, b: Rect): boolean {
 }
 
 /**
- * Resolves the Y position for a candidate drop: snaps to a fixed gutter
- * from a column-overlapping neighbor's top/bottom edge when within
- * `Y_SNAP_THRESHOLD`, otherwise returns the candidate's own Y unchanged
- * (the Y-axis does not follow the grid — spec §4.4).
+ * Resolves the Y position for a candidate drop: grid-snapped by default
+ * (like X), but overridden by a fixed gutter from a column-overlapping
+ * neighbor's top/bottom edge when one is within `Y_SNAP_THRESHOLD` — and
+ * when *several* qualify, whichever candidate is actually closest to the
+ * raw (pre-snap) Y wins, not just the first neighbor encountered. Ported
+ * from the prototype's `Card.jsx` drag handler (`snapToGrid` default,
+ * `bestDist` neighbor comparison) — an earlier revision here returned on
+ * the first qualifying neighbor and skipped the grid fallback entirely,
+ * which (with several neighbors stacked in the same column) made a fast
+ * drag appear to "stick" as it locked onto whichever neighbor came first
+ * in array order instead of the one actually nearest the cursor.
  */
 export function snapY(candidate: Rect, neighbors: readonly Rect[]): number {
+  let finalY = snapToGridMidpoint(candidate.y)
+  // The grid snap competes on equal footing with every neighbor gutter —
+  // seeded with its own distance, not `Infinity`, so a neighbor whose
+  // gutter is actually farther from the raw position than the grid is
+  // never preferred just for existing.
+  let bestDist = Math.abs(candidate.y - finalY)
+
+  function consider(snapCandidate: number) {
+    const dist = Math.abs(candidate.y - snapCandidate)
+    if (dist < bestDist) {
+      bestDist = dist
+      finalY = snapCandidate
+    }
+  }
+
   for (const neighbor of neighbors) {
     if (!columnsOverlap(candidate, neighbor)) continue
 
     const neighborBottom = neighbor.y + neighbor.h
-    if (Math.abs(candidate.y - neighborBottom) <= Y_SNAP_THRESHOLD) {
-      return neighborBottom + Y_SNAP_GUTTER
+    if (Math.abs(candidate.y - neighborBottom) < Y_SNAP_THRESHOLD) {
+      consider(neighborBottom + Y_SNAP_GUTTER)
     }
 
     const candidateBottom = candidate.y + candidate.h
-    if (Math.abs(candidateBottom - neighbor.y) <= Y_SNAP_THRESHOLD) {
-      return neighbor.y - Y_SNAP_GUTTER - candidate.h
+    if (Math.abs(candidateBottom - neighbor.y) < Y_SNAP_THRESHOLD) {
+      consider(neighbor.y - Y_SNAP_GUTTER - candidate.h)
     }
   }
-  return candidate.y
+  return finalY
 }

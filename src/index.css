@@ -423,6 +423,11 @@ body {
   user-select: none;
   transition: background-color 0.1s ease;
   touch-action: none;
+  /* A baseline above container-node's default (z-index: auto) — keeps a
+     card on top of any container it overlaps (spec §4.5) even once a
+     dragged container gets `.container-node--dragging`'s own bump below;
+     see that rule's comment. */
+  z-index: 1;
 }
 
 /* Clipping lives here rather than on .card itself, so future sibling
@@ -441,6 +446,23 @@ body {
   outline: 2px solid var(--color-outline);
   outline-offset: 2px;
   z-index: 5;
+}
+
+/* Ported from the prototype's `.card--dragging` (Card.jsx/index.css):
+   a purely visual, transient z-index bump for the whole gesture, so a
+   dragged card paints above whatever it crosses — never a change to
+   stored node order. An earlier revision here instead reordered the
+   underlying node array the instant a drag started moving
+   (`bringToFrontAtom`), which briefly moved the dragged card's DOM
+   position while it was still the active pointer-capture target for that
+   same gesture; that's what let the drag silently end early (the card
+   stops following the cursor, as if released) on fast/ordinary drags —
+   see `useBoardInteraction.ts`'s `handleNodePointerDown`/
+   `handleNodePointerMove`.
+*/
+.card--dragging {
+  cursor: grabbing;
+  z-index: 10;
 }
 
 .card:active {
@@ -634,6 +656,15 @@ body {
 .container-node--selected {
   outline: 2px solid var(--color-outline);
   outline-offset: 2px;
+}
+
+/* Transient z-index bump for the whole drag gesture (paints above any
+   other, non-dragging container it's dragged over — never above a card:
+   ties against `.card`'s own z-index: 1 go to the card, since cards
+   always paint after containers in DOM order). Never a reorder of the
+   underlying node array — see `.card--dragging`'s comment above for why. */
+.container-node--dragging {
+  z-index: 1;
 }
 
 .container-node__drag-handle:active {

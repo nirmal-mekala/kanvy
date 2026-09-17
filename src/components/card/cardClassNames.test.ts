@@ -7,6 +7,7 @@ const baseOpts = {
   isDone: false,
   isDimmed: false,
   selected: false,
+  dragging: false,
 }
 
 const textNode: CardNode = {
@@ -73,5 +74,11 @@ describe('cardClassNames', () => {
       selected: true,
     })
     expect(classes).toBe('card card--done card--dimmed card--selected')
+  })
+
+  it('adds card--dragging while the card is being dragged', () => {
+    expect(cardClassNames(textNode, { ...baseOpts, dragging: true })).toContain(
+      'card--dragging',
+    )
   })
 })

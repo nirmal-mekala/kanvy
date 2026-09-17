@@ -68,6 +68,7 @@ export function Card({
   theme,
   viewMode,
   selected = false,
+  dragging = false,
   connectorsVisible = false,
   connectorActiveSide = null,
   autoFocus = false,
@@ -78,9 +79,11 @@ export function Card({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
   onResizePointerDown,
   onResizePointerMove,
   onResizePointerUp,
+  onResizePointerCancel,
   onConnectorPointerDown,
   onConnectorPointerMove,
   onConnectorPointerUp,
@@ -90,6 +93,8 @@ export function Card({
   theme: Theme
   viewMode: ViewMode
   selected?: boolean
+  /** A transient z-index bump for the whole gesture (spec §4.4/index.css's `.card--dragging`) — never a change to stored node order. */
+  dragging?: boolean
   connectorsVisible?: boolean
   connectorActiveSide?: Side | null
   /** Grabs this card's caption focus once on mount/update (⌘/Ctrl+N, ⌘/Ctrl+D — spec §4.2). */
@@ -101,6 +106,7 @@ export function Card({
   onPointerDown?: (id: string, e: React.PointerEvent) => void
   onPointerMove?: (e: React.PointerEvent) => void
   onPointerUp?: (e: React.PointerEvent) => void
+  onPointerCancel?: (e: React.PointerEvent) => void
   onResizePointerDown?: (
     id: string,
     dir: ResizeDir,
@@ -109,6 +115,7 @@ export function Card({
   ) => void
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
+  onResizePointerCancel?: (e: React.PointerEvent) => void
   onConnectorPointerDown?: (
     id: string,
     side: Side,
@@ -157,6 +164,7 @@ export function Card({
         isDone,
         isDimmed: isDimmedByViewMode,
         selected,
+        dragging,
       })}
       style={{
         left: node.x,
@@ -168,6 +176,7 @@ export function Card({
       onPointerDown={onPointerDown && ((e) => onPointerDown(node.id, e))}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
     >
@@ -198,6 +207,7 @@ export function Card({
             onPointerDown={onResizePointerDown}
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}
+            onPointerCancel={onResizePointerCancel}
           />
         )}
       {(hovered || selected || connectorsVisible) &&

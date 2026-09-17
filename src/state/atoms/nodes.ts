@@ -255,33 +255,6 @@ export const updateLinkAtom = atom(
   },
 )
 
-/**
- * Moves `ids` to the end of `nodes` (array order doubles as z-index — phase2
- * schema §1), preserving the relative order of the moved set and of
- * everyone left behind. Used to bring a node (and whatever it's carrying)
- * to the front the moment a drag actually starts, so it paints above
- * whatever it's dragged over for the *whole* gesture — container render
- * order (renderOrder.ts) only gets recomputed as geometry actually
- * changes, so without this a dragged container could visually sit
- * *behind* unrelated content it passes over the entire time it's moving.
- */
-export const bringToFrontAtom = atom(
-  null,
-  (_get, set, ids: readonly NodeId[]) => {
-    if (ids.length === 0) return
-    const idSet = new Set(ids)
-    set(updateBoardAtom, (board: Board) => {
-      if (!board.nodes.some((node) => idSet.has(node.id))) return board
-      const rest = board.nodes.filter((node) => !idSet.has(node.id))
-      const front = board.nodes.filter((node) => idSet.has(node.id))
-      const alreadyAtEnd = board.nodes
-        .slice(board.nodes.length - front.length)
-        .every((node) => idSet.has(node.id))
-      return alreadyAtEnd ? board : { ...board, nodes: [...rest, ...front] }
-    })
-  },
-)
-
 /** Reorders `nodes` to match `orderedIds` exactly (array order doubles as z-index — phase2 schema §1). */
 export const reorderNodesAtom = atom(
   null,

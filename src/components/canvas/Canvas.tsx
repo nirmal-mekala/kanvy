@@ -101,13 +101,16 @@ export function Canvas() {
     selection,
     marqueeRect,
     creatingContainerRect,
+    draggingIds,
     handleEdgePointerDown,
     handleNodePointerDown,
     handleNodePointerMove,
     handleNodePointerUp,
+    handleNodePointerCancel,
     handleResizePointerDown,
     handleResizePointerMove,
     handleResizePointerUp,
+    handleResizePointerCancel,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
@@ -383,6 +386,7 @@ export function Canvas() {
             theme={theme}
             viewMode={viewMode}
             selected={selection.has(node.id)}
+            dragging={draggingIds?.has(node.id) ?? false}
             connectorsVisible={
               connectingFromId === node.id || connectingHoverId === node.id
             }
@@ -396,9 +400,11 @@ export function Canvas() {
             onDragHandlePointerDown={handleNodePointerDown}
             onDragHandlePointerMove={handleNodePointerMove}
             onDragHandlePointerUp={handleNodePointerUp}
+            onDragHandlePointerCancel={handleNodePointerCancel}
             onResizePointerDown={handleResizePointerDown}
             onResizePointerMove={handleResizePointerMove}
             onResizePointerUp={handleResizePointerUp}
+            onResizePointerCancel={handleResizePointerCancel}
             onConnectorPointerDown={handleConnectorPointerDown}
             onConnectorPointerMove={handleConnectingPointerMove}
             onConnectorPointerUp={handlePointerUp}
@@ -426,6 +432,7 @@ export function Canvas() {
               theme={theme}
               viewMode={viewMode}
               selected={selection.has(node.id)}
+              dragging={draggingIds?.has(node.id) ?? false}
               connectorsVisible={
                 connectingFromId === node.id || connectingHoverId === node.id
               }
@@ -444,9 +451,11 @@ export function Canvas() {
               onPointerDown={handleNodePointerDown}
               onPointerMove={handleNodePointerMove}
               onPointerUp={handleNodePointerUp}
+              onPointerCancel={handleNodePointerCancel}
               onResizePointerDown={handleResizePointerDown}
               onResizePointerMove={handleResizePointerMove}
               onResizePointerUp={handleResizePointerUp}
+              onResizePointerCancel={handleResizePointerCancel}
               onConnectorPointerDown={handleConnectorPointerDown}
               onConnectorPointerMove={handleConnectingPointerMove}
               onConnectorPointerUp={handlePointerUp}

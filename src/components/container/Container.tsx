@@ -23,14 +23,17 @@ export function Container({
   theme,
   viewMode,
   selected = false,
+  dragging = false,
   connectorsVisible = false,
   connectorActiveSide = null,
   onDragHandlePointerDown,
   onDragHandlePointerMove,
   onDragHandlePointerUp,
+  onDragHandlePointerCancel,
   onResizePointerDown,
   onResizePointerMove,
   onResizePointerUp,
+  onResizePointerCancel,
   onConnectorPointerDown,
   onConnectorPointerMove,
   onConnectorPointerUp,
@@ -39,11 +42,14 @@ export function Container({
   theme: Theme
   viewMode: ViewMode
   selected?: boolean
+  /** A transient z-index bump for the whole gesture (spec §4.4/index.css's `.container-node--dragging`) — never a change to stored node order. */
+  dragging?: boolean
   connectorsVisible?: boolean
   connectorActiveSide?: Side | null
   onDragHandlePointerDown?: (id: string, e: React.PointerEvent) => void
   onDragHandlePointerMove?: (e: React.PointerEvent) => void
   onDragHandlePointerUp?: (e: React.PointerEvent) => void
+  onDragHandlePointerCancel?: (e: React.PointerEvent) => void
   onResizePointerDown?: (
     id: string,
     dir: ResizeDir,
@@ -52,6 +58,7 @@ export function Container({
   ) => void
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
+  onResizePointerCancel?: (e: React.PointerEvent) => void
   onConnectorPointerDown?: (
     id: string,
     side: Side,
@@ -71,7 +78,11 @@ export function Container({
       ? undefined
       : patternBackgroundImage(node.pattern, PATTERN_TINT)
 
-  const classNames = ['container-node', selected && 'container-node--selected']
+  const classNames = [
+    'container-node',
+    selected && 'container-node--selected',
+    dragging && 'container-node--dragging',
+  ]
     .filter(Boolean)
     .join(' ')
 
@@ -99,6 +110,7 @@ export function Container({
         }
         onPointerMove={onDragHandlePointerMove}
         onPointerUp={onDragHandlePointerUp}
+        onPointerCancel={onDragHandlePointerCancel}
       >
         {node.task && (
           <TaskStatusIcon
@@ -116,6 +128,7 @@ export function Container({
           onPointerDown={onResizePointerDown}
           onPointerMove={onResizePointerMove}
           onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerCancel}
         />
       )}
       {(hovered || selected || connectorsVisible) &&

@@ -23,6 +23,7 @@ export function cardClassNames(
     isDone: boolean
     isDimmed: boolean
     selected: boolean
+    dragging: boolean
   },
 ): string {
   return [
@@ -33,6 +34,7 @@ export function cardClassNames(
     opts.isDone && 'card--done',
     opts.isDimmed && 'card--dimmed',
     opts.selected && 'card--selected',
+    opts.dragging && 'card--dragging',
   ]
     .filter(Boolean)
     .join(' ')

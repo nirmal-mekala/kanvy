@@ -11,6 +11,7 @@ export function ResizeHandles({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onPointerCancel,
 }: {
   id: string
   kind: ResizeKind
@@ -22,6 +23,7 @@ export function ResizeHandles({
   ) => void
   onPointerMove: (e: React.PointerEvent) => void
   onPointerUp: (e: React.PointerEvent) => void
+  onPointerCancel?: (e: React.PointerEvent) => void
 }) {
   return (
     <>
@@ -32,6 +34,7 @@ export function ResizeHandles({
           onPointerDown={(e) => onPointerDown(id, dir, kind, e)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         />
       ))}
     </>
