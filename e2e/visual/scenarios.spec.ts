@@ -1,5 +1,6 @@
+import { writeFile } from 'node:fs/promises'
 import { type Browser, expect, type Page, test } from '@playwright/test'
-import { diffScreenshots } from './diff'
+import { diffScreenshots, type VisualDiffOptions } from './diff'
 import {
   buildOurBoard,
   buildPrototypeBoard,
@@ -99,6 +100,33 @@ function centeredScene(nodes: Scene['nodes'], images?: Scene['images']): Scene {
   return images ? { nodes, images } : { nodes }
 }
 
+// Writes actual/expected/diff PNGs under test-results/ (via
+// testInfo.outputPath, which always lands on disk regardless of which
+// reporter is configured) and registers them as attachments, so a CI
+// failure's uploaded artifacts show what actually differed — CI has no
+// display for a developer to just look at the run.
+async function expectVisualMatch(
+  actual: Buffer,
+  expected: Buffer,
+  options?: VisualDiffOptions,
+): Promise<void> {
+  const result = diffScreenshots(actual, expected, options)
+  const info = test.info()
+  const files: Array<[string, Buffer]> = [
+    ['actual.png', actual],
+    ['expected.png', expected],
+    ['diff.png', result.diffImage],
+  ]
+  await Promise.all(
+    files.map(async ([name, body]) => {
+      const path = info.outputPath(name)
+      await writeFile(path, body)
+      await info.attach(name, { path, contentType: 'image/png' })
+    }),
+  )
+  expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+}
+
 test.describe('default seed board', () => {
   const scene = centeredScene([
     {
@@ -120,10 +148,7 @@ test.describe('default seed board', () => {
       theme: 'light',
       viewMode: 'standard',
     })
-    const result = diffScreenshots(actual, expected, {
-      maxDiffPixelRatio: 0.01,
-    })
-    expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+    await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.01 })
   })
 
   test('standard view, dark theme', async ({ browser }) => {
@@ -131,10 +156,7 @@ test.describe('default seed board', () => {
       theme: 'dark',
       viewMode: 'standard',
     })
-    const result = diffScreenshots(actual, expected, {
-      maxDiffPixelRatio: 0.01,
-    })
-    expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+    await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.01 })
   })
 })
 
@@ -212,10 +234,7 @@ test.describe('each card kind in isolation', () => {
         'img-1': PLACEHOLDER_IMAGE_DATA_URI,
       })
       const { actual, expected } = await captureBoardPair(browser, scene)
-      const result = diffScreenshots(actual, expected, {
-        maxDiffPixelRatio: 0.02,
-      })
-      expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+      await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.02 })
     })
   }
 })
@@ -248,10 +267,7 @@ test.describe('each container pattern', () => {
         },
       ])
       const { actual, expected } = await captureBoardPair(browser, scene)
-      const result = diffScreenshots(actual, expected, {
-        maxDiffPixelRatio: 0.02,
-      })
-      expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+      await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.02 })
     })
   }
 })
@@ -276,8 +292,7 @@ test('task view with a mix of statuses', async ({ browser }) => {
   const { actual, expected } = await captureBoardPair(browser, scene, {
     viewMode: 'task',
   })
-  const result = diffScreenshots(actual, expected, { maxDiffPixelRatio: 0.02 })
-  expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+  await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.02 })
 })
 
 test('recency view across all 4 thresholds', async ({ browser }) => {
@@ -308,8 +323,7 @@ test('recency view across all 4 thresholds', async ({ browser }) => {
   const { actual, expected } = await captureBoardPair(browser, scene, {
     viewMode: 'recency',
   })
-  const result = diffScreenshots(actual, expected, { maxDiffPixelRatio: 0.02 })
-  expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+  await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.02 })
 })
 
 test('done styling (struck-through text, tinted image overlay)', async ({
@@ -347,8 +361,7 @@ test('done styling (struck-through text, tinted image overlay)', async ({
     { 'img-done': PLACEHOLDER_IMAGE_DATA_URI },
   )
   const { actual, expected } = await captureBoardPair(browser, scene)
-  const result = diffScreenshots(actual, expected, { maxDiffPixelRatio: 0.03 })
-  expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+  await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.03 })
 })
 
 test('help panel open', async ({ browser }) => {
@@ -402,10 +415,7 @@ test('help panel open', async ({ browser }) => {
         },
       }),
     ])
-    const result = diffScreenshots(actual, expected, {
-      maxDiffPixelRatio: 0.05,
-    })
-    expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+    await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.05 })
   } finally {
     await newAppContext.close()
     await prototypeContext.close()
@@ -497,10 +507,7 @@ test('selection menu anchored to a mixed selection', async ({ browser }) => {
         },
       }),
     ])
-    const result = diffScreenshots(actual, expected, {
-      maxDiffPixelRatio: 0.08,
-    })
-    expect(result.passed, `diff ratio ${result.diffPixelRatio}`).toBe(true)
+    await expectVisualMatch(actual, expected, { maxDiffPixelRatio: 0.08 })
   } finally {
     await newAppContext.close()
     await prototypeContext.close()

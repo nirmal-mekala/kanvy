@@ -35,3 +35,10 @@ jobs:
       - run: pnpm e2e:visual:setup
 
       - run: pnpm e2e:visual
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 14
