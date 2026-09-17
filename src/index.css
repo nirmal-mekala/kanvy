@@ -1024,3 +1024,25 @@ input:focus-visible,
   border-radius: 4px;
   padding: 2px 4px;
 }
+
+/* ---------- board card (multiboard support) ---------- */
+
+.card__board-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 64px;
+  padding: 16px 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  -webkit-user-drag: none;
+}
+
+.card--done .card__board-body,
+.card--dimmed .card__board-body {
+  color: var(--color-ink-soft);
+  opacity: 0.6;
+}

@@ -1,10 +1,26 @@
 // `.card__inner`'s contents — extracted out of Card.tsx purely to keep
 // that component's cognitive complexity under Biome's threshold.
+//
+// The `kind === 'board'` branch below is the one place this otherwise
+// fully prop-driven component reads/writes jotai state directly, rather
+// than routing through Canvas.tsx's centralized wiring like every other
+// mutation in this component tree. That's deliberate, not an oversight:
+// a board card's title lives on `boards[boardRef].title`, not the node
+// itself, and `boardFamily`/`renameBoardAtom` (state/atoms/boards.ts) are
+// exactly the granular per-id atoms this codebase already uses for this
+// shape of lookup (see nodes.ts's `nodeFamily` and Breadcrumb.tsx, which
+// does the identical thing) — threading a title string plus a rename
+// callback through Card.tsx's already-large prop list for one card kind
+// would cost more than it buys.
 
+import { useNavigate } from '@tanstack/react-router'
+import { useAtomValue, useSetAtom } from 'jotai'
+import { LayoutGrid } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
 import type { CardNode } from '../../schema/node'
+import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
 import { CardLinkMeta } from './CardLinkMeta'
 import { CardMedia } from './CardMedia'
 import { RecencyIndicator } from './RecencyIndicator'
@@ -35,6 +51,14 @@ export function CardBody({
   onContentChange?: (content: string) => void
   onContentBlur?: () => void
 }) {
+  const navigate = useNavigate()
+  const renameBoard = useSetAtom(renameBoardAtom)
+  // `boardFamily('')` (never a real id) when this isn't a board card —
+  // keeps the hook call unconditional without needing a real lookup.
+  const referencedBoard = useAtomValue(
+    boardFamily(node.kind === 'board' ? node.boardRef : ''),
+  )
+
   return (
     <div className="card__inner">
       <div className="card__bar">
@@ -86,7 +110,35 @@ export function CardBody({
         </a>
       )}
 
-      {showCaption && (
+      {node.kind === 'board' && (
+        // Reuses the link node's click-semantics model exactly (border/
+        // drag-handle = select, interior click = activate) — the only
+        // deviation is *what* activation does: in-app navigation instead
+        // of `target="_blank"` (multiboard support design doc §3).
+        <button
+          type="button"
+          className="card__board-body no-drag"
+          onClick={() =>
+            navigate({
+              to: '/board/$boardId',
+              params: { boardId: node.boardRef },
+            })
+          }
+        >
+          <LayoutGrid size={32} strokeWidth={1.5} />
+        </button>
+      )}
+
+      {showCaption && node.kind === 'board' && (
+        <input
+          className="card__content no-drag"
+          aria-label="Board title"
+          value={referencedBoard?.title ?? ''}
+          onChange={(e) => renameBoard(node.boardRef, e.target.value)}
+        />
+      )}
+
+      {showCaption && node.kind !== 'board' && (
         <textarea
           ref={contentRef}
           className="card__content no-drag"

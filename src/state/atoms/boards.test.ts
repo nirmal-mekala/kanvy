@@ -148,3 +148,48 @@ describe('renameBoardAtom', () => {
     expect(store.get(boardFamily('child-1'))?.title).toBe('Untitled board')
   })
 })
+
+describe('createBoardAtom', () => {
+  it('mints a new boards entry and a board-node referencing it, in one atomic step, while viewing root', async () => {
+    const { store, createBoardAtom, boardAtom } = await freshState()
+    const boardsBefore = store.get(boardAtom).boards.length
+    const nodesBefore = store.get(boardAtom).nodes.length
+
+    store.set(createBoardAtom, 100, 100)
+
+    const board = store.get(boardAtom)
+    expect(board.boards).toHaveLength(boardsBefore + 1)
+    expect(board.nodes).toHaveLength(nodesBefore + 1)
+
+    const newBoardMeta = board.boards.at(-1)
+    const newNode = board.nodes.at(-1)
+    expect(newBoardMeta?.title).toBe('Untitled board')
+    if (newNode?.type !== 'card' || newNode.kind !== 'board') {
+      throw new Error('expected the new node to be a board card')
+    }
+    expect(newNode.boardRef).toBe(newBoardMeta?.id)
+    expect(newNode.boardId).toBe(ROOT_BOARD_ID)
+  })
+
+  it('undoing the creation removes both the boards entry and the board-node together', async () => {
+    const { store, createBoardAtom, undoBoardAtom, boardAtom } =
+      await freshState()
+    const before = store.get(boardAtom)
+
+    store.set(createBoardAtom, 100, 100)
+    store.set(undoBoardAtom)
+
+    expect(store.get(boardAtom)).toEqual(before)
+  })
+
+  it('is a no-op anywhere but the home board', async () => {
+    const { store, createBoardAtom, currentBoardIdAtom, boardAtom } =
+      await freshState()
+    store.set(currentBoardIdAtom, 'some-other-board')
+    const before = store.get(boardAtom)
+
+    store.set(createBoardAtom, 100, 100)
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+})

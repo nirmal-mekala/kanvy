@@ -82,7 +82,7 @@ export function convertToLinkCard(card: CardNode, url: string): CardNode {
   }
 }
 
-/** True for a card that isn't already `image` or `link` — the only kind of card spec §5.3/§5.4 allow converting in place. */
+/** True for a card that isn't already `image`/`link`/`board` — the only kind of card spec §5.3/§5.4 allow converting in place. A board card is never convertible (multiboard support design doc §3): converting it would destroy the board reference with no way to recover the board it pointed to. */
 export function isConvertibleCard(card: CardNode): boolean {
-  return card.kind !== 'image' && card.kind !== 'link'
+  return card.kind !== 'image' && card.kind !== 'link' && card.kind !== 'board'
 }

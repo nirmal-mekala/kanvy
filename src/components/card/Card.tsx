@@ -127,8 +127,13 @@ export function Card({
   onConnectorPointerUp?: (e: React.PointerEvent) => void
 }) {
   const isHeading = node.kind === 'text' && node.size !== 'regular'
+  // A board card's title field follows the same content-or-selected
+  // visibility rule as link/image captions (multiboard support design
+  // doc §3) — `node.content` is always empty for a board card (the title
+  // lives on `boards[boardRef].title`, not the node), so this reduces to
+  // "visible only while selected," matching "grows on select."
   const showCaption =
-    (node.kind !== 'image' && node.kind !== 'link') ||
+    (node.kind !== 'image' && node.kind !== 'link' && node.kind !== 'board') ||
     node.content !== '' ||
     selected
   const isDone = node.task?.status === 'done'

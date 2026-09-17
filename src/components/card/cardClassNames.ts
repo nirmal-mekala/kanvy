@@ -31,6 +31,7 @@ export function cardClassNames(
     opts.headingSize && HEADING_CLASS[opts.headingSize],
     node.kind === 'image' && 'card--image',
     node.kind === 'link' && 'card--link',
+    node.kind === 'board' && 'card--board',
     opts.isDone && 'card--done',
     opts.isDimmed && 'card--dimmed',
     opts.selected && 'card--selected',

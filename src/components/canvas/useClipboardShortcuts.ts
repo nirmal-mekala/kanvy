@@ -25,7 +25,9 @@ import {
 } from '../../clipboard/systemClipboard'
 import { boundingBox } from '../../geometry/containment'
 import type { Rect } from '../../geometry/snap'
+import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import type { Node, NodeId } from '../../schema/node'
+import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { addNodesAtom, removeEntitiesAtom } from '../../state/atoms/nodes'
 import { selectionAtom, setSelectionAtom } from '../../state/atoms/selection'
@@ -59,6 +61,10 @@ export function useClipboardShortcuts({
   const setFocusNodeId = useSetAtom(focusNodeIdAtom)
   const undo = useSetAtom(undoBoardAtom)
   const redo = useSetAtom(redoBoardAtom)
+  const currentBoardId = useAtomValue(currentBoardIdAtom)
+  // Root only ever creates `board`/`container` nodes — text/image/link
+  // creation paths are disabled there (multiboard support design doc §3).
+  const isRoot = currentBoardId === ROOT_BOARD_ID
 
   function containerRects(): Rect[] {
     return nodes
@@ -100,7 +106,10 @@ export function useClipboardShortcuts({
     }
 
     // Plain OS-clipboard text as a new card, centered in the viewport,
-    // stripped of any rich formatting (text/plain already is).
+    // stripped of any rich formatting (text/plain already is). Root only
+    // ever creates board/container nodes (design doc §3) — never a text
+    // card, so this is a no-op there.
+    if (isRoot) return
     const text = e.clipboardData?.getData('text/plain')
     if (!text?.trim()) return
     e.preventDefault()
@@ -149,9 +158,16 @@ export function useClipboardShortcuts({
     return true
   }
 
-  /** ⌘/Ctrl+N — a fresh empty text card, centered, immediately focused for editing. */
+  /** ⌘/Ctrl+N — a fresh empty text card, centered, immediately focused for editing. Root only ever creates board/container nodes (design doc §3), so this shortcut does nothing there. */
+  // CRAP scoring penalizes this handler for 0% coverage — component/
+  // interaction tests aren't a required tier for v0 (spec §13); real
+  // coverage comes from e2e (e2e/clipboard.spec.ts, e2e/multiboard.spec.ts),
+  // which fallow's static analysis can't see.
+  // fallow-ignore-next-line complexity
   function tryNewCard(e: KeyboardEvent, mod: boolean, key: string): boolean {
-    if (!mod || key !== 'n' || isEditableTarget(e.target)) return false
+    if (!mod || key !== 'n' || isEditableTarget(e.target) || isRoot) {
+      return false
+    }
     e.preventDefault()
     const center = viewportCenter()
     const card = newTextCard(center.x, center.y)

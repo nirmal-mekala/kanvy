@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CARD_WIDTH } from '../geometry/constants'
-import { newImageCard, newLinkCard, newTextCard } from './newCard'
+import { newBoardCard, newImageCard, newLinkCard, newTextCard } from './newCard'
 
 describe('newTextCard', () => {
   it('creates a regular text card centered on the given point', () => {
@@ -34,5 +34,19 @@ describe('newLinkCard', () => {
       url: 'https://example.com',
       status: 'loading',
     })
+  })
+})
+
+describe('newBoardCard', () => {
+  it('creates a board card referencing the given boardRef', () => {
+    const card = newBoardCard(100, 100, 'child-1')
+    expect(card.kind).toBe('board')
+    expect(card.kind === 'board' && card.boardRef).toBe('child-1')
+    expect(card.w).toBe(CARD_WIDTH)
+    expect(card.x).toBe(100 - CARD_WIDTH / 2)
+  })
+
+  it('generates a unique id per call', () => {
+    expect(newBoardCard(0, 0, 'a').id).not.toBe(newBoardCard(0, 0, 'a').id)
   })
 })

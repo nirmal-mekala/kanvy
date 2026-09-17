@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { CHILD_BOARD_ID, childBoardDocument, seedBoard } from './fixtures/board'
 import { dispatchPaste } from './fixtures/clipboard'
 
 // Stage 7 (clipboard, keyboard shortcuts, toolbar/help) — spec §7, §4.2.
@@ -386,8 +386,8 @@ test.describe('OS clipboard priority (spec §7)', () => {
   test('pasting plain text with nothing selected creates a new text card', async ({
     page,
   }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     await dispatchPaste(page, { text: 'hello from the OS clipboard' })
     await expect(
       page.locator('[data-node-id]:not(.node-connector)'),
@@ -400,8 +400,8 @@ test.describe('OS clipboard priority (spec §7)', () => {
 
 test.describe('keyboard shortcuts (spec §4.2)', () => {
   test('⌘/Ctrl+N creates a new empty text card, focused', async ({ page }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     await page.keyboard.press('ControlOrMeta+n')
     await expect(
       page.locator('[data-node-id]:not(.node-connector)'),

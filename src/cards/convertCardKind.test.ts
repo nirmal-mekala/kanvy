@@ -87,4 +87,13 @@ describe('isConvertibleCard', () => {
       isConvertibleCard(convertToLinkCard(headingText, 'https://example.com')),
     ).toBe(false)
   })
+
+  it('is false for a board card (multiboard support design doc §3 — converting it would orphan the board it references)', () => {
+    const boardCard: CardNode = {
+      ...headingText,
+      kind: 'board',
+      boardRef: 'child-1',
+    }
+    expect(isConvertibleCard(boardCard)).toBe(false)
+  })
 })

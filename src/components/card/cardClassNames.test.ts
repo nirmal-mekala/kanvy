@@ -67,6 +67,15 @@ describe('cardClassNames', () => {
     expect(cardClassNames(linkNode, baseOpts)).toContain('card--link')
   })
 
+  it('adds card--board for a board card', () => {
+    const boardNode: CardNode = {
+      ...textNode,
+      kind: 'board',
+      boardRef: 'child-1',
+    }
+    expect(cardClassNames(boardNode, baseOpts)).toContain('card--board')
+  })
+
   it('combines done, dimmed, and selected modifiers', () => {
     const classes = cardClassNames(textNode, {
       ...baseOpts,

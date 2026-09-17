@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { CHILD_BOARD_ID, childBoardDocument, seedBoard } from './fixtures/board'
 import { dispatchPaste } from './fixtures/clipboard'
 import { dispatchImageFileDrop } from './fixtures/dragDrop'
 import { mockLinkMetadata } from './fixtures/linkMetadata'
@@ -90,8 +90,8 @@ test.describe('card-kind behavior (spec §5)', () => {
     page,
   }) => {
     await mockLinkMetadata(page, { status: 'ready', title: 'Example Site' })
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     await dispatchPaste(page, { text: 'https://example.com' })
     const linkCard = page.locator('.card--link')
     await expect(linkCard).toHaveCount(1)
@@ -132,8 +132,8 @@ test.describe('card-kind behavior (spec §5)', () => {
       title: 'Slow Site',
       delayMs: 500,
     })
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     await dispatchPaste(page, { text: 'https://example.com' })
     await expect(page.locator('.card__link-title-text')).toHaveText('Loading…')
     await expect(page.locator('.card__link-title-text')).toHaveText(
@@ -320,8 +320,8 @@ test.describe('image cards (spec §5.3)', () => {
   test('dropping an image file onto blank canvas creates an image card', async ({
     page,
   }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     const dataUri = await makeImageDataUri(page, 100, 60)
     const board = page.locator('[data-testid="canvas-root"]')
     const boardBox = await board.boundingBox()
@@ -342,8 +342,8 @@ test.describe('image cards (spec §5.3)', () => {
   test('pasting an image with nothing selected creates a new image card', async ({
     page,
   }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     const dataUri = await makeImageDataUri(page, 100, 60)
     await dispatchPaste(page, { imageDataUri: dataUri })
     await expect(page.locator('.card--image')).toHaveCount(1)
@@ -352,13 +352,11 @@ test.describe('image cards (spec §5.3)', () => {
   test('pasting an image with a container (not a card) selected still creates a new image card, not a conversion', async ({
     page,
   }) => {
-    await seed(page, {
-      version: 1,
-      nodes: [containerNode('c1', 100, 100, 300, 300)],
-      edges: [],
-      images: {},
-    })
-    await page.goto('/')
+    await seed(
+      page,
+      childBoardDocument([containerNode('c1', 100, 100, 300, 300)]),
+    )
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     await page
       .locator(
         '[data-node-id="c1"]:not(.node-connector) .container-node__drag-handle',
@@ -407,8 +405,8 @@ test.describe('image cards (spec §5.3)', () => {
   test('an oversized image is downsized before being stored (spec §2.6)', async ({
     page,
   }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     // MAX_IMAGE_DIMENSION (cards/imageFile.ts) is 1200 — well past it on
     // the long edge.
     const dataUri = await makeImageDataUri(page, 2000, 1000)
@@ -561,8 +559,8 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
   test('double-click on blank canvas creates a new text card', async ({
     page,
   }) => {
-    await seed(page, { version: 1, nodes: [], edges: [], images: {} })
-    await page.goto('/')
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     const board = page.locator('[data-testid="canvas-root"]')
     const boardBox = await board.boundingBox()
     if (!boardBox) throw new Error('board not rendered')
@@ -570,18 +568,20 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
     await page.mouse.dblclick(boardBox.x + 200, boardBox.y + 200)
 
     await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+    // Not a `.card--board` — proves this landed as an actual text card,
+    // not a board card (which is what double-click creates on root
+    // instead, multiboard support design doc §3).
+    await expect(page.locator('.card--board')).toHaveCount(0)
   })
 
   test('double-clicking inside a container creates a card that is carried along when the container is later dragged', async ({
     page,
   }) => {
-    await seed(page, {
-      version: 1,
-      nodes: [containerNode('c1', 100, 100, 300, 300)],
-      edges: [],
-      images: {},
-    })
-    await page.goto('/')
+    await seed(
+      page,
+      childBoardDocument([containerNode('c1', 100, 100, 300, 300)]),
+    )
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     const box = await page
       .locator('[data-node-id="c1"]:not(.node-connector)')
       .boundingBox()
@@ -590,6 +590,8 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
     await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
 
     await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+    // Proves this is an actual text card, not a board card (design doc §3).
+    await expect(page.locator('.card--board')).toHaveCount(0)
     const nodes = await readBoardNodes(page)
     const card = nodes.find((n) => n.type === 'card')
 
@@ -621,13 +623,11 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
   test('dropping an image file inside a container creates a card that is carried along when the container is later dragged', async ({
     page,
   }) => {
-    await seed(page, {
-      version: 1,
-      nodes: [containerNode('c1', 100, 100, 300, 300)],
-      edges: [],
-      images: {},
-    })
-    await page.goto('/')
+    await seed(
+      page,
+      childBoardDocument([containerNode('c1', 100, 100, 300, 300)]),
+    )
+    await page.goto(`/board/${CHILD_BOARD_ID}`)
     const box = await page
       .locator('[data-node-id="c1"]:not(.node-connector)')
       .boundingBox()

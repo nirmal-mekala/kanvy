@@ -78,3 +78,30 @@ export function newLinkCard(x: number, y: number, url: string): CardNode {
     updatedAt: now,
   }
 }
+
+/**
+ * A fresh board card referencing `boardRef` (an already-minted `boards`
+ * entry — this factory only builds the node, not the board metadata),
+ * centered on `(x, y)` (multiboard support, ctx/notes/260917-multiboard-
+ * support-design.md §2/§3). Usable only on the home board — never a
+ * heading size, no node-local title (the displayed title always resolves
+ * through `boards.find(b => b.id === boardRef).title`).
+ */
+export function newBoardCard(x: number, y: number, boardRef: string): CardNode {
+  const now = new Date().toISOString()
+  return {
+    id: generateId(),
+    boardId: ROOT_BOARD_ID,
+    type: 'card',
+    kind: 'board',
+    boardRef,
+    x: x - CARD_WIDTH / 2,
+    y: y - NEW_CARD_HEIGHT_ESTIMATE / 2,
+    w: CARD_WIDTH,
+    h: NEW_CARD_HEIGHT_ESTIMATE,
+    color: 'gray',
+    content: '',
+    createdAt: now,
+    updatedAt: now,
+  }
+}
