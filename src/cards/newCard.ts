@@ -2,14 +2,25 @@
 // (see convertCardKind.ts for converting an existing card in place).
 
 import { CARD_WIDTH, NEW_CARD_HEIGHT_ESTIMATE } from '../geometry/constants'
+import { ROOT_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { CardNode } from '../schema/node'
+
+// `boardId` is hardcoded to the root board here for now — these factories
+// predate multiboard support's "current board" concept. Once
+// state/atoms/nodes.ts gains a `currentBoardIdAtom` (multiboard-support
+// implementation plan, Sub-phase 2), every call site below should stamp
+// the actual current board instead of always `ROOT_BOARD_ID`. Correct for
+// today: the only board that exists yet is root, so this is a no-op
+// behavior-wise until Sub-phase 4 makes board creation reachable from the
+// UI.
 
 /** A fresh regular text card, centered on `(x, y)` (spec §5.1) — created via double-click canvas, ⌘/Ctrl+N, or typing/pasting plain text with nothing selected. */
 export function newTextCard(x: number, y: number, content = ''): CardNode {
   const now = new Date().toISOString()
   return {
     id: generateId(),
+    boardId: ROOT_BOARD_ID,
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -35,6 +46,7 @@ export function newImageCard(
   const h = Math.round(CARD_WIDTH / aspectRatio)
   return {
     id: generateId(),
+    boardId: ROOT_BOARD_ID,
     type: 'card',
     kind: 'image',
     x: x - CARD_WIDTH / 2,
@@ -54,6 +66,7 @@ export function newLinkCard(x: number, y: number, url: string): CardNode {
   const now = new Date().toISOString()
   return {
     id: generateId(),
+    boardId: ROOT_BOARD_ID,
     type: 'card',
     kind: 'link',
     x: x - CARD_WIDTH / 2,

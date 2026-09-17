@@ -2,6 +2,7 @@
 // ctx/notes/260915-prototype-migration-phase2-schema.md §2.
 
 import { z } from 'zod'
+import { BoardIdSchema } from './boardMeta'
 import { NodeIdSchema, SideSchema } from './node'
 
 // Used internally to build EdgeSchema; exported for a later stage
@@ -13,6 +14,10 @@ export type EdgeDirection = z.infer<typeof EdgeDirectionSchema>
 
 export const EdgeSchema = z.object({
   id: z.string(),
+  // FK into `boards` (schema/boardMeta.ts) — an edge only ever connects
+  // two nodes on the same board, so it carries the same `boardId` its
+  // endpoints do (schema v3).
+  boardId: BoardIdSchema,
   fromNodeId: NodeIdSchema,
   fromSide: SideSchema,
   toNodeId: NodeIdSchema,

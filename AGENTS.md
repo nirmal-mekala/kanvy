@@ -16,6 +16,12 @@ Two schema revisions since the initial migration (see spec §2.3):
 - Drag-carry requires a node to be *completely within* the dragged
   container, not merely overlapping it.
 
+Multi-board support (spec §14's deferred "Multiboard support" item) has a
+design doc but is **not yet implemented**: see
+`ctx/notes/260917-multiboard-support-design.md` for the schema v3 shape
+(`boards` collection, `boardId`-scoped shared `nodes`/`edges`, a new `board`
+card kind) and the home-board UI/navigation plan (TanStack Router adoption).
+
 Do not use this file to track test/build pass counts or a changelog of
 fixed bugs — that state goes stale immediately and belongs in test output
 and git history, not here.

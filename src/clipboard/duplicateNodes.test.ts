@@ -7,6 +7,7 @@ import { duplicateNodes } from './duplicateNodes'
 function containerNode(id: string, x = 0, y = 0, w = 200, h = 200): Node {
   return {
     id,
+    boardId: 'root',
     type: 'container',
     pattern: 'none',
     color: 'gray',

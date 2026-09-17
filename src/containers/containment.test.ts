@@ -11,6 +11,7 @@ function containerNode(
 ): ContainerNode {
   return {
     id,
+    boardId: 'root',
     type: 'container',
     pattern: 'none',
     color: 'gray',
@@ -26,6 +27,7 @@ function containerNode(
 function textCard(id: string, x: number, y: number, w = 40, h = 40): CardNode {
   return {
     id,
+    boardId: 'root',
     type: 'card',
     kind: 'text',
     size: 'regular',

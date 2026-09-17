@@ -10,6 +10,7 @@ export function serializeBoard(board: Board): string {
     version: board.version,
     nodes: board.nodes,
     edges: board.edges,
+    boards: board.boards,
     images: board.images,
   })
 }

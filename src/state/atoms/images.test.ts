@@ -5,6 +5,7 @@ import { pruneOrphanedImages } from './images'
 function imageNode(id: string, imageId: string): Node {
   return {
     id,
+    boardId: 'root',
     type: 'card',
     kind: 'image',
     imageId,

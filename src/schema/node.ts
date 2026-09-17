@@ -4,6 +4,7 @@
 // here is derived via z.infer<>, never hand-written separately.
 
 import { z } from 'zod'
+import { BoardIdSchema } from './boardMeta'
 
 // The individual schema/type exports below (ColorKeySchema, PatternKeySchema,
 // TaskStatusSchema, TextCardSchema, ImageCardSchema, LinkCardSchema,
@@ -59,8 +60,15 @@ export type Side = z.infer<typeof SideSchema>
 export const NodeIdSchema = z.string()
 export type NodeId = z.infer<typeof NodeIdSchema>
 
+// FK into `boards` (schema/boardMeta.ts) — every node belongs to exactly
+// one board (schema v3, ctx/notes/260917-multiboard-support-design.md §2).
+// `nodes` is a single flat array shared across all boards; filtering by
+// `boardId` before rendering is what gives each board its own content and
+// preserves that board's own relative z-order (array order among its own
+// entries), regardless of how other boards' entries are interleaved.
 const NodeBaseSchema = z.object({
   id: NodeIdSchema,
+  boardId: BoardIdSchema,
   x: z.number(),
   y: z.number(),
   w: z.number(),
@@ -113,6 +121,22 @@ export const LinkCardSchema = CardBaseSchema.extend({
 // fallow-ignore-next-line unused-type
 export type LinkCard = z.infer<typeof LinkCardSchema>
 
+// Usable only on the home board (`boardId === ROOT_BOARD_ID`, enforced by
+// the state layer, not this schema — see
+// ctx/notes/260917-multiboard-support-design.md §2/§3). No node-local
+// title/caption field: the displayed title always resolves through
+// `boards.find(b => b.id === boardRef).title`, the single source of
+// truth for both on-canvas and breadcrumb rename. Never has a heading
+// size. `content` (inherited from CardBaseSchema) is unused for display
+// but kept for shape uniformity with the other CardNode variants.
+// fallow-ignore-next-line unused-export
+export const BoardCardSchema = CardBaseSchema.extend({
+  kind: z.literal('board'),
+  boardRef: BoardIdSchema,
+}).strict()
+// fallow-ignore-next-line unused-type
+export type BoardCard = z.infer<typeof BoardCardSchema>
+
 // Nested discriminated union: every CardNode variant shares `type: 'card'`
 // and is further discriminated on `kind`. zod v4's discriminatedUnion does
 // not flatten a nested discriminated union member's own literal options
@@ -124,6 +148,7 @@ export const CardNodeSchema = z.discriminatedUnion('kind', [
   TextCardSchema,
   ImageCardSchema,
   LinkCardSchema,
+  BoardCardSchema,
 ])
 // fallow-ignore-next-line unused-type
 export type CardNode = z.infer<typeof CardNodeSchema>

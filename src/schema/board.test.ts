@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { BoardSchema, SCHEMA_VERSION } from './board'
+import { ROOT_BOARD_ID } from './boardMeta'
 import { normalizeLegacyBoard } from './legacy'
 import { createSeedBoard } from './seed'
 
 function validTextCard() {
   return {
     id: 'c1',
+    boardId: ROOT_BOARD_ID,
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -23,6 +25,7 @@ function validTextCard() {
 function validContainer() {
   return {
     id: 'g1',
+    boardId: ROOT_BOARD_ID,
     type: 'container',
     pattern: 'none',
     x: 0,
@@ -35,16 +38,83 @@ function validContainer() {
   }
 }
 
+function validBoardMeta() {
+  return {
+    id: ROOT_BOARD_ID,
+    title: 'Home',
+    status: 'active' as const,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function validBoardCard() {
+  return {
+    id: 'b1',
+    boardId: ROOT_BOARD_ID,
+    type: 'card',
+    kind: 'board',
+    boardRef: 'child-1',
+    x: 0,
+    y: 0,
+    w: 224,
+    h: 90,
+    color: 'gray',
+    content: '',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
 describe('BoardSchema', () => {
   it('accepts a well-formed board with a mix of node kinds', () => {
     const board = {
       version: SCHEMA_VERSION,
       nodes: [validTextCard(), validContainer()],
       edges: [],
+      boards: [validBoardMeta()],
       images: {},
     }
     const result = BoardSchema.safeParse(board)
     expect(result.success).toBe(true)
+  })
+
+  it('accepts a board card referencing a second boards entry', () => {
+    const board = {
+      version: SCHEMA_VERSION,
+      nodes: [validBoardCard()],
+      edges: [],
+      boards: [
+        validBoardMeta(),
+        { ...validBoardMeta(), id: 'child-1', title: 'Untitled board' },
+      ],
+      images: {},
+    }
+    expect(BoardSchema.safeParse(board).success).toBe(true)
+  })
+
+  it('rejects a board card missing boardRef', () => {
+    const invalid = { ...validBoardCard(), boardRef: undefined }
+    const board = {
+      version: SCHEMA_VERSION,
+      nodes: [invalid],
+      edges: [],
+      boards: [validBoardMeta()],
+      images: {},
+    }
+    expect(BoardSchema.safeParse(board).success).toBe(false)
+  })
+
+  it('rejects a node missing boardId', () => {
+    const invalid = { ...validTextCard(), boardId: undefined }
+    const board = {
+      version: SCHEMA_VERSION,
+      nodes: [invalid],
+      edges: [],
+      boards: [validBoardMeta()],
+      images: {},
+    }
+    expect(BoardSchema.safeParse(board).success).toBe(false)
   })
 
   it('accepts the seed board', () => {
@@ -156,6 +226,19 @@ describe('normalizeLegacyBoard', () => {
     expect(() => normalizedLegacyFixture()).not.toThrow()
   })
 
+  it('stamps boardId: root on every node/edge and synthesizes the root board (multiboard v3)', () => {
+    const result = normalizedLegacyFixture()
+    for (const node of result.nodes) {
+      expect(node.boardId).toBe(ROOT_BOARD_ID)
+    }
+    for (const edge of result.edges) {
+      expect(edge.boardId).toBe(ROOT_BOARD_ID)
+    }
+    expect(result.boards).toEqual([
+      expect.objectContaining({ id: ROOT_BOARD_ID, status: 'active' }),
+    ])
+  })
+
   it('sorts containers before cards (array-order-as-z-index, phase 2 schema §1)', () => {
     expect(normalizedLegacyFixture().nodes[0]?.type).toBe('container')
   })
@@ -195,6 +278,34 @@ describe('normalizeLegacyBoard', () => {
     const result = BoardSchema.parse(normalizeLegacyBoard(nearlyV0))
     expect(result.version).toBe(SCHEMA_VERSION)
     expect(result.nodes[0]?.createdAt).toBeTruthy()
+  })
+
+  it('upgrades a pre-v3 document (nodes/edges with no boardId, no boards array) to v3', () => {
+    const preV3 = {
+      version: 2,
+      nodes: [{ ...validTextCard(), boardId: undefined }],
+      edges: [],
+      images: {},
+    }
+    const result = BoardSchema.parse(normalizeLegacyBoard(preV3))
+    expect(result.version).toBe(SCHEMA_VERSION)
+    expect(result.nodes[0]?.boardId).toBe(ROOT_BOARD_ID)
+    expect(result.boards).toEqual([
+      expect.objectContaining({ id: ROOT_BOARD_ID, status: 'active' }),
+    ])
+  })
+
+  it("leaves an already-v3 document's boards/boardId untouched, only backfilling missing timestamps", () => {
+    const v3 = {
+      version: SCHEMA_VERSION,
+      nodes: [validTextCard()],
+      edges: [],
+      boards: [{ id: ROOT_BOARD_ID, title: 'Home', status: 'active' }],
+      images: {},
+    }
+    const result = BoardSchema.parse(normalizeLegacyBoard(v3))
+    expect(result.boards).toHaveLength(1)
+    expect(result.boards[0]?.createdAt).toBeTruthy()
   })
 
   it('passes non-object input through unchanged for the schema to reject', () => {

@@ -10,6 +10,7 @@ import type { CardNode } from '../schema/node'
 type CommonFields = Pick<
   CardNode,
   | 'id'
+  | 'boardId'
   | 'x'
   | 'y'
   | 'w'
@@ -22,9 +23,22 @@ type CommonFields = Pick<
 >
 
 function commonFields(card: CardNode): CommonFields {
-  const { id, x, y, w, h, color, task, content, createdAt, updatedAt } = card
+  const {
+    id,
+    boardId,
+    x,
+    y,
+    w,
+    h,
+    color,
+    task,
+    content,
+    createdAt,
+    updatedAt,
+  } = card
   return {
     id,
+    boardId,
     x,
     y,
     w,

@@ -29,6 +29,7 @@ const validBoard: Board = {
   nodes: [
     {
       id: 'c1',
+      boardId: 'root',
       type: 'card',
       kind: 'text',
       size: 'regular',
@@ -43,6 +44,15 @@ const validBoard: Board = {
     },
   ],
   edges: [],
+  boards: [
+    {
+      id: 'root',
+      title: 'Home',
+      status: 'active',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   images: {},
 }
 

@@ -11,6 +11,7 @@ function containerNode(
 ): ContainerNode {
   return {
     id,
+    boardId: 'root',
     type: 'container',
     pattern: 'none',
     color: 'gray',

@@ -6,6 +6,15 @@ const board: Board = {
   version: 1,
   nodes: [],
   edges: [],
+  boards: [
+    {
+      id: 'root',
+      title: 'Home',
+      status: 'active',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   images: { img1: 'data:image/png;base64,abc' },
 }
 

@@ -7,6 +7,7 @@
 import { CARD_WIDTH, NEW_CARD_HEIGHT_ESTIMATE } from '../geometry/constants'
 import type { Board } from './board'
 import { SCHEMA_VERSION } from './board'
+import { ROOT_BOARD_ID } from './boardMeta'
 import { generateId } from './legacy'
 
 const SEED_CARD_X = 88 // snapToGrid(80), spec §3 grid-midpoint offset
@@ -20,6 +21,7 @@ export function createSeedBoard(): Board {
     nodes: [
       {
         id: generateId(),
+        boardId: ROOT_BOARD_ID,
         type: 'card',
         kind: 'text',
         size: 'regular',
@@ -34,6 +36,15 @@ export function createSeedBoard(): Board {
       },
     ],
     edges: [],
+    boards: [
+      {
+        id: ROOT_BOARD_ID,
+        title: 'Home',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
     images: {},
   }
 }

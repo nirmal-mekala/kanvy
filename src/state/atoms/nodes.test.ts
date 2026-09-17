@@ -21,6 +21,7 @@ class MemoryStorage {
 function textNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
+    boardId: 'root',
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -183,6 +184,7 @@ describe('nodes atoms', () => {
 
     const container: Node = {
       id: 'container1',
+      boardId: 'root',
       type: 'container',
       pattern: 'none',
       x: 0,
@@ -198,6 +200,7 @@ describe('nodes atoms', () => {
     store.set(addNodeAtom, child)
     store.set(addEdgeAtom, {
       id: 'e1',
+      boardId: 'root',
       fromNodeId: 'container1',
       fromSide: 'right',
       toNodeId: 'child1',

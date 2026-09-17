@@ -17,9 +17,16 @@
 //      ownership field that v0.1 (spec §2.3) removed — backfilled/stripped
 //      in place rather than reconstructed, and always stamped with the
 //      current `SCHEMA_VERSION` regardless of what version they arrived as.
+//      A pre-v3 document (no `boards` array, no per-entity `boardId`) is
+//      also normalized here: every node/edge is stamped `boardId: 'root'`
+//      and a single synthesized root `boards` entry is added — today's
+//      only board becomes "the root board" for free, with no data loss and
+//      no user-visible change (multiboard support,
+//      ctx/notes/260917-multiboard-support-design.md §2).
 
 import { customAlphabet } from 'nanoid'
 import { SCHEMA_VERSION } from './board'
+import { ROOT_BOARD_ID } from './boardMeta'
 import type { PatternKey, TextSize } from './node'
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12)
@@ -70,6 +77,55 @@ function backfillTimestamps(
   }
 }
 
+/** Stamps `boardId: 'root'` onto an entity from before multiboard support existed, unless it already has one (a v3 document, or a pre-v3 document a caller has already stamped). */
+function backfillBoardId(
+  entity: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...entity,
+    boardId:
+      typeof entity.boardId === 'string' ? entity.boardId : ROOT_BOARD_ID,
+  }
+}
+
+/**
+ * Normalizes a pre-existing `boards` array (already-v3 documents just
+ * missing a timestamp or two), or synthesizes the single root entry a
+ * pre-v3 document never had. Either way, the reserved root board is always
+ * present — a document that's missing it (or has an incomplete one) gets
+ * it filled in, never left absent, since every node/edge is about to be
+ * stamped with a `boardId` that must resolve to *some* `boards` entry.
+ */
+function normalizeBoardsCollection(
+  parsed: Record<string, unknown>,
+  now: string,
+): Record<string, unknown>[] {
+  const existing = Array.isArray(parsed.boards)
+    ? parsed.boards.filter(isRecord).map((board) => {
+        const timestamped = backfillTimestamps(board, now)
+        return {
+          id: board.id,
+          title:
+            typeof board.title === 'string' ? board.title : 'Untitled board',
+          status: board.status === 'trashed' ? 'trashed' : 'active',
+          createdAt: timestamped.createdAt,
+          updatedAt: timestamped.updatedAt,
+        }
+      })
+    : []
+  if (existing.some((board) => board.id === ROOT_BOARD_ID)) return existing
+  return [
+    {
+      id: ROOT_BOARD_ID,
+      title: 'Home',
+      status: 'active' as const,
+      createdAt: now,
+      updatedAt: now,
+    },
+    ...existing,
+  ]
+}
+
 function normalizeTask(
   entity: Record<string, unknown>,
 ): { status: string } | undefined {
@@ -114,6 +170,7 @@ function normalizeLegacyCard(
 
   return {
     id: base.id,
+    boardId: ROOT_BOARD_ID,
     x: base.x,
     y: base.y,
     w: base.w,
@@ -141,6 +198,7 @@ function normalizeLegacyGroup(
 
   return {
     id: base.id,
+    boardId: ROOT_BOARD_ID,
     x: base.x,
     y: base.y,
     w: base.w,
@@ -161,6 +219,7 @@ function normalizeLegacyEdge(
   const base = backfillTimestamps(edge, now)
   return {
     id: base.id,
+    boardId: ROOT_BOARD_ID,
     fromNodeId: base.fromNodeId ?? base.fromId,
     fromSide: base.fromSide,
     toNodeId: base.toNodeId ?? base.toId,
@@ -202,6 +261,7 @@ function normalizePreV0Board(
       ...cards.filter(isRecord).map((card) => normalizeLegacyCard(card, now)),
     ],
     edges: edges.filter(isRecord).map((edge) => normalizeLegacyEdge(edge, now)),
+    boards: normalizeBoardsCollection(parsed, now),
     images: isRecord(parsed.images) ? parsed.images : {},
   }
 }
@@ -236,12 +296,15 @@ function backfillV0Board(
     version: SCHEMA_VERSION,
     nodes: nodes.map((node) =>
       isRecord(node)
-        ? migrateTextSize(stripParentId(backfillTimestamps(node, now)))
+        ? backfillBoardId(
+            migrateTextSize(stripParentId(backfillTimestamps(node, now))),
+          )
         : node,
     ),
     edges: edges.map((edge) =>
-      isRecord(edge) ? backfillTimestamps(edge, now) : edge,
+      isRecord(edge) ? backfillBoardId(backfillTimestamps(edge, now)) : edge,
     ),
+    boards: normalizeBoardsCollection(parsed, now),
     images: isRecord(parsed.images) ? parsed.images : {},
   }
 }

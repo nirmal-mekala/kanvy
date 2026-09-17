@@ -644,7 +644,11 @@ Per Q16–Q18:
 
 - Final shape of the node/edge collections (single `nodes` array vs.
   separate `cards`/`containers`; typed edge-endpoint union) — prototype-migration phase 2.
-- Multiboard support — prototype-migration phase 2.
+- Multiboard support — prototype-migration phase 2. Design (not yet
+  implemented): `ctx/notes/260917-multiboard-support-design.md` — a
+  `boards` collection, `boardId`-scoped shared `nodes`/`edges` (which also
+  settles the node/edge-collection-shape question above for the multi-board
+  case), a new `board` card kind, and TanStack Router-based navigation.
 - JSON-on-disk + REST backend — prototype-migration phase 2 (design only), implementation later.
 - JSON Canvas spec alignment/inspiration — prototype-migration phase 2.
 - Image storage size/reference-counting budget — revisit once disk-backed.
