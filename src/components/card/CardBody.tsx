@@ -66,7 +66,13 @@ export function CardBody({
       )}
 
       {node.kind === 'link' && (
-        <>
+        <a
+          className="card__link-body no-drag"
+          href={node.link.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          draggable={false}
+        >
           {node.link.imageUrl && (
             <CardMedia
               src={node.link.imageUrl}
@@ -77,7 +83,7 @@ export function CardBody({
             />
           )}
           <CardLinkMeta link={node.link} />
-        </>
+        </a>
       )}
 
       {showCaption && (

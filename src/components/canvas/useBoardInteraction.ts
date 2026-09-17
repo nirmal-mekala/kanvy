@@ -282,9 +282,11 @@ export function useBoardInteraction({
     setSelection(nextSelection)
 
     // A click starting on an interactive child (a card's caption textarea,
-    // a link card's title) still selects the node above, but never starts a
-    // drag from it — ported from the prototype's `.no-drag` check in
-    // Card.jsx's handlePointerDown.
+    // an image card's image, a link card's whole clickable body) still
+    // selects the node above, but never starts a drag from it — ported
+    // from the prototype's `.no-drag` check in Card.jsx's handlePointerDown,
+    // extended to cover image/link cards' non-`.card__bar` areas so only
+    // the bar (or an empty part of the card) starts a drag.
     if ((e.target as HTMLElement).closest('.no-drag')) return
 
     const carryOrigins = beginNodeDrag(id, node, nextSelection)

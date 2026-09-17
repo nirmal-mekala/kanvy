@@ -2,3 +2,6 @@
 <!-- fallow:agent-install v1 claude-import:start -->
 @AGENTS.md
 <!-- fallow:agent-install v1 claude-import:end -->
+
+<!-- Local, git-ignored, machine-specific — see CLAUDE.local.md's own header. -->
+@CLAUDE.local.md

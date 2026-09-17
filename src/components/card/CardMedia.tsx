@@ -27,7 +27,7 @@ export function CardMedia({
 
   return (
     <div
-      className={`card__media${divided ? ' card__media--divided' : ''}${small ? ' card__media--small' : ''}`}
+      className={`card__media no-drag${divided ? ' card__media--divided' : ''}${small ? ' card__media--small' : ''}`}
     >
       <div className="card__media-frame">
         <img
