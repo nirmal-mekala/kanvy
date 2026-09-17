@@ -19,6 +19,7 @@ import { cardClassNames } from './cardClassNames'
 
 function useAutoGrowHeight(
   contentRef: React.RefObject<HTMLTextAreaElement | null>,
+  content: string,
   skip: boolean,
 ) {
   useLayoutEffect(() => {
@@ -27,7 +28,7 @@ function useAutoGrowHeight(
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [skip, contentRef])
+  }, [skip, contentRef, content])
 }
 
 function useMeasuredHeight(
@@ -141,7 +142,7 @@ export function Card({
   // Regular notes grow to fit their content; a heading-sized card (h1/h2/
   // h3) has an explicit, user-resized height instead (a later stage's
   // resize handles), so it never participates in this.
-  useAutoGrowHeight(contentRef, isHeading)
+  useAutoGrowHeight(contentRef, node.content, isHeading)
 
   // Stored height is the source of truth once measured (spec §2.4) — a
   // regular card's total rendered height (bar + content) only lives in the
