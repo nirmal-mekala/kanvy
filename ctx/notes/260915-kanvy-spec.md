@@ -291,17 +291,18 @@ respect.
 
 - **X-axis:** snaps to the grid (see §3, midpoint offset).
 - **Y-axis:** grid-snaps by default, same as X — but if a column-overlapping
-  neighbor's top or bottom edge is within `Y_SNAP_THRESHOLD` (2 grid cells)
-  *and* its fixed gutter point (`Y_SNAP_GUTTER` = 1 grid cell from that
-  edge) is actually closer to the raw drop position than the grid snap is,
-  the gutter wins instead — producing visually consistent spacing between
-  cards of varying height regardless of grid alignment. When several
-  neighbors qualify, whichever candidate (grid or any neighbor's gutter) is
-  closest to the raw position wins, not just the first neighbor checked —
-  an earlier revision returned on the first qualifying neighbor with no
-  grid fallback at all, which made a fast drag through a column of several
-  cards appear to "stick" as it locked onto whichever neighbor came first
-  instead of the nearest one.
+  neighbor's top or bottom edge is within `Y_SNAP_THRESHOLD` (2 grid cells),
+  its fixed gutter point (`Y_SNAP_GUTTER` = 1 grid cell from that edge)
+  always wins over the grid snap, producing visually consistent spacing
+  between cards of varying height regardless of grid alignment. The
+  ~1-grid-height band around a neighbor's edge is effectively a "no drop
+  zone": you can't land closer to it than the gutter, which is what guides
+  drags into equidistant spacing. When several neighbors qualify,
+  whichever neighbor's gutter is closest to the raw position wins, not
+  just the first neighbor checked — an earlier revision returned on the
+  first qualifying neighbor regardless of distance, which made a fast drag
+  through a column of several cards appear to "stick" as it locked onto
+  whichever neighbor came first instead of the nearest one.
 - **Container no-fly zone:** a card can never end up straddling a
   container's top-edge drag-handle band (the handle itself, plus one grid
   cell of clearance above and below). It can still be placed fully inside

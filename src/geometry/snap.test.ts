@@ -44,19 +44,20 @@ describe('snapY', () => {
     expect(snapY(candidate, [neighbor])).toBe(100 - Y_SNAP_GUTTER - 40)
   })
 
-  it('still qualifies right at the edge of the threshold, but the grid wins there since it is closer', () => {
-    // This is the old, pre-fix expectation flipped: at the very edge of
-    // the threshold the neighbor gutter is far from the raw position, so
-    // grid-snapping (which is always within half a grid cell) wins — this
-    // is the actual fix for the "fast upward drag doesn't track the
-    // cursor" bug (a distant neighbor no longer wins just by being first).
+  it('still qualifies right at the edge of the threshold, and the gutter wins over the grid there', () => {
+    // A qualifying neighbor's gutter always wins over the grid snap, even
+    // when the raw position happens to be far from the gutter (but still
+    // within Y_SNAP_THRESHOLD) — this is what makes the ~1-grid-height
+    // band around a neighbor's edge act as a "no drop zone" that guides
+    // drags into an equidistant gutter instead of letting the grid pull
+    // the drop closer than that gap.
     const candidate: Rect = {
       x: 20,
       y: 140 + Y_SNAP_THRESHOLD - 1,
       w: 160,
       h: 40,
     }
-    expect(snapY(candidate, [neighbor])).toBe(snapToGridMidpoint(candidate.y))
+    expect(snapY(candidate, [neighbor])).toBe(140 + Y_SNAP_GUTTER)
   })
 
   it('falls back to the grid (not the raw value) when no neighbor qualifies', () => {
@@ -84,12 +85,13 @@ describe('snapY', () => {
     expect(snapY(candidate, [far, near])).toBe(440 + Y_SNAP_GUTTER)
   })
 
-  it('prefers the grid snap over a neighbor gutter that is actually farther from the raw position', () => {
+  it('prefers a qualifying neighbor gutter over the grid snap even when the grid is closer to the raw position', () => {
     const neighborFar: Rect = { x: 0, y: 100, w: 160, h: 40 } // bottom edge at 140, gutter at 156
     // Raw Y (152) sits exactly on a grid midpoint (0px away) and is also
-    // within the neighbor's threshold, but its gutter (156) is 4px away —
-    // farther than the grid snap, so the grid wins.
+    // within the neighbor's threshold; its gutter (156) is 4px away — farther
+    // than the grid snap, but the neighbor still wins, since any qualifying
+    // neighbor takes priority over the grid (the "no drop zone" guidance).
     const candidate: Rect = { x: 20, y: 152, w: 160, h: 40 }
-    expect(snapY(candidate, [neighborFar])).toBe(snapToGridMidpoint(152))
+    expect(snapY(candidate, [neighborFar])).toBe(156)
   })
 })

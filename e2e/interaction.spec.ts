@@ -71,13 +71,12 @@ import { seedBoard } from './fixtures/board'
 // fallback at all, so a fast drag through several stacked cards could
 // lock onto a distant neighbor instead of the nearest one — visible as
 // the dragged card freezing for a frame while the cursor kept moving.
-// Fixed by having every candidate (the grid snap and each qualifying
-// neighbor gutter) compete on actual distance to the raw drop position,
-// closest wins. The gutter-snap test above was tightened to land at the
-// neighbor's actual gutter point instead of merely within the threshold,
-// and a new test drags fast through a column of neighbors, sampling the
-// dragged card's `style.top` every animation frame (not via
-// `boundingBox()` polling between moves, which can itself look "stuck"
+// Fixed by having every *qualifying neighbor* compete on actual distance
+// to the raw drop position (closest wins), while still falling back to
+// the grid only when no neighbor qualifies at all. A new test drags fast
+// through a column of neighbors, sampling the dragged card's `style.top`
+// every animation frame (not via `boundingBox()` polling between moves,
+// which can itself look "stuck"
 // from Playwright/render-timing artifacts even when the app updates
 // smoothly every frame) to prove it never stalls.
 
@@ -341,10 +340,10 @@ test.describe('dragging & snapping (spec §4.4)', () => {
 
     await page.mouse.move(boxB.x + 10, boxB.y + 10)
     await page.mouse.down()
-    // Drag b's top edge to (approximately) a's own gutter point — close
-    // enough to it, not just within the wider Y_SNAP_THRESHOLD, that it
-    // beats the grid snap (grid and gutter now compete on actual distance
-    // from the raw drop position, whichever is closer wins).
+    // Drag b's top edge to (approximately) a's own gutter point. Any drop
+    // within the wider Y_SNAP_THRESHOLD band always resolves to this exact
+    // gutter point — the neighbor gutter always wins over the grid snap,
+    // which is what makes that band act as a "no drop zone".
     await page.mouse.move(boxB.x + 10, boxA.y + boxA.height + 16 + 10, {
       steps: 10,
     })

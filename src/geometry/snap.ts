@@ -42,19 +42,18 @@ function columnsOverlap(a: Rect, b: Rect): boolean {
  * when *several* qualify, whichever candidate is actually closest to the
  * raw (pre-snap) Y wins, not just the first neighbor encountered. Ported
  * from the prototype's `Card.jsx` drag handler (`snapToGrid` default,
- * `bestDist` neighbor comparison) — an earlier revision here returned on
- * the first qualifying neighbor and skipped the grid fallback entirely,
- * which (with several neighbors stacked in the same column) made a fast
- * drag appear to "stick" as it locked onto whichever neighbor came first
- * in array order instead of the one actually nearest the cursor.
+ * `bestDist` neighbor comparison). A qualifying neighbor's gutter always
+ * wins over the grid snap — the grid is only used when no neighbor is
+ * within threshold — so the ~1-grid-height band around a neighbor's edge
+ * acts as a "no drop zone" that guides drags into equidistant gutters
+ * regardless of the neighbor's height.
  */
 export function snapY(candidate: Rect, neighbors: readonly Rect[]): number {
   let finalY = snapToGridMidpoint(candidate.y)
-  // The grid snap competes on equal footing with every neighbor gutter —
-  // seeded with its own distance, not `Infinity`, so a neighbor whose
-  // gutter is actually farther from the raw position than the grid is
-  // never preferred just for existing.
-  let bestDist = Math.abs(candidate.y - finalY)
+  // Seeded at `Infinity`, not the grid's own distance, so the grid never
+  // competes with a qualifying neighbor gutter — it's only the fallback
+  // when no neighbor is within `Y_SNAP_THRESHOLD` at all.
+  let bestDist = Number.POSITIVE_INFINITY
 
   function consider(snapCandidate: number) {
     const dist = Math.abs(candidate.y - snapCandidate)
