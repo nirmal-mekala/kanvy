@@ -128,7 +128,9 @@ export function Container({
           onPointerDown={onResizePointerDown}
           onPointerMove={onResizePointerMove}
           onPointerUp={onResizePointerUp}
-          onPointerCancel={onResizePointerCancel}
+          {...(onResizePointerCancel
+            ? { onPointerCancel: onResizePointerCancel }
+            : {})}
         />
       )}
       {(hovered || selected || connectorsVisible) &&

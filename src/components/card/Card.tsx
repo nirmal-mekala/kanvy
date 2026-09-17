@@ -22,6 +22,7 @@ function useAutoGrowHeight(
   content: string,
   skip: boolean,
 ) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: content isn't read in the body, but the effect must re-run on every keystroke to remeasure scrollHeight against the textarea's new content.
   useLayoutEffect(() => {
     if (skip) return
     const el = contentRef.current
@@ -208,7 +209,9 @@ export function Card({
             onPointerDown={onResizePointerDown}
             onPointerMove={onResizePointerMove}
             onPointerUp={onResizePointerUp}
-            onPointerCancel={onResizePointerCancel}
+            {...(onResizePointerCancel
+              ? { onPointerCancel: onResizePointerCancel }
+              : {})}
           />
         )}
       {(hovered || selected || connectorsVisible) &&
