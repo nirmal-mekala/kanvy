@@ -91,13 +91,20 @@ needed, never stored**.
   (`containers/containment.ts`), computed at the moment it's needed — e.g.
   once, at the start of a drag (`computeCarryIds`) — never continuously and
   never persisted.
-- Dragging a container carries along every node whose box overlaps its own,
-  except a container that *fully encloses* it (the ancestor-exclusion fix:
-  an ancestor "overlaps" a descendant just as much as the reverse, so
-  fully-enclosing containers are excluded from what a dragged node carries).
-  This is a single flat pass over every other node, not a tree walk — a
-  card nested several containers deep is picked up directly because its box
-  geometrically overlaps the outermost dragged container's rect too.
+- Dragging a container carries along every node **completely within** its
+  own bounds — a node that only partially overlaps the dragged container
+  (merely touching or straddling its edge) is left behind, not carried.
+  Requiring full containment also settles the ancestor-vs-descendant
+  question for free: an ancestor's rect is always at least as large as the
+  dragged one, so it can never itself be completely within it — no
+  separate exclusion check needed, unlike a plain overlap test (which is
+  symmetric and would otherwise require one). This is a single flat pass
+  over every other node, not a tree walk — a card nested several
+  containers deep is picked up directly because it's completely within
+  the outermost dragged container's rect too, not just the inner one.
+  (An earlier revision of this rule used plain overlap instead of full
+  containment — revised because a node merely brushing a container's edge
+  being swept along felt unpredictable and unintentional.)
 - Dragging a container that is itself nested inside another container moves
   only that container and whatever it spatially contains — never its
   enclosing container(s) — matching the deeply-nested-group bug fix already
@@ -293,8 +300,9 @@ respect.
   cell of clearance above and below). It can still be placed fully inside
   the container (below the zone) or fully above the container (above the
   zone).
-- Dragging a container carries everything spatially inside it (§2.3) and,
-  when the container is part of a multi-selection, the rest of that
+- Dragging a container carries everything completely within it (§2.3;
+  merely straddling its edge doesn't count) and, when the container is
+  part of a multi-selection, the rest of that
   selection too — merged so nothing double-moves.
 - Dragging any node that's part of a multi-selection carries the whole
   selection, preserving relative positions.

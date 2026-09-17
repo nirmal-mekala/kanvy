@@ -1,9 +1,14 @@
 // Spatial ("sticky") container membership (spec §2.3, v0.1) — no stored
 // ownership field; every question about what's "in" a container is answered
 // fresh, at the moment it's asked, purely from x/y/w/h. Ported from the
-// prototype's Board.jsx (`groupsContainingPoint`, `getContainedOrigins`).
+// prototype's Board.jsx (`groupsContainingPoint`, `getContainedOrigins`),
+// with one deliberate departure: `computeCarryIds` requires a node to be
+// *completely within* a dragged container's bounds to come along with it —
+// the prototype (and an earlier revision here) carried anything merely
+// overlapping, which could sweep up something only partially, incidentally
+// touching the container's edge.
 
-import { fullyEncloses, overlapArea } from '../geometry/containment'
+import { fullyEncloses } from '../geometry/containment'
 import type { Rect } from '../geometry/snap'
 import type { ContainerNode, Node, NodeId } from '../schema/node'
 
@@ -32,14 +37,20 @@ export function containersContainingPoint(
 
 /**
  * Every other node that should move along when the node at `rect` (id
- * `excludeId`) is dragged — every node whose box overlaps `rect`, except a
- * container that fully encloses `rect` (an ancestor "overlaps" a descendant
- * just as much as the descendant overlaps it, so `fullyEncloses` is what
- * tells the two apart — only a descendant should ever be carried along).
+ * `excludeId`) is dragged — every node *completely within* `rect`, not
+ * merely overlapping it. A node that only partially overlaps the dragged
+ * container isn't considered "in" it, so it's left behind.
+ *
+ * Requiring full containment also settles the ancestor-vs-descendant
+ * question for free: an ancestor's rect is always at least as large as
+ * `rect` (it encloses it), so it can never itself be "completely within"
+ * the smaller `rect` — no separate exclusion check needed, unlike a plain
+ * overlap test (which is symmetric and would otherwise need one).
  *
  * A single flat pass, not a tree walk: a card nested two containers deep is
- * picked up directly because its box geometrically overlaps the outer
- * container's rect too, exactly like the prototype's `getContainedOrigins`.
+ * picked up directly because it's completely within the outer container's
+ * rect too, not just the inner one — same one-pass approach as the
+ * prototype's `getContainedOrigins`, just with a stricter containment test.
  * No double-motion risk, since a carried container's own drag handler is
  * never separately invoked — only the node actually grabbed computes this.
  */
@@ -49,10 +60,6 @@ export function computeCarryIds(
   nodes: readonly Node[],
 ): NodeId[] {
   return nodes
-    .filter((node) => {
-      if (node.id === excludeId) return false
-      if (overlapArea(rect, node) <= 0) return false
-      return !(node.type === 'container' && fullyEncloses(node, rect))
-    })
+    .filter((node) => node.id !== excludeId && fullyEncloses(rect, node))
     .map((node) => node.id)
 }

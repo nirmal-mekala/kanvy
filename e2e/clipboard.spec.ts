@@ -55,6 +55,14 @@ import { dispatchPaste } from './fixtures/clipboard'
 // `useClipboardShortcuts.ts`'s `panPastedIntoView` was already a small,
 // pure, paste-specific helper; renamed to `panNewNodesIntoView` and called
 // from `tryDuplicate` too, rather than writing a second copy of it.
+// A later pass tightened container drag-carry from "overlaps" to
+// "completely within" (see interaction.spec.ts's header for the mechanism
+// change) — the shared c1/k1 fixture below widened `c1` from 200x200 to
+// 300x250 so `k1` genuinely sits fully inside it; it previously poked out
+// by 54px and the "carried along when dragged" tests only still passed
+// because paste/duplicate leave everything selected, and dragging a node
+// that's part of a multi-selection carries the whole selection regardless
+// of geometry — a real, separate mechanism, not the one being tested.
 // See AGENTS.md and ctx/notes/260915-phase6-e2e-test-scenario-checklist.md.
 
 function textCard(id: string, x: number, y: number, content = id) {
@@ -247,7 +255,10 @@ test.describe('in-app clipboard (spec §7)', () => {
       await seed(page, {
         version: 1,
         nodes: [
-          containerNode('c1', 100, 100, 200, 200),
+          // c1 sized generously enough that k1 (224 wide) sits completely
+          // within it, with margin — full containment, not merely
+          // overlap, spec §2.3/§4.4/§4.5.
+          containerNode('c1', 100, 100, 300, 250),
           textCard('k1', 130, 150, 'child'),
         ],
         edges: [],
@@ -427,7 +438,10 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
       await seed(page, {
         version: 1,
         nodes: [
-          containerNode('c1', 100, 100, 200, 200),
+          // c1 sized generously enough that k1 (224 wide) sits completely
+          // within it, with margin — full containment, not merely
+          // overlap, spec §2.3/§4.4/§4.5.
+          containerNode('c1', 100, 100, 300, 250),
           textCard('k1', 130, 150, 'child'),
         ],
         edges: [],
@@ -484,10 +498,10 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
       if (!dupContainer) throw new Error('duplicated container not found')
 
       const overlapsOriginal =
-        dupContainer.x < 100 + 200 &&
-        dupContainer.x + 200 > 100 &&
-        dupContainer.y < 100 + 200 &&
-        dupContainer.y + 200 > 100
+        dupContainer.x < 100 + 300 &&
+        dupContainer.x + 300 > 100 &&
+        dupContainer.y < 100 + 250 &&
+        dupContainer.y + 250 > 100
       expect(overlapsOriginal).toBe(false)
     })
 

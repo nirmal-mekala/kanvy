@@ -8,7 +8,7 @@ import { seedBoard } from './fixtures/board'
 // as the only container drag surface, `.resize-handle--<dir>` for the 8-way
 // handles.
 //
-// Run and passing (all 81) via the playwright-remote-browser skill. This
+// Run and passing (all 82) via the playwright-remote-browser skill. This
 // run caught a real, significant bug: clicking a card's caption text
 // (nearly its entire visible surface) failed to select it at all —
 // `CardBody.tsx`'s textarea called `stopPropagation()` on `pointerdown`,
@@ -38,6 +38,17 @@ import { seedBoard } from './fixtures/board'
 // used to assert a `parentId` value now asserts the equivalent *behavior*
 // instead (carried on drag, or not) — a strictly more robust check, since
 // it's what a user can actually observe.
+//
+// A later pass tightened that spatial rule further: a dragged container
+// now only carries a node *completely within* its bounds, not merely
+// overlapping it (a node just brushing/straddling the edge is left
+// behind) — `containers/containment.ts`'s `computeCarryIds` dropped its
+// plain-overlap check for `fullyEncloses`, which also made the old
+// ancestor-exclusion special case unnecessary (an ancestor can never be
+// completely within its smaller descendant). A couple of existing test
+// fixtures needed widening to stay genuinely full-containment (they'd
+// been drawn/dropped just overlapping, not completely inside); a new test
+// proves a merely-straddling card is correctly left behind.
 
 function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   return {
@@ -427,7 +438,7 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     expect(bAfter.y - bBefore.y).toBeCloseTo(dyA, 0)
   })
 
-  test('dragging a container moves everything spatially inside it', async ({
+  test('dragging a container moves a card completely within it', async ({
     page,
   }) => {
     await seed(page, {
@@ -463,6 +474,46 @@ test.describe('dragging & snapping (spec §4.4)', () => {
     if (!childAfter) throw new Error('missing bounding box')
     expect(childAfter.x - childBefore.x).toBeGreaterThan(40)
     expect(childAfter.y - childBefore.y).toBeGreaterThan(40)
+  })
+
+  test('dragging a container does NOT move a card that only straddles its edge (full containment required, not mere overlap)', async ({
+    page,
+  }) => {
+    // "straddling" starts inside "parent" (world x: 50..450) but pokes
+    // 174px past its right edge (straddling spans x: 400..624) — merely
+    // overlapping, not completely within.
+    await seed(page, {
+      version: 1,
+      nodes: [
+        containerNode('parent', 50, 50, 400, 400),
+        textCard('straddling', 400, 150),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const handle = page.locator(
+      '[data-node-id="parent"]:not(.node-connector) .container-node__drag-handle',
+    )
+    const handleBox = await handle.boundingBox()
+    const cardBefore = await page
+      .locator('[data-node-id="straddling"]:not(.node-connector)')
+      .boundingBox()
+    if (!handleBox || !cardBefore) throw new Error('missing bounding box')
+
+    await page.mouse.move(handleBox.x + 10, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 10 + 80, handleBox.y + 5 + 80, {
+      steps: 10,
+    })
+    await page.mouse.up()
+
+    const cardAfter = await page
+      .locator('[data-node-id="straddling"]:not(.node-connector)')
+      .boundingBox()
+    if (!cardAfter) throw new Error('missing bounding box')
+    expect(cardAfter.x).toBe(cardBefore.x)
+    expect(cardAfter.y).toBe(cardBefore.y)
   })
 
   test("a container's body is not a drag surface", async ({ page }) => {
@@ -556,11 +607,13 @@ test.describe('containers (spec §2.3, §4.5)', () => {
     const boardBox = await board.boundingBox()
     if (!boardBox) throw new Error('board not rendered')
 
-    // Draw a box around both cards.
+    // Draw a box completely around both cards, with margin on every side —
+    // full containment is required to be carried along (spec §2.3/§4.4/
+    // §4.5), not mere overlap.
     await page.keyboard.down('Control')
     await page.mouse.move(boardBox.x + 50, boardBox.y + 50)
     await page.mouse.down()
-    await page.mouse.move(boardBox.x + 400, boardBox.y + 250, { steps: 10 })
+    await page.mouse.move(boardBox.x + 600, boardBox.y + 300, { steps: 10 })
     await page.mouse.up()
     await page.keyboard.up('Control')
     await expect(page.locator('.container-node')).toHaveCount(1)
@@ -678,11 +731,16 @@ test.describe('containers (spec §2.3, §4.5)', () => {
       .boundingBox()
     if (!containerBox) throw new Error('container not rendered')
 
+    // Grab 10px into the card's top-left corner, so the target mouse
+    // position has to account for that same offset (plus half the card's
+    // own size) to actually *center* the card in the container — dropping
+    // it merely overlapping isn't enough to be carried now (full
+    // containment required, spec §2.3/§4.4/§4.5).
     await page.mouse.move(cardBox.x + 10, cardBox.y + 10)
     await page.mouse.down()
     await page.mouse.move(
-      containerBox.x + containerBox.width / 2,
-      containerBox.y + containerBox.height / 2,
+      containerBox.x + containerBox.width / 2 - cardBox.width / 2 + 10,
+      containerBox.y + containerBox.height / 2 - cardBox.height / 2 + 10,
       { steps: 10 },
     )
     await page.mouse.up()

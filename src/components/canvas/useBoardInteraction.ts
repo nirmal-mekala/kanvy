@@ -252,9 +252,10 @@ export function useBoardInteraction({
   // ---- Node drag: a card's whole body, or a container's drag handle ----
 
   // The rest of a multi-selection (and, for a container, whatever it
-  // spatially encloses) carries along with the grabbed node once a drag
-  // actually starts (spec §4.4/§4.5) — split out of handleNodePointerDown
-  // purely to keep that function's complexity under Biome's threshold.
+  // completely encloses — partial overlap doesn't count, spec §4.4/§4.5)
+  // carries along with the grabbed node once a drag actually starts —
+  // split out of handleNodePointerDown purely to keep that function's
+  // complexity under Biome's threshold.
   // Computed once, here, at drag-start — never recomputed mid-drag (matches
   // the prototype's `getContainedOrigins`/`Group.jsx` exactly).
   function beginNodeDrag(id: NodeId, node: Node, nextSelection: Set<NodeId>) {
@@ -560,8 +561,8 @@ export function useBoardInteraction({
         w: finalRect.w / view.zoom,
         h: finalRect.h / view.zoom,
       }
-      // Whatever the drawn box spatially swept up is automatically "in" the
-      // new container from now on (spec §2.3/§4.5, v0.1) — nothing to
+      // Whatever the drawn box completely encloses is automatically "in"
+      // the new container from now on (spec §2.3/§4.5, v0.1) — nothing to
       // record; the next drag of either one re-derives it fresh from
       // geometry (containers/containment.ts's `computeCarryIds`), and it
       // renders beneath what it encloses immediately (renderOrder.ts).

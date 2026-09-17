@@ -41,7 +41,7 @@ function textCard(id: string, x: number, y: number, w = 40, h = 40): CardNode {
 }
 
 describe('computeCarryIds', () => {
-  it('carries every node overlapping the dragged rect', () => {
+  it('carries every node completely within the dragged rect', () => {
     const nodes: Node[] = [
       textCard('a', 10, 10),
       textCard('b', 60, 10),
@@ -55,24 +55,40 @@ describe('computeCarryIds', () => {
     expect(new Set(carried)).toEqual(new Set(['a', 'b']))
   })
 
-  it('returns an empty list when nothing overlaps', () => {
+  it('does not carry a node that only partially overlaps the dragged rect', () => {
+    // "straddling" pokes 10px past the dragged rect's right edge (which
+    // spans x: 0..100) — only touching it, not completely within it.
+    const nodes: Node[] = [
+      textCard('inside', 10, 10, 40, 40), // spans x: 10..50 — fully within
+      textCard('straddling', 70, 10, 40, 40), // spans x: 70..110 — pokes out
+    ]
+    const carried = computeCarryIds(
+      { x: 0, y: 0, w: 100, h: 60 },
+      'dragged',
+      nodes,
+    )
+    expect(carried).toEqual(['inside'])
+  })
+
+  it('returns an empty list when nothing is contained', () => {
     const nodes: Node[] = [textCard('far', 1000, 1000)]
     expect(
       computeCarryIds({ x: 0, y: 0, w: 50, h: 50 }, 'dragged', nodes),
     ).toEqual([])
   })
 
-  it('excludes the dragged node itself even though its own rect obviously overlaps', () => {
+  it('excludes the dragged node itself even though its own rect trivially contains itself', () => {
     const nodes: Node[] = [containerNode('self', 0, 0, 100, 100)]
     expect(
       computeCarryIds({ x: 0, y: 0, w: 100, h: 100 }, 'self', nodes),
     ).toEqual([])
   })
 
-  it('never carries a container that fully encloses the dragged rect (ancestor exclusion)', () => {
-    // Dragging "inner" must not pull its enclosing "outer" along, even
-    // though outer's box geometrically overlaps inner's rect just as much
-    // as the reverse.
+  it('never carries a container that encloses the dragged rect — full containment rules ancestors out for free, no separate exclusion needed', () => {
+    // Dragging "inner" must not pull its enclosing "outer" along — "outer"
+    // is larger than "inner"'s rect, so it can never be *completely within*
+    // it, unlike a plain overlap test (which is symmetric and would need
+    // an explicit ancestor exclusion).
     const nodes: Node[] = [
       containerNode('outer', 0, 0, 400, 400),
       containerNode('inner', 100, 100, 50, 50),
@@ -86,9 +102,9 @@ describe('computeCarryIds', () => {
   })
 
   it('picks up a grandchild directly, in one flat pass, when dragging the outermost container', () => {
-    // outer > middle > card, all geometrically nested. Dragging "outer"
-    // must carry both "middle" and "card" without needing to first walk
-    // middle's own members.
+    // outer > middle > card, all geometrically nested (each completely
+    // within its parent). Dragging "outer" must carry both "middle" and
+    // "card" without needing to first walk middle's own members.
     const nodes: Node[] = [
       containerNode('outer', 0, 0, 400, 400),
       containerNode('middle', 50, 50, 200, 200),
@@ -116,7 +132,7 @@ describe('computeCarryIds', () => {
     expect(carried).toEqual(['card'])
   })
 
-  it('a card lying outside a swallowed container is still swallowed directly', () => {
+  it('a card lying elsewhere within the dragged rect is still swallowed directly', () => {
     const nodes: Node[] = [
       containerNode('parent', 10, 10, 50, 50),
       textCard('sibling', 200, 10, 30, 30),
@@ -129,7 +145,7 @@ describe('computeCarryIds', () => {
     expect(new Set(carried)).toEqual(new Set(['parent', 'sibling']))
   })
 
-  it('two unrelated overlapped containers are both carried', () => {
+  it('two unrelated contained containers are both carried', () => {
     const nodes: Node[] = [
       containerNode('left', 0, 0, 50, 50),
       containerNode('right', 200, 0, 50, 50),
