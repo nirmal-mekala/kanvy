@@ -1,4 +1,4 @@
-import { type Browser, expect, test } from '@playwright/test'
+import { type Browser, expect, type Page, test } from '@playwright/test'
 import { diffScreenshots } from './diff'
 import {
   buildOurBoard,
@@ -33,6 +33,22 @@ const NEW_APP_URL = `http://localhost:${process.env.KANVY_VISUAL_NEW_APP_PORT ??
 const PROTOTYPE_URL = `http://localhost:${process.env.KANVY_VISUAL_PROTOTYPE_PORT ?? '5174'}`
 const VIEWPORT = { width: 900, height: 700 }
 
+async function waitForImagesToDecode(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      Array.from(document.images).map((img) =>
+        img.complete ? Promise.resolve() : img.decode().catch(() => {}),
+      ),
+    ),
+  )
+  // Let React commit the re-render that `onLoad`/`decode()` triggers
+  // (e.g. `CardMedia`'s small-image sizing class) before we screenshot.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => requestAnimationFrame(() => resolve(undefined))),
+  )
+}
+
 async function captureBoardPair(
   browser: Browser,
   scene: Scene,
@@ -58,6 +74,15 @@ async function captureBoardPair(
     const prototypeBoard = prototypePage.locator('.board__layer')
     await newAppBoard.waitFor()
     await prototypeBoard.waitFor()
+
+    // Card images (e.g. `CardMedia.tsx`) resize themselves on `onLoad`, one
+    // React render after paint — without waiting for decode, a screenshot
+    // can land mid-flight and diff against the settled prototype/expected
+    // state (found via a CI-only flake on the image-card scenarios).
+    await Promise.all([
+      waitForImagesToDecode(newAppPage),
+      waitForImagesToDecode(prototypePage),
+    ])
 
     const [actual, expected] = await Promise.all([
       newAppBoard.screenshot(),
