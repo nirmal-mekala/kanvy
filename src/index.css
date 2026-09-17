@@ -486,11 +486,25 @@ body {
 }
 
 .card__media {
-  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+/* An image narrower than the card's fixed width isn't stretched to fill it
+   (that upscales and looks pixelated) — instead it's centered at its
+   natural size, with breathing room so it doesn't sit flush against the
+   bar above or the caption/edge below. */
+.card__media--small {
+  padding: 16px 0;
 }
 
 .card__media--divided {
   border-bottom: 1px solid var(--color-border-soft);
+}
+
+.card__media-frame {
+  position: relative;
+  max-width: 100%;
 }
 
 /* A duotone-style "grayscale, then tint" effect for a done task's image:
@@ -506,15 +520,17 @@ body {
 
 .card__image {
   display: block;
-  width: 100%;
-  height: auto; /* intrinsic aspect ratio, always — never cropped/stretched */
+  max-width: 100%;
+  width: auto;
+  height: auto; /* intrinsic aspect ratio, always — never cropped/stretched, and never upscaled past its natural size */
   cursor: grab;
   -webkit-user-drag: none;
 }
 
 .card__link-image {
   display: block;
-  width: 100%;
+  max-width: 100%;
+  width: auto;
   height: auto;
   border-bottom: 1px solid var(--color-border-soft);
   cursor: grab;
