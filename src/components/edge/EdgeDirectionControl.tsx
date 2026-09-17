@@ -5,12 +5,17 @@
 // multi-edge selection (spec §4.3's "one selection menu for the whole
 // selection, however mixed" — no option reads as falsely "active" then).
 
+import { ArrowLeft, ArrowRight, Minus } from 'lucide-react'
 import type { EdgeDirection } from '../../schema/edge'
 
-const OPTIONS: { value: EdgeDirection; label: string; title: string }[] = [
-  { value: 'none', label: '—', title: 'No direction' },
-  { value: 'forward', label: '→', title: 'Forward' },
-  { value: 'backward', label: '←', title: 'Backward' },
+const OPTIONS: {
+  value: EdgeDirection
+  Icon: typeof Minus
+  title: string
+}[] = [
+  { value: 'none', Icon: Minus, title: 'No direction' },
+  { value: 'forward', Icon: ArrowRight, title: 'Forward' },
+  { value: 'backward', Icon: ArrowLeft, title: 'Backward' },
 ]
 
 export function EdgeDirectionControl({
@@ -42,7 +47,7 @@ export function EdgeDirectionControl({
           }`}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          <option.Icon size={14} strokeWidth={2} />
         </button>
       ))}
     </div>

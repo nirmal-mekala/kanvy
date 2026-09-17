@@ -309,10 +309,10 @@ test.describe('connections (spec §4.6)', () => {
     await page
       .locator('[data-edge-id="e1"] .edge__hit')
       .dispatchEvent('pointerdown', { button: 0 })
-    await page.locator('.edge-direction-control__btn', { hasText: '→' }).click()
+    await page.locator('.edge-direction-control__btn[title="Forward"]').click()
     await expect(
-      page.locator('[data-edge-id="e1"] .edge__line'),
-    ).toHaveAttribute('marker-end', /edge-arrow/)
+      page.locator('[data-edge-id="e1"] .edge__arrowhead'),
+    ).toBeAttached()
   })
 })
 

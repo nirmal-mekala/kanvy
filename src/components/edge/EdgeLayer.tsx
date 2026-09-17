@@ -5,7 +5,7 @@
 
 import type { Point, Side } from '../../geometry/anchor'
 import { anchorPoint } from '../../geometry/anchor'
-import { bezierPath } from '../../geometry/curve'
+import { bezierPath, edgeGeometry } from '../../geometry/curve'
 import type { Edge as EdgeData } from '../../schema/edge'
 import type { Node } from '../../schema/node'
 import { Edge } from './Edge'
@@ -26,35 +26,6 @@ export function EdgeLayer({
 }) {
   return (
     <svg className="board__edges" data-testid="edge-layer" aria-hidden="true">
-      <defs>
-        <marker
-          id="edge-arrow"
-          viewBox="0 0 10 10"
-          refX="8"
-          refY="5"
-          markerWidth="7"
-          markerHeight="7"
-          orient="auto-start-reverse"
-        >
-          <path d="M0,0 L10,5 L0,10 Z" fill="var(--color-edge)" />
-        </marker>
-        {/* Recolored to --color-ink when its edge is selected — matches
-            the prototype's Board.jsx-drawn selected-arrowhead treatment
-            (opaque, unlike the translucent --color-outline used for other
-            selection outlines, since a fill would otherwise let the
-            background show through). */}
-        <marker
-          id="edge-arrow-selected"
-          viewBox="0 0 10 10"
-          refX="8"
-          refY="5"
-          markerWidth="7"
-          markerHeight="7"
-          orient="auto-start-reverse"
-        >
-          <path d="M0,0 L10,5 L0,10 Z" className="edge__arrowhead--selected" />
-        </marker>
-      </defs>
       {/* CRAP scoring penalizes this callback's 0% coverage — component
           tests aren't a required tier for v0 (spec §13); real coverage
           comes from e2e/visual-regression specs, which fallow's static
@@ -66,12 +37,26 @@ export function EdgeLayer({
         if (!fromNode || !toNode) return null
         const from = anchorPoint(fromNode, edge.fromSide)
         const to = anchorPoint(toNode, edge.toSide)
-        const d = bezierPath(from, edge.fromSide, to, edge.toSide, edge.id)
+        const arrowEnd =
+          edge.direction === 'none'
+            ? null
+            : edge.direction === 'forward'
+              ? 'to'
+              : 'from'
+        const { d, arrow } = edgeGeometry(
+          from,
+          edge.fromSide,
+          to,
+          edge.toSide,
+          edge.id,
+          arrowEnd,
+        )
         return (
           <Edge
             key={edge.id}
             edge={edge}
             d={d}
+            arrow={arrow}
             selected={selectedIds?.has(edge.id) ?? false}
             {...(onEdgePointerDown ? { onPointerDown: onEdgePointerDown } : {})}
           />
