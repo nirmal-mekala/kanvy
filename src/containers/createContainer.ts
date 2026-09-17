@@ -5,10 +5,8 @@ import { ROOT_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { ContainerNode } from '../schema/node'
 
-// `boardId` hardcoded to root for now — see cards/newCard.ts's matching
-// note; replaced with the actual current board once
-// state/atoms/nodes.ts's `currentBoardIdAtom` exists (multiboard-support
-// implementation plan, Sub-phase 2).
+// `boardId` below is a placeholder only — see cards/newCard.ts's matching
+// note: `addNodeAtom` always overwrites it with the actual current board.
 
 /** A freshly created container at the given world-space rect (default color/pattern, no task). */
 export function createContainer(rect: {

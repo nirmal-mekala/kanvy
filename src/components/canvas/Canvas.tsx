@@ -12,6 +12,7 @@ import { boundingBox } from '../../geometry/containment'
 import { GRID_SIZE } from '../../geometry/snap'
 import type { EdgeDirection } from '../../schema/edge'
 import type { CardNode, ContainerNode } from '../../schema/node'
+import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
 import { setEdgeDirectionAtom } from '../../state/atoms/edges'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { imagesAtom } from '../../state/atoms/images'
@@ -59,6 +60,17 @@ interface View {
 // fallow-ignore-next-line complexity
 export function Canvas() {
   const board = useAtomValue(boardAtom)
+  const currentBoardId = useAtomValue(currentBoardIdAtom)
+  // Multiboard support (ctx/notes/260917-multiboard-support-design.md §2):
+  // `board.nodes`/`board.edges` are shared flat arrays across every board —
+  // every render/query path below operates on these current-board-scoped
+  // views, never the raw `board.nodes`/`board.edges`.
+  const boardNodes = board.nodes.filter(
+    (node) => node.boardId === currentBoardId,
+  )
+  const boardEdges = board.edges.filter(
+    (edge) => edge.boardId === currentBoardId,
+  )
   const images = useAtomValue(imagesAtom)
   const theme = useAtomValue(themeAtom)
   const viewMode = useAtomValue(viewModeAtom)
@@ -114,9 +126,9 @@ export function Canvas() {
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
-  } = useBoardInteraction({ nodes: board.nodes, view, boardElRef })
+  } = useBoardInteraction({ nodes: boardNodes, view, boardElRef })
 
-  const nodesById = new Map(board.nodes.map((node) => [node.id, node]))
+  const nodesById = new Map(boardNodes.map((node) => [node.id, node]))
 
   const { handleContentChange, handleContentBlur } = useCardEditing({
     nodesById,
@@ -134,14 +146,14 @@ export function Canvas() {
     handleConnectingPointerMove,
     finishConnecting,
   } = useConnectionInteraction({
-    nodes: board.nodes,
-    edges: board.edges,
+    nodes: boardNodes,
+    edges: boardEdges,
     view,
     boardElRef,
   })
 
   useClipboardShortcuts({
-    nodes: board.nodes,
+    nodes: boardNodes,
     nodesById,
     view,
     setView,
@@ -151,11 +163,11 @@ export function Canvas() {
   // Selected edges get the direction-toggle control (spec §4.6); selected
   // cards/containers get the full SelectionMenu (spec §4.3 — "one selection
   // menu for the whole selection, however mixed" — both can show at once).
-  const selectedEdges = board.edges.filter((edge) => selection.has(edge.id))
-  const selectedCards = board.nodes.filter(
+  const selectedEdges = boardEdges.filter((edge) => selection.has(edge.id))
+  const selectedCards = boardNodes.filter(
     (node): node is CardNode => node.type === 'card' && selection.has(node.id),
   )
-  const selectedContainers = board.nodes.filter(
+  const selectedContainers = boardNodes.filter(
     (node): node is ContainerNode =>
       node.type === 'container' && selection.has(node.id),
   )
@@ -211,11 +223,11 @@ export function Canvas() {
   // `x`/`y`/`w`/`h` are the source of truth per spec §2.4) rather than
   // DOM measurement.
   const zoomToFitAll = useCallback(() => {
-    if (board.nodes.length === 0) return
+    if (boardNodes.length === 0) return
     const rect = boardElRef.current?.getBoundingClientRect()
     if (!rect) return
 
-    const box = boundingBox(board.nodes)
+    const box = boundingBox(boardNodes)
     const contentWidth = Math.max(1, box.w)
     const contentHeight = Math.max(1, box.h)
     const fitZoom = Math.min(
@@ -233,7 +245,7 @@ export function Canvas() {
       x: anchorX - worldCenterX * newZoom,
       y: anchorY - worldCenterY * newZoom,
     })
-  }, [board.nodes])
+  }, [boardNodes])
 
   useEffect(() => {
     const el = boardElRef.current
@@ -376,7 +388,7 @@ export function Canvas() {
             same nesting depth, instead of that whole new subtree painting
             cleanly above everything before it. */}
         {sortContainersForRender(
-          board.nodes.filter(
+          boardNodes.filter(
             (node): node is ContainerNode => node.type === 'container',
           ),
         ).map((node) => (
@@ -412,14 +424,14 @@ export function Canvas() {
         ))}
 
         <EdgeLayer
-          edges={board.edges}
+          edges={boardEdges}
           nodesById={nodesById}
           selectedIds={selection}
           preview={edgePreview}
           onEdgePointerDown={handleEdgePointerDown}
         />
 
-        {board.nodes
+        {boardNodes
           .filter((node) => node.type === 'card')
           // fallow-ignore-next-line complexity
           .map((node) => (

@@ -48,6 +48,7 @@ async function freshState() {
   const edgesModule = await import('./edges')
   const historyModule = await import('../history/boardHistoryAtom')
   const selectionModule = await import('./selection')
+  const currentBoardModule = await import('./currentBoard')
   const store = createStore()
   return {
     store,
@@ -55,6 +56,7 @@ async function freshState() {
     ...edgesModule,
     ...historyModule,
     ...selectionModule,
+    ...currentBoardModule,
   }
 }
 
@@ -247,5 +249,162 @@ describe('nodes atoms', () => {
 
     store.set(undoBoardAtom)
     expect([...store.get(selectionAtom)]).toEqual(['n1'])
+  })
+})
+
+describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2, §5)', () => {
+  it("nodeIdsAtom only includes the current board's own nodes", async () => {
+    const { store, addNodeAtom, nodeIdsAtom, currentBoardIdAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('root-1'))
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodeAtom, textNode('child-1'))
+
+    expect(store.get(nodeIdsAtom)).toEqual(['child-1'])
+    store.set(currentBoardIdAtom, 'root')
+    expect(store.get(nodeIdsAtom)).toContain('root-1')
+    expect(store.get(nodeIdsAtom)).not.toContain('child-1')
+  })
+
+  it('addNodeAtom stamps the current board onto the new node, overriding whatever the caller constructed it with', async () => {
+    const { store, addNodeAtom, boardAtom, currentBoardIdAtom } =
+      await freshState()
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodeAtom, textNode('n1', { boardId: 'root' }))
+
+    const node = store.get(boardAtom).nodes.find((n) => n.id === 'n1')
+    expect(node?.boardId).toBe('child')
+  })
+
+  it('addNodesAtom stamps the current board onto every node in the batch', async () => {
+    const { store, addNodesAtom, boardAtom, currentBoardIdAtom } =
+      await freshState()
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodesAtom, [textNode('n1'), textNode('n2')])
+
+    const nodes = store.get(boardAtom).nodes
+    expect(nodes.find((n) => n.id === 'n1')?.boardId).toBe('child')
+    expect(nodes.find((n) => n.id === 'n2')?.boardId).toBe('child')
+  })
+
+  it('addEdgeAtom stamps the current board onto the new edge', async () => {
+    const { store, addNodeAtom, addEdgeAtom, boardAtom, currentBoardIdAtom } =
+      await freshState()
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodeAtom, textNode('a'))
+    store.set(addNodeAtom, textNode('b'))
+    store.set(addEdgeAtom, {
+      id: 'e1',
+      boardId: 'root',
+      fromNodeId: 'a',
+      fromSide: 'right',
+      toNodeId: 'b',
+      toSide: 'left',
+      direction: 'none',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    expect(store.get(boardAtom).edges[0]?.boardId).toBe('child')
+  })
+
+  it("edgeIdsAtom only includes the current board's own edges", async () => {
+    const { store, addNodeAtom, addEdgeAtom, edgeIdsAtom, currentBoardIdAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('a'))
+    store.set(addNodeAtom, textNode('b'))
+    store.set(addEdgeAtom, {
+      id: 'root-edge',
+      boardId: 'root',
+      fromNodeId: 'a',
+      fromSide: 'right',
+      toNodeId: 'b',
+      toSide: 'left',
+      direction: 'none',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodeAtom, textNode('c'))
+    store.set(addNodeAtom, textNode('d'))
+    store.set(addEdgeAtom, {
+      id: 'child-edge',
+      boardId: 'child',
+      fromNodeId: 'c',
+      fromSide: 'right',
+      toNodeId: 'd',
+      toSide: 'left',
+      direction: 'none',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+
+    expect(store.get(edgeIdsAtom)).toEqual(['child-edge'])
+    store.set(currentBoardIdAtom, 'root')
+    expect(store.get(edgeIdsAtom)).toEqual(['root-edge'])
+  })
+
+  it('undo is a no-op if the top of the stack was attributed to a different board than the one currently being viewed', async () => {
+    const { store, addNodeAtom, undoBoardAtom, boardAtom, currentBoardIdAtom } =
+      await freshState()
+    const initialCount = store.get(boardAtom).nodes.length
+    store.set(addNodeAtom, textNode('root-1'))
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
+
+    // Navigate to a different board without editing it — its last action
+    // ("root-1" added) belongs to root, not the board now being viewed.
+    store.set(currentBoardIdAtom, 'child')
+    store.set(undoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
+
+    // Back on root, whose own action is still on top: undo works normally.
+    store.set(currentBoardIdAtom, 'root')
+    store.set(undoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount)
+  })
+
+  it('redo is a no-op if the next future entry was attributed to a different board than the one currently being viewed', async () => {
+    const {
+      store,
+      addNodeAtom,
+      undoBoardAtom,
+      redoBoardAtom,
+      boardAtom,
+      currentBoardIdAtom,
+    } = await freshState()
+    const initialCount = store.get(boardAtom).nodes.length
+    store.set(addNodeAtom, textNode('root-1'))
+    store.set(undoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount)
+
+    store.set(currentBoardIdAtom, 'child')
+    store.set(redoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount)
+
+    store.set(currentBoardIdAtom, 'root')
+    store.set(redoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
+  })
+
+  it("editing a second board after the first makes the first board's undo unavailable until it's edited again", async () => {
+    const { store, addNodeAtom, undoBoardAtom, boardAtom, currentBoardIdAtom } =
+      await freshState()
+    const initialCount = store.get(boardAtom).nodes.length
+    store.set(addNodeAtom, textNode('root-1'))
+
+    store.set(currentBoardIdAtom, 'child')
+    store.set(addNodeAtom, textNode('child-1', { boardId: 'child' }))
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 2)
+
+    // root-1 is no longer the topmost entry — root's undo can't reach it.
+    store.set(currentBoardIdAtom, 'root')
+    store.set(undoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 2)
+
+    // child's own last action is on top: its undo works normally.
+    store.set(currentBoardIdAtom, 'child')
+    store.set(undoBoardAtom)
+    expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
   })
 })

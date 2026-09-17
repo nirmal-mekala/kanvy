@@ -132,13 +132,11 @@ export function useConnectionInteraction({
     }
 
     const now = new Date().toISOString()
-    // Both endpoints are already on the current board (an edge can't span
-    // boards), so the new edge's boardId is just whichever board its
-    // fromNode belongs to.
-    const fromNode = nodesById().get(state.fromId)
     const edge: Edge = {
       id: generateId(),
-      boardId: fromNode?.boardId ?? ROOT_BOARD_ID,
+      // Overwritten by addEdgeAtom's own board-stamping — kept here only
+      // to satisfy the schema's required field at construction time.
+      boardId: ROOT_BOARD_ID,
       fromNodeId: state.fromId,
       fromSide: state.fromSide,
       toNodeId: current.hoverId,

@@ -1,16 +1,24 @@
 // Granular per-edge read access + edge-affecting board operations. See
 // nodes.ts for why `edgeFamily(id)` is a derived read atom rather than a
-// primitive per-entity atom.
+// primitive per-entity atom. `edgeIdsAtom` scopes itself to
+// `currentBoardIdAtom` (multiboard support, ctx/notes/260917-multiboard-
+// support-design.md §2) the same way `nodeIdsAtom` does; `addEdgeAtom`
+// stamps the new edge's `boardId` to the current board, same as
+// `addNodeAtom` does for nodes.
 
 import { atom } from 'jotai'
 import type { Board } from '../../schema/board'
 import type { Edge } from '../../schema/edge'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
+import { currentBoardIdAtom } from './currentBoard'
 
-export const edgeIdsAtom = atom((get) =>
-  get(boardAtom).edges.map((edge) => edge.id),
-)
+export const edgeIdsAtom = atom((get) => {
+  const currentBoardId = get(currentBoardIdAtom)
+  return get(boardAtom)
+    .edges.filter((edge) => edge.boardId === currentBoardId)
+    .map((edge) => edge.id)
+})
 
 export const edgeFamily = atomFamily((id: string) =>
   atom((get) => get(boardAtom).edges.find((edge) => edge.id === id)),
@@ -33,10 +41,12 @@ export function findEdgeBetween(
   )
 }
 
-export const addEdgeAtom = atom(null, (_get, set, edge: Edge) => {
-  set(updateBoardAtom, (board: Board) => ({
+export const addEdgeAtom = atom(null, (get, set, edge: Edge) => {
+  const boardId = get(currentBoardIdAtom)
+  const stamped = { ...edge, boardId }
+  set(updateBoardAtom, boardId, (board: Board) => ({
     ...board,
-    edges: [...board.edges, edge],
+    edges: [...board.edges, stamped],
   }))
 })
 
@@ -47,11 +57,11 @@ export const addEdgeAtom = atom(null, (_get, set, edge: Edge) => {
  */
 export const setEdgeDirectionAtom = atom(
   null,
-  (_get, set, ids: readonly string[], direction: Edge['direction']) => {
+  (get, set, ids: readonly string[], direction: Edge['direction']) => {
     if (ids.length === 0) return
     const idSet = new Set(ids)
     const now = new Date().toISOString()
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const edges = board.edges.map((edge) => {
         if (!idSet.has(edge.id) || edge.direction === direction) return edge

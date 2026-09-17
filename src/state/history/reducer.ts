@@ -36,16 +36,23 @@ export function createHistoryState<T>(initial: T): HistoryState<T> {
  * Applies a new state value as the next history step. A no-op (same
  * reference as the current present) is dropped rather than recorded, same
  * as the prototype. `now` is injected (rather than read internally) so the
- * coalescing window is deterministically testable.
+ * coalescing window is deterministically testable. `forceNewEntry` lets a
+ * caller override coalescing even within the window, when its own domain
+ * logic says these two updates shouldn't merge regardless of timing — e.g.
+ * multiboard support's per-board attribution (state/history/
+ * boardHistoryAtom.ts): two rapid edits to *different* boards must never
+ * coalesce into one entry, since that entry's single attribution couldn't
+ * represent both.
  */
 export function pushUpdate<T>(
   history: HistoryState<T>,
   next: T,
   now: number,
   restoreSelection?: readonly string[],
+  forceNewEntry = false,
 ): HistoryState<T> {
   if (next === history.present.state) return history
-  const coalesce = now - history.lastActionAt < COALESCE_MS
+  const coalesce = !forceNewEntry && now - history.lastActionAt < COALESCE_MS
   const past = coalesce
     ? history.past
     : [...history.past, history.present].slice(-MAX_HISTORY)

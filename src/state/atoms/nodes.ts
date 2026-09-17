@@ -9,6 +9,15 @@
 // subscribers — the "whole canvas re-renders on one drag" problem phase3's
 // stack decision (AGENTS.md) called out, solved without a second
 // synchronized copy of node state to keep consistent with undo/redo.
+//
+// Multiboard support (ctx/notes/260917-multiboard-support-design.md §2):
+// `nodes` is a single flat array shared across all boards. `nodeIdsAtom`
+// scopes itself to `currentBoardIdAtom`; every mutation below is
+// attributed to the current board for undo/redo purposes (see
+// state/history/boardHistoryAtom.ts), and the two that create brand-new
+// nodes (`addNodeAtom`/`addNodesAtom`) additionally stamp the new node's
+// `boardId` to the current board, overriding whatever placeholder value
+// the caller's factory happened to construct it with.
 
 import { atom } from 'jotai'
 import {
@@ -30,6 +39,7 @@ import type {
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
+import { currentBoardIdAtom } from './currentBoard'
 import { pruneOrphanedImages } from './images'
 
 /**
@@ -51,9 +61,12 @@ interface NodeCommonPatch {
   task?: { status: TaskStatus }
 }
 
-export const nodeIdsAtom = atom((get) =>
-  get(boardAtom).nodes.map((node) => node.id),
-)
+export const nodeIdsAtom = atom((get) => {
+  const currentBoardId = get(currentBoardIdAtom)
+  return get(boardAtom)
+    .nodes.filter((node) => node.boardId === currentBoardId)
+    .map((node) => node.id)
+})
 
 export const nodeFamily = atomFamily((id: NodeId) =>
   atom((get) => get(boardAtom).nodes.find((node) => node.id === id)),
@@ -78,10 +91,12 @@ function withoutTask(node: Node): Node {
  */
 export const addNodeAtom = atom(
   null,
-  (_get, set, node: Node, newImage?: { id: string; dataUri: string }) => {
-    set(updateBoardAtom, (board: Board) => ({
+  (get, set, node: Node, newImage?: { id: string; dataUri: string }) => {
+    const boardId = get(currentBoardIdAtom)
+    const stamped = { ...node, boardId }
+    set(updateBoardAtom, boardId, (board: Board) => ({
       ...board,
-      nodes: [...board.nodes, node],
+      nodes: [...board.nodes, stamped],
       images: newImage
         ? { ...board.images, [newImage.id]: newImage.dataUri }
         : board.images,
@@ -95,11 +110,13 @@ export const addNodeAtom = atom(
  * than one node at once when the source selection was multi-node, and
  * should undo as a single step).
  */
-export const addNodesAtom = atom(null, (_get, set, nodes: readonly Node[]) => {
+export const addNodesAtom = atom(null, (get, set, nodes: readonly Node[]) => {
   if (nodes.length === 0) return
-  set(updateBoardAtom, (board: Board) => ({
+  const boardId = get(currentBoardIdAtom)
+  const stamped = nodes.map((node) => ({ ...node, boardId }))
+  set(updateBoardAtom, boardId, (board: Board) => ({
     ...board,
-    nodes: [...board.nodes, ...nodes],
+    nodes: [...board.nodes, ...stamped],
   }))
 })
 
@@ -115,13 +132,13 @@ export const addNodesAtom = atom(null, (_get, set, nodes: readonly Node[]) => {
 export const replaceNodeAtom = atom(
   null,
   (
-    _get,
+    get,
     set,
     id: NodeId,
     next: Node,
     newImage?: { id: string; dataUri: string },
   ) => {
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         if (node.id !== id) return node
@@ -149,9 +166,9 @@ export const replaceNodeAtom = atom(
  */
 export const updateCardContentAtom = atom(
   null,
-  (_get, set, id: NodeId, content: string) => {
+  (get, set, id: NodeId, content: string) => {
     const now = nowISO()
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         if (node.id !== id || node.type !== 'card') return node
@@ -174,8 +191,8 @@ export const updateCardContentAtom = atom(
  */
 export const setNodeHeightAtom = atom(
   null,
-  (_get, set, id: NodeId, h: number) => {
-    set(updateBoardAtom, (board: Board) => {
+  (get, set, id: NodeId, h: number) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         if (node.id !== id || node.h === h) return node
@@ -195,9 +212,9 @@ export const setNodeHeightAtom = atom(
  */
 export const updateNodeAtom = atom(
   null,
-  (_get, set, id: NodeId, patch: NodeCommonPatch) => {
+  (get, set, id: NodeId, patch: NodeCommonPatch) => {
     const now = nowISO()
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         if (node.id !== id) return node
@@ -216,11 +233,11 @@ export const updateNodeAtom = atom(
  */
 export const moveNodesAtom = atom(
   null,
-  (_get, set, moves: readonly { id: NodeId; x: number; y: number }[]) => {
+  (get, set, moves: readonly { id: NodeId; x: number; y: number }[]) => {
     if (moves.length === 0) return
     const now = nowISO()
     const byId = new Map(moves.map((move) => [move.id, move]))
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         const move = byId.get(node.id)
@@ -240,9 +257,9 @@ export const moveNodesAtom = atom(
  */
 export const updateLinkAtom = atom(
   null,
-  (_get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
+  (get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
     const now = nowISO()
-    set(updateBoardAtom, (board: Board) => {
+    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
       let changed = false
       const nodes = board.nodes.map((node) => {
         if (node.id !== id || node.type !== 'card' || node.kind !== 'link')
@@ -255,16 +272,42 @@ export const updateLinkAtom = atom(
   },
 )
 
-/** Reorders `nodes` to match `orderedIds` exactly (array order doubles as z-index — phase2 schema §1). */
+/**
+ * Reorders `nodes` to match `orderedIds` exactly (array order doubles as
+ * z-index — phase2 schema §1). `orderedIds` is expected to be exactly the
+ * current board's own node ids (a no-op otherwise) — only the *content* at
+ * each of the current board's own array positions is permuted; the
+ * positions themselves, and every other board's interleaved entries, are
+ * left untouched.
+ */
 export const reorderNodesAtom = atom(
   null,
-  (_get, set, orderedIds: readonly NodeId[]) => {
-    set(updateBoardAtom, (board: Board) => {
+  (get, set, orderedIds: readonly NodeId[]) => {
+    const currentBoardId = get(currentBoardIdAtom)
+    set(updateBoardAtom, currentBoardId, (board: Board) => {
+      const ownIds = new Set(
+        board.nodes
+          .filter((node) => node.boardId === currentBoardId)
+          .map((node) => node.id),
+      )
+      if (
+        orderedIds.length !== ownIds.size ||
+        !orderedIds.every((id) => ownIds.has(id))
+      ) {
+        return board
+      }
       const byId = new Map(board.nodes.map((node) => [node.id, node]))
-      const nodes = orderedIds
+      const queue = orderedIds
         .map((id) => byId.get(id))
         .filter((node): node is Node => node !== undefined)
-      return nodes.length === board.nodes.length ? { ...board, nodes } : board
+      let cursor = 0
+      const nodes = board.nodes.map((node) => {
+        if (node.boardId !== currentBoardId) return node
+        const next = queue[cursor]
+        cursor += 1
+        return next ?? node
+      })
+      return { ...board, nodes }
     })
   },
 )
@@ -281,10 +324,11 @@ export const reorderNodesAtom = atom(
  */
 export const removeEntitiesAtom = atom(
   null,
-  (_get, set, ids: readonly string[]) => {
+  (get, set, ids: readonly string[]) => {
     const idSet = new Set(ids)
     set(
       updateBoardAtom,
+      get(currentBoardIdAtom),
       (board: Board) => {
         const nodes = board.nodes.filter((node) => !idSet.has(node.id))
         const edges = board.edges.filter(
@@ -310,8 +354,10 @@ export const removeEntitiesAtom = atom(
  * whole current selection without pre-filtering by node type/kind.
  */
 function patchSelectedNodes(
+  get: (a: typeof currentBoardIdAtom) => string,
   set: (
     write: typeof updateBoardAtom,
+    boardId: string,
     updater: (board: Board) => Board,
   ) => void,
   ids: readonly NodeId[],
@@ -321,7 +367,7 @@ function patchSelectedNodes(
   if (ids.length === 0) return
   const idSet = new Set(ids)
   const now = nowISO()
-  set(updateBoardAtom, (board: Board) => {
+  set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
     let changed = false
     const nodes = board.nodes.map((node) => {
       if (!idSet.has(node.id) || skip(node)) return node
@@ -334,8 +380,9 @@ function patchSelectedNodes(
 
 export const setColorAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], color: ColorKey) => {
+  (get, set, ids: readonly NodeId[], color: ColorKey) => {
     patchSelectedNodes(
+      get,
       set,
       ids,
       (node) => node.color === color,
@@ -347,8 +394,9 @@ export const setColorAtom = atom(
 /** Pattern only applies to containers (spec §4.5) — any selected card is left untouched. */
 export const setPatternAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], pattern: PatternKey) => {
+  (get, set, ids: readonly NodeId[], pattern: PatternKey) => {
     patchSelectedNodes(
+      get,
       set,
       ids,
       (node) => node.type !== 'container' || node.pattern === pattern,
@@ -374,8 +422,9 @@ export const setPatternAtom = atom(
  */
 export const setTextSizeAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], size: TextSize) => {
+  (get, set, ids: readonly NodeId[], size: TextSize) => {
     patchSelectedNodes(
+      get,
       set,
       ids,
       (node) =>
@@ -410,8 +459,9 @@ export const setTextSizeAtom = atom(
  */
 export const setTaskKindAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], kind: 'default' | 'task') => {
+  (get, set, ids: readonly NodeId[], kind: 'default' | 'task') => {
     patchSelectedNodes(
+      get,
       set,
       ids,
       (node) =>
@@ -427,8 +477,9 @@ export const setTaskKindAtom = atom(
 /** Status is only ever set via the selection menu (spec §6.1) — a no-op on any selected node that isn't already a task. */
 export const setTaskStatusAtom = atom(
   null,
-  (_get, set, ids: readonly NodeId[], status: TaskStatus) => {
+  (get, set, ids: readonly NodeId[], status: TaskStatus) => {
     patchSelectedNodes(
+      get,
       set,
       ids,
       (node) => !node.task || node.task.status === status,

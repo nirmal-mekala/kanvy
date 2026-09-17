@@ -6,14 +6,12 @@ import { ROOT_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { CardNode } from '../schema/node'
 
-// `boardId` is hardcoded to the root board here for now — these factories
-// predate multiboard support's "current board" concept. Once
-// state/atoms/nodes.ts gains a `currentBoardIdAtom` (multiboard-support
-// implementation plan, Sub-phase 2), every call site below should stamp
-// the actual current board instead of always `ROOT_BOARD_ID`. Correct for
-// today: the only board that exists yet is root, so this is a no-op
-// behavior-wise until Sub-phase 4 makes board creation reachable from the
-// UI.
+// `boardId` below is a placeholder (`ROOT_BOARD_ID`) only — these
+// factories don't know what the current board is, and don't need to:
+// state/atoms/nodes.ts's `addNodeAtom`/`addNodesAtom` always overwrite it
+// with the actual current board (`currentBoardIdAtom`) before the node is
+// added. Kept here only to satisfy the schema's required field at
+// construction time.
 
 /** A fresh regular text card, centered on `(x, y)` (spec §5.1) — created via double-click canvas, ⌘/Ctrl+N, or typing/pasting plain text with nothing selected. */
 export function newTextCard(x: number, y: number, content = ''): CardNode {

@@ -40,6 +40,14 @@ describe('pushUpdate', () => {
     expect(history.past.map((e) => e.state)).toEqual([0, 1])
   })
 
+  it('forceNewEntry starts a new step even within the coalesce window (multiboard support: two rapid edits attributed to different boards must never merge)', () => {
+    let history = createHistoryState(0)
+    history = pushUpdate(history, 1, T0)
+    history = pushUpdate(history, 2, T0 + 100, undefined, true)
+    expect(history.past.map((e) => e.state)).toEqual([0, 1])
+    expect(history.present.state).toBe(2)
+  })
+
   it('drops a no-op update (same reference) without recording a step', () => {
     const value = { x: 1 }
     let history = createHistoryState(value)
