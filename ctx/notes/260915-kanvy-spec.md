@@ -391,7 +391,13 @@ respect.
   that card in place, preserving its text and color).
 - Downsized client-side (canvas re-encode) to a max long-edge dimension
   before storage as a base64 data URI (see §2.6 for storage shape).
-- Fixed card width; height derived from the image's intrinsic aspect ratio.
+- Fixed card width; height derived from the image's intrinsic aspect
+  ratio — but never upscaled past its natural size. An image narrower
+  than the card's fixed width is centered at its natural size (with
+  breathing room above/below) rather than stretched to fill the card,
+  since upscaling it would look pixelated. This is an intentional
+  correction of the prototype, which did stretch small images to fill
+  the card (see `ctx/notes/260917-remove-visual-regression-tier.md`).
 - Caption textarea hidden when empty and the card isn't selected; visible
   (with placeholder) once selected, or whenever it has text.
 - Never has a heading size (`h1`/`h2`/`h3`).

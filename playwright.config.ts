@@ -1,10 +1,6 @@
 import { defineConfig } from '@playwright/test'
 
-// Interaction-behavior e2e suite. The visual-regression tier (diffing
-// against the live original prototype, per
-// ctx/notes/260915-prototype-migration-phase3-tooling.md §3) lives in
-// playwright.visual.config.ts instead — it needs a second dev server
-// (the vendored prototype) and isn't run by this config.
+// Interaction-behavior e2e suite.
 //
 // Phase 6 built the harness (e2e/fixtures/, smoke tests) and a scenario
 // checklist (ctx/notes/260915-phase6-e2e-test-scenario-checklist.md);
@@ -28,7 +24,6 @@ const HOST = process.env.KANVY_E2E_HOST ?? 'localhost'
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['visual/**'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

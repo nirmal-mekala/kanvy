@@ -81,13 +81,14 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
 - **Validation**: Zod is the source of truth for the data model; TS types
   are derived via `z.infer<>`. Validates at board load and JSON import.
 - **Testing**: Vitest for pure-function unit tests (spec §13); Playwright
-  for e2e (primary interaction-test layer) and a separate visual-
-  regression tier that diffs the new app against the *live* prototype
-  (not committed baseline PNGs) — run both via the `playwright-remote-
-  browser` skill, using `KANVY_E2E_PORT`/`KANVY_VISUAL_NEW_APP_PORT`/
-  `KANVY_VISUAL_PROTOTYPE_PORT`/`KANVY_E2E_HOST` for this container's
-  forwarded ports. `tsc --noEmit` and a coverage floor on pure-function
-  modules both gate, same as lint/tests.
+  for e2e (interaction-test layer), run via the `playwright-remote-
+  browser` skill, using `KANVY_E2E_PORT`/`KANVY_E2E_HOST` for this
+  container's forwarded ports. A prior visual-regression tier that diffed
+  the new app against the live prototype was removed (see
+  `ctx/notes/260917-remove-visual-regression-tier.md`) — the migration is
+  complete and cross-app pixel comparison no longer serves a purpose.
+  `tsc --noEmit` and a coverage floor on pure-function modules both gate,
+  same as lint/tests.
 - **Linting/formatting**: Biome (`recommended` + cognitive-complexity
   opt-in), also owns formatting — no Prettier. 2-space indentation.
 - **Code health**: `fallow` — complexity/duplication/circular-dependency/

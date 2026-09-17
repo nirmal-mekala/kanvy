@@ -32,10 +32,6 @@ jobs:
 
       - run: pnpm e2e
 
-      - run: pnpm e2e:visual:setup
-
-      - run: pnpm e2e:visual
-
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
