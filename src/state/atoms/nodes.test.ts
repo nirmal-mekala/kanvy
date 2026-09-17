@@ -49,6 +49,7 @@ async function freshState() {
   const historyModule = await import('../history/boardHistoryAtom')
   const selectionModule = await import('./selection')
   const currentBoardModule = await import('./currentBoard')
+  const boardsModule = await import('./boards')
   const store = createStore()
   return {
     store,
@@ -57,6 +58,7 @@ async function freshState() {
     ...historyModule,
     ...selectionModule,
     ...currentBoardModule,
+    ...boardsModule,
   }
 }
 
@@ -406,5 +408,100 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     store.set(currentBoardIdAtom, 'child')
     store.set(undoBoardAtom)
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
+  })
+})
+
+describe("removeEntitiesAtom tombstones a board node's referenced board (multiboard support design doc §2/§4)", () => {
+  function boardCard(id: string, boardRef: string): Node {
+    return {
+      ...textNode(id),
+      type: 'card',
+      kind: 'board',
+      boardRef,
+      content: '',
+    } as Node
+  }
+
+  it("deleting a board node removes it and flips its referenced board's status to trashed", async () => {
+    const {
+      store,
+      addNodeAtom,
+      removeEntitiesAtom,
+      boardAtom,
+      loadImportedBoardAtom,
+    } = await freshState()
+    const before = store.get(boardAtom)
+    store.set(loadImportedBoardAtom, {
+      ...before,
+      boards: [
+        ...before.boards,
+        {
+          id: 'child-1',
+          title: 'Untitled board',
+          status: 'active' as const,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    })
+    store.set(addNodeAtom, boardCard('bn1', 'child-1'))
+
+    store.set(removeEntitiesAtom, ['bn1'])
+
+    const board = store.get(boardAtom)
+    expect(board.nodes.find((n) => n.id === 'bn1')).toBeUndefined()
+    expect(board.boards.find((b) => b.id === 'child-1')?.status).toBe('trashed')
+  })
+
+  it('leaves other boards untouched when deleting an unrelated (non-board) node', async () => {
+    const { store, addNodeAtom, removeEntitiesAtom, boardAtom } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1'))
+    const boardsBefore = store.get(boardAtom).boards
+
+    store.set(removeEntitiesAtom, ['n1'])
+
+    expect(store.get(boardAtom).boards).toEqual(boardsBefore)
+  })
+
+  it("undoing the delete restores both the board-node and its board's active status, in one step", async () => {
+    const {
+      store,
+      addNodeAtom,
+      removeEntitiesAtom,
+      undoBoardAtom,
+      boardAtom,
+      loadImportedBoardAtom,
+    } = await freshState()
+    const before = store.get(boardAtom)
+    store.set(loadImportedBoardAtom, {
+      ...before,
+      boards: [
+        ...before.boards,
+        {
+          id: 'child-1',
+          title: 'Untitled board',
+          status: 'active' as const,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    })
+    store.set(addNodeAtom, boardCard('bn1', 'child-1'))
+
+    // Advance past the 400ms coalescing window so the delete is its own
+    // undo step, not merged with the setup above.
+    vi.advanceTimersByTime(1000)
+    store.set(removeEntitiesAtom, ['bn1'])
+    expect(
+      store.get(boardAtom).boards.find((b) => b.id === 'child-1')?.status,
+    ).toBe('trashed')
+
+    store.set(undoBoardAtom)
+    const restored = store.get(boardAtom)
+    expect(restored.nodes.find((n) => n.id === 'bn1')).toBeDefined()
+    expect(restored.boards.find((b) => b.id === 'child-1')?.status).toBe(
+      'active',
+    )
   })
 })

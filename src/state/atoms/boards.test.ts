@@ -193,3 +193,59 @@ describe('createBoardAtom', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 })
+
+describe('duplicateBoardNodesAtom', () => {
+  it("duplicates a board node's referenced board, appending everything in one step", async () => {
+    const { store, createBoardAtom, duplicateBoardNodesAtom, boardAtom } =
+      await freshState()
+    store.set(createBoardAtom, 100, 100)
+    const board = store.get(boardAtom)
+    const boardCard = board.nodes.at(-1)
+    if (boardCard?.type !== 'card' || boardCard.kind !== 'board') {
+      throw new Error('expected a board card')
+    }
+    const boardsBefore = board.boards.length
+    const nodesBefore = board.nodes.length
+
+    const result = store.set(duplicateBoardNodesAtom, [boardCard], 40)
+
+    expect(result).toHaveLength(1)
+    const after = store.get(boardAtom)
+    expect(after.boards).toHaveLength(boardsBefore + 1)
+    expect(after.nodes).toHaveLength(nodesBefore + 1)
+    expect(result[0]?.boardRef).not.toBe(boardCard.boardRef)
+    expect(result[0]?.x).toBe(boardCard.x + 40)
+  })
+
+  it('is a no-op given no board nodes', async () => {
+    const { store, duplicateBoardNodesAtom, boardAtom } = await freshState()
+    const before = store.get(boardAtom)
+
+    const result = store.set(duplicateBoardNodesAtom, [], 40)
+
+    expect(result).toEqual([])
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it('undoing the duplication removes the new board and its board-node together', async () => {
+    const {
+      store,
+      createBoardAtom,
+      duplicateBoardNodesAtom,
+      undoBoardAtom,
+      boardAtom,
+    } = await freshState()
+    store.set(createBoardAtom, 100, 100)
+    const boardCard = store.get(boardAtom).nodes.at(-1)
+    if (boardCard?.type !== 'card' || boardCard.kind !== 'board') {
+      throw new Error('expected a board card')
+    }
+    vi.advanceTimersByTime(1000)
+    const before = store.get(boardAtom)
+
+    store.set(duplicateBoardNodesAtom, [boardCard], 40)
+    store.set(undoBoardAtom)
+
+    expect(store.get(boardAtom)).toEqual(before)
+  })
+})

@@ -28,6 +28,7 @@ import { themeAtom } from '../../state/atoms/theme'
 import { viewModeAtom } from '../../state/atoms/viewMode'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
 import { Card } from '../card/Card'
+import { ConfirmModal } from '../confirm-modal/ConfirmModal'
 import { Container } from '../container/Container'
 import { EdgeDirectionControl } from '../edge/EdgeDirectionControl'
 import { EdgeLayer } from '../edge/EdgeLayer'
@@ -152,13 +153,14 @@ export function Canvas() {
     boardElRef,
   })
 
-  useClipboardShortcuts({
-    nodes: boardNodes,
-    nodesById,
-    view,
-    setView,
-    boardElRef,
-  })
+  const { pendingConfirm, confirmPending, cancelPending } =
+    useClipboardShortcuts({
+      nodes: boardNodes,
+      nodesById,
+      view,
+      setView,
+      boardElRef,
+    })
 
   // Selected edges get the direction-toggle control (spec §4.6); selected
   // cards/containers get the full SelectionMenu (spec §4.3 — "one selection
@@ -553,6 +555,16 @@ export function Canvas() {
         })()}
 
       <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+
+      {pendingConfirm && (
+        <ConfirmModal
+          title={pendingConfirm.title}
+          body={pendingConfirm.body}
+          confirmLabel={pendingConfirm.confirmLabel}
+          onConfirm={confirmPending}
+          onCancel={cancelPending}
+        />
+      )}
 
       <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
         <button

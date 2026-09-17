@@ -248,3 +248,147 @@ test.describe('board card kind (Sub-phase 4)', () => {
     await expect(page.locator('.card--link')).toHaveCount(0)
   })
 })
+
+test.describe('confirm modal + board delete/duplicate/paste (Sub-phase 5)', () => {
+  test('deleting a board node shows a confirm modal; cancel leaves everything unchanged', async ({
+    page,
+  }) => {
+    await seedBoard(page, EMPTY_ROOT_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 400, y: 300 } })
+    await page.locator('[data-testid="card"]').locator('.card__bar').click()
+
+    await page.keyboard.press('Backspace')
+    await expect(page.locator('.confirm-modal')).toBeVisible()
+    await expect(page.locator('.confirm-modal__title')).toHaveText(
+      'Delete 1 board (0 nodes total)?',
+    )
+
+    await page.locator('.confirm-modal__btn--cancel').click()
+    await expect(page.locator('.confirm-modal')).toHaveCount(0)
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+  })
+
+  test('confirming delete tombstones the board node; undo restores it', async ({
+    page,
+  }) => {
+    await seedBoard(page, EMPTY_ROOT_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 400, y: 300 } })
+    await page.locator('[data-testid="card"]').locator('.card__bar').click()
+
+    // Past the 400ms undo-coalescing window, so the delete records its
+    // own undo step rather than merging with the board's creation.
+    await page.waitForTimeout(500)
+    await page.keyboard.press('Backspace')
+    await page.locator('.confirm-modal__btn--confirm').click()
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(0)
+
+    await page.keyboard.press('Control+z')
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+    await expect(page.locator('[data-testid="card"]')).toHaveClass(
+      /card--board/,
+    )
+  })
+
+  test('duplicating a board node with content shows the confirm modal with the real node count, and deep-copies on confirm', async ({
+    page,
+  }) => {
+    await seedBoard(page, EMPTY_ROOT_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+
+    // Create a board, navigate in, add two cards, navigate back out.
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 400, y: 300 } })
+    await page
+      .locator('[data-testid="card"]')
+      .locator('.card__board-body')
+      .click()
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 200, y: 200 } })
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 500, y: 200 } })
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(2)
+    await page.locator('.breadcrumb__home').click()
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(1)
+
+    await page.locator('[data-testid="card"]').locator('.card__bar').click()
+    await page.keyboard.press('Control+d')
+    await expect(page.locator('.confirm-modal__title')).toHaveText(
+      'Duplicate 1 board (2 nodes total)?',
+    )
+    await page.locator('.confirm-modal__btn--confirm').click()
+
+    // Two board nodes on root now, each pointing at its own board (a
+    // distinct boardRef, and each with its own 2-node content) — checked
+    // via the persisted data rather than clicking to navigate into each:
+    // the duplicate's small placement offset leaves the two cards
+    // overlapping, so one's `.card__board-body` sits under the other's
+    // pointer-event-intercepting DOM subtree.
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(2)
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate(() =>
+          window.localStorage.getItem('kanvy.board'),
+        )
+        const parsed = JSON.parse(raw ?? '{}') as {
+          nodes: { boardId: string; kind?: string; boardRef?: string }[]
+        }
+        const boardRefs = parsed.nodes
+          .filter((n) => n.kind === 'board')
+          .map((n) => n.boardRef)
+        const contentCounts = boardRefs.map(
+          (ref) => parsed.nodes.filter((n) => n.boardId === ref).length,
+        )
+        return { distinctBoards: new Set(boardRefs).size, contentCounts }
+      })
+      .toEqual({ distinctBoards: 2, contentCounts: [2, 2] })
+  })
+
+  test('pasting a copied board node deep-copies it too, never sharing the original boardRef', async ({
+    page,
+  }) => {
+    await seedBoard(page, EMPTY_ROOT_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 400, y: 300 } })
+    await page.locator('[data-testid="card"]').locator('.card__bar').click()
+    await page.keyboard.press('Control+c')
+
+    // The in-app clipboard is a jotai atom, not the real OS clipboard —
+    // triggering it via a synthetic `paste` event (like every other
+    // paste-driven e2e scenario, e.g. clipboard.spec.ts's `dispatchPaste`
+    // calls) rather than a real Control+V keypress, which needs actual OS
+    // clipboard content/permissions this app never writes to for a
+    // caption-less board card.
+    await dispatchPaste(page, {})
+    await expect(page.locator('.confirm-modal__title')).toHaveText(
+      'Paste 1 board (0 nodes total)?',
+    )
+    await page.locator('.confirm-modal__btn--confirm').click()
+
+    await expect(page.locator('[data-testid="card"]')).toHaveCount(2)
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate(() =>
+          window.localStorage.getItem('kanvy.board'),
+        )
+        const parsed = JSON.parse(raw ?? '{}') as {
+          nodes: { kind?: string; boardRef?: string }[]
+        }
+        const boardRefs = parsed.nodes
+          .filter((n) => n.kind === 'board')
+          .map((n) => n.boardRef)
+        return new Set(boardRefs).size
+      })
+      .toBe(2)
+  })
+})

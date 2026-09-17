@@ -36,6 +36,7 @@ import {
   type LoadResult,
   loadBoard,
 } from '../persistence/storage'
+import { reapableBoardIds, reapBoards } from '../reaper'
 import {
   createHistoryState,
   type HistoryState,
@@ -59,8 +60,20 @@ export const boardLoadResultAtom = atom<LoadResult>(initialLoad)
 /** Gates autosave (spec §9/Q12) — starts true unless the initial load was a recovery. */
 export const recoveryAcknowledgedAtom = atom(initialLoad.ok)
 
+// On-load tombstone reaper (state/reaper.ts, design doc §5/§7): permanently
+// frees a trashed board's content once its tombstone is old enough that an
+// accidental delete has had ample time to be noticed. Applied directly to
+// the initial board *before* history is created — reaping isn't a user
+// action and must never itself become an undo step (undoing it would
+// silently resurrect content the reaper just decided was safe to free).
+// If nothing's reapable this is a no-op (same reference back).
+const initialBoard = reapBoards(
+  initialLoad.board,
+  reapableBoardIds(initialLoad.board.boards, Date.now()),
+)
+
 export const boardHistoryAtom = atom<HistoryState<AttributedBoard>>(
-  createHistoryState({ board: initialLoad.board, boardId: ROOT_BOARD_ID }),
+  createHistoryState({ board: initialBoard, boardId: ROOT_BOARD_ID }),
 )
 
 export const boardAtom = atom(

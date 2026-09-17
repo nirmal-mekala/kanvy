@@ -259,17 +259,19 @@ body {
   bottom: 14px;
 }
 
-.help-backdrop {
+/* Shared by every full-screen dialog backdrop (help panel, confirm modal)
+   — each pairs this with its own z-index modifier class (`.help-backdrop`/
+   `.confirm-backdrop`) so a later-opened dialog always sits on top. */
+.modal-backdrop {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 30;
 }
 
-.help-backdrop__dismiss {
+.modal-backdrop__dismiss {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -278,6 +280,10 @@ body {
   border: none;
   background: transparent;
   cursor: default;
+}
+
+.help-backdrop {
+  z-index: 30;
 }
 
 .help-panel {
@@ -1045,4 +1051,68 @@ input:focus-visible,
 .card--dimmed .card__board-body {
   color: var(--color-ink-soft);
   opacity: 0.6;
+}
+
+/* ---------- confirm modal (multiboard support) ---------- */
+
+.confirm-backdrop {
+  z-index: 40;
+}
+
+.confirm-modal {
+  position: relative;
+  width: min(420px, 90%);
+  padding: 24px 28px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+}
+
+.confirm-modal__title {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.confirm-modal__body {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-ink-soft);
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-modal__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.confirm-modal__btn--cancel {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 2px solid var(--color-border-soft);
+}
+
+.confirm-modal__btn--cancel:hover {
+  background: var(--color-surface-hover);
+}
+
+.confirm-modal__btn--confirm {
+  /* nord11 — matches colors/colorKey.ts's `coral` (used elsewhere for a
+     "destructive/attention" accent, e.g. recency mode's oldest tier). */
+  background: #bf616a;
+  color: white;
+  border: 2px solid transparent;
+}
+
+.confirm-modal__btn--confirm:hover {
+  opacity: 0.9;
 }

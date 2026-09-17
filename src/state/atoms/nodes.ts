@@ -321,6 +321,14 @@ export const reorderNodesAtom = atom(
  * dangling to clean up on a survivor either. Also drops any edge touching a
  * removed node and prunes orphaned images (spec §2.6). Records the removed
  * ids as the undo step's `restoreSelection` (spec §8/Q11).
+ *
+ * Multiboard support (design doc §2/§4): any `kind: 'board'` node among
+ * `ids` is a tombstone, not a real removal, for the board it references —
+ * its own node still gets removed here like any other (it's just a
+ * stand-in on the home board), but the *board* it points to is flipped to
+ * `status: 'trashed'` rather than having its content actually deleted.
+ * That content, and the reap that eventually frees it, are entirely
+ * untouched by this action (see state/reaper.ts).
  */
 export const removeEntitiesAtom = atom(
   null,
@@ -330,6 +338,17 @@ export const removeEntitiesAtom = atom(
       updateBoardAtom,
       get(currentBoardIdAtom),
       (board: Board) => {
+        const now = nowISO()
+        const trashedBoardIds = new Set(
+          board.nodes
+            .filter(
+              (node): node is Node & { kind: 'board'; boardRef: string } =>
+                idSet.has(node.id) &&
+                node.type === 'card' &&
+                node.kind === 'board',
+            )
+            .map((node) => node.boardRef),
+        )
         const nodes = board.nodes.filter((node) => !idSet.has(node.id))
         const edges = board.edges.filter(
           (edge) =>
@@ -338,7 +357,15 @@ export const removeEntitiesAtom = atom(
             !idSet.has(edge.toNodeId),
         )
         const images = pruneOrphanedImages(nodes, board.images)
-        return { ...board, nodes, edges, images }
+        const boards =
+          trashedBoardIds.size === 0
+            ? board.boards
+            : board.boards.map((meta) =>
+                trashedBoardIds.has(meta.id)
+                  ? { ...meta, status: 'trashed' as const, updatedAt: now }
+                  : meta,
+              )
+        return { ...board, nodes, edges, images, boards }
       },
       ids,
     )

@@ -5,9 +5,11 @@
 
 import { atom } from 'jotai'
 import { newBoardCard } from '../../cards/newCard'
+import { duplicateBoardNodes } from '../../clipboard/duplicateBoardNodes'
 import type { Board } from '../../schema/board'
 import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { generateId } from '../../schema/legacy'
+import type { BoardCard } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
@@ -82,3 +84,35 @@ export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
     ],
   }))
 })
+
+/**
+ * Duplicates each of `boardNodes`' referenced board — content and all —
+ * via `duplicateBoardNodes` (design doc §3), in one atomic history step
+ * attributed to the current board. Takes the board-card objects directly
+ * (not ids to look up on the live board): the ⌘/Ctrl+D caller has them
+ * from the live selection, but the paste caller has them from an in-app
+ * clipboard *snapshot* — the original board-node may since have been
+ * deleted (its own board's content is untouched regardless, since a
+ * board's content never depended on the shortcut card that pointed to
+ * it). `offset` is the same uniform placement offset the caller computed
+ * for the whole gesture's selection, so a board node duplicated/pasted
+ * alongside ordinary nodes still displaces together as one visual unit.
+ * Returns the new board-node cards themselves (not just ids) so the
+ * caller can pan-into-view/select/focus them the same way it already does
+ * for `duplicateNodes`/`pasteFromNodeClipboardAtom`'s results.
+ */
+export const duplicateBoardNodesAtom = atom(
+  null,
+  (get, set, boardNodes: readonly BoardCard[], offset: number): BoardCard[] => {
+    if (boardNodes.length === 0) return []
+    const board = get(boardAtom)
+    const result = duplicateBoardNodes(boardNodes, board, offset)
+    set(updateBoardAtom, get(currentBoardIdAtom), (b: Board) => ({
+      ...b,
+      boards: [...b.boards, ...result.boards],
+      nodes: [...b.nodes, ...result.nodes],
+      edges: [...b.edges, ...result.edges],
+    }))
+    return result.newBoardNodeCards
+  },
+)

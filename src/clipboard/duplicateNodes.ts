@@ -20,10 +20,18 @@ import { computePasteOffset } from './pasteOffset'
  * `containers` is every container currently on the board (including one
  * being duplicated itself) — the same set paste checks against, so a
  * duplicate escapes containment exactly like a paste does.
+ *
+ * `offsetOverride`, when given, replaces the internally-computed offset —
+ * multiboard support's board-node duplicate/paste (useClipboardShortcuts.ts)
+ * needs the *same* offset applied to both a mixed selection's ordinary
+ * nodes (this function) and its board nodes (`duplicateBoardNodes`,
+ * computed once over the whole selection's bounding box), so the two
+ * groups displace together as one gesture rather than independently.
  */
 export function duplicateNodes(
   nodes: readonly Node[],
   containers: readonly Rect[],
+  offsetOverride?: number,
 ): Node[] {
   if (nodes.length === 0) return []
   const now = new Date().toISOString()
@@ -34,7 +42,8 @@ export function duplicateNodes(
   // own position becomes the next press's *source*, so repeated ⌘/Ctrl+D
   // naturally staircases anyway. `1` just matches the old fixed baseline
   // offset when nothing needs pushing further.
-  const offset = computePasteOffset(1, boundingBox(nodes), containers)
+  const offset =
+    offsetOverride ?? computePasteOffset(1, boundingBox(nodes), containers)
 
   return nodes.map((node) => ({
     ...node,

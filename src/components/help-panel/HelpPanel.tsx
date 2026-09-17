@@ -52,7 +52,7 @@ export function HelpPanel({
 
       {open && (
         <div
-          className="help-backdrop"
+          className="modal-backdrop help-backdrop"
           onPointerDown={(e) => e.stopPropagation()}
         >
           {/* A real, keyboard-operable button standing in for the backdrop
@@ -60,7 +60,7 @@ export function HelpPanel({
               the panel dismisses it, same as Escape or the `?` button. */}
           <button
             type="button"
-            className="help-backdrop__dismiss"
+            className="modal-backdrop__dismiss"
             aria-label="Close keyboard shortcuts"
             onClick={() => onOpenChange(false)}
           />
