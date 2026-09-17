@@ -472,7 +472,8 @@ body {
 .card__bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  gap: 4px;
   min-height: 16px; /* matches GRID_SIZE */
   padding: 1px 3px;
   background: var(--color-dot);
@@ -480,9 +481,24 @@ body {
 }
 
 /* Decorative only — not interactive on its own; status is only ever
-   changed via the selection menu (Stage 8). */
+   changed via the selection menu (Stage 8). Pushed to the bar's trailing
+   edge via auto margin so the recency indicator (when present) can sit at
+   the leading edge without the bar needing two different justify rules. */
 .task-status-icon {
   pointer-events: none;
+  margin-left: auto;
+}
+
+/* Recency view mode's updated-at label (spec §6.3). Unlike the
+   task-status glyph, this needs `pointer-events` left enabled — it's the
+   element the native `title` tooltip hovers over; a pointer-down on it
+   still bubbles up to the bar's own drag handler, so this doesn't add any
+   real interactivity. */
+.recency-indicator {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
 }
 
 .card__media {
@@ -660,7 +676,8 @@ body {
 .container-node__drag-handle {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  gap: 4px;
   min-height: 16px; /* matches GRID_SIZE */
   padding: 1px 3px;
   background: var(--color-surface-hover);

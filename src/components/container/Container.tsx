@@ -11,6 +11,7 @@ import type { ContainerNode } from '../../schema/node'
 import { NodeConnectors } from '../canvas/NodeConnectors'
 import { ResizeHandles } from '../canvas/ResizeHandles'
 import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
+import { RecencyIndicator } from '../card/RecencyIndicator'
 import { TaskStatusIcon } from '../card/TaskStatusIcon'
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
@@ -112,6 +113,13 @@ export function Container({
         onPointerUp={onDragHandlePointerUp}
         onPointerCancel={onDragHandlePointerCancel}
       >
+        {viewMode === 'recency' && (
+          <RecencyIndicator
+            updatedAt={node.updatedAt}
+            now={new Date()}
+            className="recency-indicator"
+          />
+        )}
         {node.task && (
           <TaskStatusIcon
             status={node.task.status}

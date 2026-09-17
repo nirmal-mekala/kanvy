@@ -186,6 +186,7 @@ export function Card({
         node={node}
         imageSrc={imageSrc}
         theme={theme}
+        viewMode={viewMode}
         showCaption={showCaption}
         tinted={isDone || isDimmedByViewMode}
         contentRef={contentRef}

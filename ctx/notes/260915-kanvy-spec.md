@@ -470,6 +470,13 @@ Selected from a menu (eye icon) in the top bar; persisted across sessions.
   This view must visibly update over time even with no user interaction
   (i.e., re-evaluate periodically while active), since it's a function of
   wall-clock time, not just board data.
+  - While recency mode is active, each card/container's drag bar also shows
+    a small, non-interactive relative-time label ("3h ago", "2d ago", "3w
+    ago") derived from the same `updatedAt`, at the opposite end of the bar
+    from the task-status glyph. Hovering it surfaces the full timestamp via
+    the browser's native `title` tooltip. Purely a labeling convenience
+    alongside the border-color bands above — not part of the color logic,
+    and re-evaluated on the same periodic tick.
 
 ## 7. Clipboard & copy/paste
 

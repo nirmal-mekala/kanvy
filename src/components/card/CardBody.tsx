@@ -2,10 +2,12 @@
 // that component's cognitive complexity under Biome's threshold.
 
 import type { RefObject } from 'react'
+import type { ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
 import type { CardNode } from '../../schema/node'
 import { CardLinkMeta } from './CardLinkMeta'
 import { CardMedia } from './CardMedia'
+import { RecencyIndicator } from './RecencyIndicator'
 import { TaskStatusIcon } from './TaskStatusIcon'
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
@@ -16,6 +18,7 @@ export function CardBody({
   node,
   imageSrc,
   theme,
+  viewMode,
   showCaption,
   tinted,
   contentRef,
@@ -25,6 +28,7 @@ export function CardBody({
   node: CardNode
   imageSrc: string | undefined
   theme: Theme
+  viewMode: ViewMode
   showCaption: boolean
   tinted: boolean
   contentRef: RefObject<HTMLTextAreaElement | null>
@@ -34,6 +38,13 @@ export function CardBody({
   return (
     <div className="card__inner">
       <div className="card__bar">
+        {viewMode === 'recency' && (
+          <RecencyIndicator
+            updatedAt={node.updatedAt}
+            now={new Date()}
+            className="recency-indicator"
+          />
+        )}
         {node.task && (
           <TaskStatusIcon
             status={node.task.status}
