@@ -60,6 +60,17 @@ export const boardLoadResultAtom = atom<LoadResult>(initialLoad)
 /** Gates autosave (spec §9/Q12) — starts true unless the initial load was a recovery. */
 export const recoveryAcknowledgedAtom = atom(initialLoad.ok)
 
+/**
+ * The non-home board a brand-new user should be dropped into, set only
+ * when this session's initial load minted a fresh seed document. The `/`
+ * route's `beforeLoad` (router.tsx) consumes this once — redirecting to it
+ * and clearing it back to `undefined` — so a later, deliberate visit to `/`
+ * behaves normally.
+ */
+export const freshBoardIdAtom = atom<string | undefined>(
+  initialLoad.ok ? initialLoad.freshBoardId : undefined,
+)
+
 // On-load tombstone reaper (state/reaper.ts, design doc §5/§7): permanently
 // frees a trashed board's content once its tombstone is old enough that an
 // accidental delete has had ample time to be noticed. Applied directly to

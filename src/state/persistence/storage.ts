@@ -20,7 +20,12 @@ import { serializeBoard } from './serialize'
 export const STORAGE_KEY = 'kanvy.board'
 
 export type LoadResult =
-  | { ok: true; board: Board }
+  | {
+      ok: true
+      board: Board
+      /** Set only when this load minted a brand-new seed document — the non-home board a first-time visit should be routed to (router.tsx's `/` route). Absent for a returning user's stored board, and absent on the corrupt-data recovery paths below (that's a recovery, not onboarding). */
+      freshBoardId?: string
+    }
   | {
       ok: false
       board: Board
@@ -41,25 +46,32 @@ export function loadBoard(): LoadResult {
   } catch {
     // localStorage unavailable (e.g. disabled in the browser) — same
     // fallback as "nothing saved yet", not a reportable corruption.
-    return { ok: true, board: createSeedBoard() }
+    const { board, welcomeBoardId } = createSeedBoard()
+    return { ok: true, board, freshBoardId: welcomeBoardId }
   }
 
   if (raw === null) {
-    return { ok: true, board: createSeedBoard() }
+    const { board, welcomeBoardId } = createSeedBoard()
+    return { ok: true, board, freshBoardId: welcomeBoardId }
   }
 
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return { ok: false, board: createSeedBoard(), reason: 'parse-error', raw }
+    return {
+      ok: false,
+      board: createSeedBoard().board,
+      reason: 'parse-error',
+      raw,
+    }
   }
 
   const board = validateParsed(parsed)
   if (!board) {
     return {
       ok: false,
-      board: createSeedBoard(),
+      board: createSeedBoard().board,
       reason: 'validation-error',
       raw,
     }

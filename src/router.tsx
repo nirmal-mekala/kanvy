@@ -7,10 +7,13 @@
 // scoped Provider, so the default store is the one and only store, safely
 // readable outside React) and redirects to `/` for the root board id itself
 // (it has its own route already) or for an unknown/trashed board id — a
-// stale/hand-edited URL shouldn't hard-crash the router. `/` is never
-// redirected, even if (through some broken invariant) root were somehow
-// missing from `boards` — redirecting it to itself on a failed check would
-// infinite-loop.
+// stale/hand-edited URL shouldn't hard-crash the router. `/` itself is
+// never redirected for that "self" case, even if (through some broken
+// invariant) root were somehow missing from `boards` — redirecting it to
+// itself on a failed check would infinite-loop. It *is* redirected exactly
+// once, away from itself, on a brand-new user's first visit: see
+// `freshBoardIdAtom`'s doc comment (state/history/boardHistoryAtom.ts) —
+// a first-time visit lands on a new non-home board instead of home itself.
 
 import {
   createRootRoute,
@@ -26,6 +29,7 @@ import { RecoveryBanner } from './components/notifications/RecoveryBanner'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
+import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 
 function RootLayout() {
   // Rendered above the route Outlet for every route, so `boardId` isn't a
@@ -46,6 +50,15 @@ export const rootRoute = createRootRoute({ component: RootLayout })
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  beforeLoad: () => {
+    const store = getDefaultStore()
+    const freshBoardId = store.get(freshBoardIdAtom)
+    if (freshBoardId !== undefined) {
+      // Consume once, so a later deliberate visit to `/` isn't redirected.
+      store.set(freshBoardIdAtom, undefined)
+      throw redirect({ to: '/$boardId', params: { boardId: freshBoardId } })
+    }
+  },
   component: () => <BoardPage boardId={ROOT_BOARD_ID} />,
 })
 

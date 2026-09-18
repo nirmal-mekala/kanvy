@@ -118,7 +118,7 @@ describe('BoardSchema', () => {
   })
 
   it('accepts the seed board', () => {
-    expect(BoardSchema.safeParse(createSeedBoard()).success).toBe(true)
+    expect(BoardSchema.safeParse(createSeedBoard().board).success).toBe(true)
   })
 
   it('rejects a heading-size image card (invalid kind/size combination)', () => {

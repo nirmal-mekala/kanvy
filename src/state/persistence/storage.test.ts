@@ -65,6 +65,12 @@ describe('loadBoard', () => {
     const result = loadBoard()
     expect(result.ok).toBe(true)
     expect(result.board.nodes.length).toBeGreaterThan(0)
+    if (result.ok) {
+      expect(result.freshBoardId).toBeDefined()
+      expect(
+        result.board.boards.some((b) => b.id === result.freshBoardId),
+      ).toBe(true)
+    }
   })
 
   it('returns the stored board when it is valid', () => {
