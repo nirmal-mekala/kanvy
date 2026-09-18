@@ -51,14 +51,82 @@ function board(overrides: Partial<Board> = {}): Board {
 }
 
 describe('duplicateBoardNodes', () => {
-  it('mints a fresh board metadata entry, preserving the source title', () => {
+  it('mints a fresh board metadata entry, appending " - Copy" to the source title', () => {
     const b = board()
     const result = duplicateBoardNodes([boardCard('bn1', 'child-1')], b, 40)
 
     expect(result.boards).toHaveLength(1)
-    expect(result.boards[0]?.title).toBe('Child board')
+    expect(result.boards[0]?.title).toBe('Child board - Copy')
     expect(result.boards[0]?.id).not.toBe('child-1')
     expect(result.boards[0]?.status).toBe('active')
+  })
+
+  it('numbers successive duplicates of the same board, skipping the source', () => {
+    let b = board()
+    let result = duplicateBoardNodes([boardCard('bn1', 'child-1')], b, 40)
+    expect(result.boards[0]?.title).toBe('Child board - Copy')
+
+    b = { ...b, boards: [...b.boards, ...result.boards] }
+    result = duplicateBoardNodes([boardCard('bn1', 'child-1')], b, 40)
+    expect(result.boards[0]?.title).toBe('Child board - Copy 2')
+
+    b = { ...b, boards: [...b.boards, ...result.boards] }
+    result = duplicateBoardNodes([boardCard('bn1', 'child-1')], b, 40)
+    expect(result.boards[0]?.title).toBe('Child board - Copy 3')
+  })
+
+  it('reuses the lowest available copy number once a duplicate is trashed', () => {
+    const b = board({
+      boards: [
+        ...board().boards,
+        {
+          id: 'copy-1',
+          title: 'Child board - Copy',
+          status: 'active',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+        {
+          id: 'copy-2',
+          title: 'Child board - Copy 2',
+          status: 'trashed',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    })
+    const result = duplicateBoardNodes([boardCard('bn1', 'child-1')], b, 40)
+    expect(result.boards[0]?.title).toBe('Child board - Copy 2')
+  })
+
+  it('duplicating a copy targets the same base title rather than stacking suffixes', () => {
+    const b = board({
+      boards: [
+        ...board().boards,
+        {
+          id: 'copy-1',
+          title: 'Child board - Copy',
+          status: 'active',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    })
+    const result = duplicateBoardNodes([boardCard('bn1', 'copy-1')], b, 40)
+    expect(result.boards[0]?.title).toBe('Child board - Copy 2')
+  })
+
+  it('gives distinct copy numbers when duplicating the same board twice in one gesture', () => {
+    const b = board()
+    const result = duplicateBoardNodes(
+      [boardCard('bn1', 'child-1'), boardCard('bn2', 'child-1')],
+      b,
+      40,
+    )
+    expect(result.boards.map((meta) => meta.title)).toEqual([
+      'Child board - Copy',
+      'Child board - Copy 2',
+    ])
   })
 
   it("deep-copies the source board's content with fresh ids and the new boardId", () => {

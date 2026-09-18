@@ -12,6 +12,7 @@ import type { BoardMeta } from '../schema/boardMeta'
 import type { Edge } from '../schema/edge'
 import { generateId } from '../schema/legacy'
 import type { BoardCard, Node } from '../schema/node'
+import { nextCopyTitle } from './copyTitle'
 
 export interface BoardDuplicationResult {
   /** Freshly-minted `boards` entries — one per board node duplicated. */
@@ -30,6 +31,9 @@ export interface BoardDuplicationResult {
  * `offset` — the same uniform-offset placement `duplicateNodes.ts`/
  * `nodeClipboard.ts` use for every other kind, so a mixed selection
  * (board nodes alongside containers) still displaces as one gesture.
+ * Each new board's title is the source's with a " - Copy"/" - Copy N"
+ * suffix (see `nextCopyTitle`), so duplicates stay distinguishable instead
+ * of colliding on the source's exact title.
  */
 export function duplicateBoardNodes(
   boardNodes: readonly BoardCard[],
@@ -40,15 +44,28 @@ export function duplicateBoardNodes(
   const nodes: Node[] = []
   const edges: Edge[] = []
   const newBoardNodeCards: BoardCard[] = []
+  // Existing (non-trashed — a tombstoned "X - Copy 2" frees up that number,
+  // §2/§5's delete-is-a-tombstone mechanism) + already-minted-this-call
+  // titles, so multiple board nodes duplicated in one gesture (e.g.
+  // duplicating the same board twice via a multi-select) still get
+  // distinct, incrementing copy numbers.
+  const takenTitles = board.boards
+    .filter((b) => b.status !== 'trashed')
+    .map((b) => b.title)
 
   for (const boardNode of boardNodes) {
     const now = new Date().toISOString()
     const sourceBoardId = boardNode.boardRef
     const sourceMeta = board.boards.find((b) => b.id === sourceBoardId)
     const newBoardId = generateId()
+    const title = nextCopyTitle(
+      sourceMeta?.title ?? 'Untitled board',
+      takenTitles,
+    )
+    takenTitles.push(title)
     boards.push({
       id: newBoardId,
-      title: sourceMeta?.title ?? 'Untitled board',
+      title,
       status: 'active',
       createdAt: now,
       updatedAt: now,
