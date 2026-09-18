@@ -26,6 +26,14 @@ export const HEADING_DEFAULT_H = GRID_SIZE * 8
 export const CONTAINER_MIN_W = GRID_SIZE * 8
 export const CONTAINER_MIN_H = GRID_SIZE * 6
 
+/**
+ * Minimum width for a board card's east/west-only resize — enough to keep
+ * the leading icon and a few characters of name legible. Board cards don't
+ * resize vertically (height stays content/CSS-driven, as for every other
+ * non-heading card), so there's no corresponding `BOARD_MIN_H`.
+ */
+export const BOARD_MIN_W = GRID_SIZE * 10
+
 /** Rounds `value` to the nearest grid multiple, no smaller than `min` (spec §4.4 resize snapping). */
 export function snapSize(value: number, min: number): number {
   return Math.max(min, Math.round(value / GRID_SIZE) * GRID_SIZE)

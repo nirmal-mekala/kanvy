@@ -98,9 +98,12 @@ explicitly stated.
   redesign.md for the full history; this bullet describes the current
   shape only): the board node is a single primary row — a leading
   `LayoutDashboard` icon, then the board's name at a larger-than-usual
-  font size — always visible, not select-gated, fixed width (`CARD_WIDTH`,
-  never resizes). No separate big centered icon and no second caption row
-  (both of those were tried and superseded, see the redesign note).
+  font size — always visible, not select-gated, initial width `CARD_WIDTH`
+  but user-resizable east/west (`BOARD_MIN_W` floor, no max) to
+  accommodate longer board names — see ctx/notes/260918-board-node-
+  redesign.md's update for the resize-handle details. No separate big
+  centered icon and no second caption row (both of those were tried and
+  superseded, see the redesign note).
   Renaming uses the shared `BoardNameEditor` component (`components/board/`)
   — hover reveals a pencil button; clicking it enters edit mode (swapping
   the pencil for a checkmark in the same slot); blur, Enter, or the

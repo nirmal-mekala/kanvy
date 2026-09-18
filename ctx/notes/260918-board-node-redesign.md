@@ -23,8 +23,13 @@ card system's existing patterns, and asked for a full redesign:
 - The board card is now **one primary row**: a left-aligned `LayoutDashboard`
   icon, then the board's name at a larger-than-usual font size (1rem vs.
   the card system's normal 0.85rem), with generous spacing between them.
-  Still fixed width (`CARD_WIDTH`), still always visible (unchanged from
-  the previous revision).
+  Still always visible (unchanged from the previous revision); width
+  starts at `CARD_WIDTH` but is now user-resizable via east/west drag
+  handles (`geometry/constants.ts`'s `BOARD_MIN_W` floor, no max) — added
+  260918, after developer feedback that longer board names needed
+  room to breathe. Board cards otherwise stay unresizable vertically
+  (height is still content/CSS-driven, as for every other non-heading
+  card).
 - **Interaction model:** when not editing, the whole icon+name area is a
   single button that activates (navigates into the board) on click — same
   click-to-navigate semantics the link card already uses for its interior,

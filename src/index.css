@@ -339,7 +339,7 @@ body {
   pointer-events: none;
 }
 
-/* ---------- resize handles (spec §4.4: containers always, big-text cards only) ---------- */
+/* ---------- resize handles (spec §4.4: containers always, big-text cards only; board cards east/west only) ---------- */
 
 .resize-handle {
   position: absolute;

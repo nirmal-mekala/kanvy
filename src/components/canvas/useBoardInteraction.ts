@@ -16,6 +16,7 @@ import {
 } from '../../containers/containment'
 import { createContainer } from '../../containers/createContainer'
 import {
+  BOARD_MIN_W,
   CONTAINER_MIN_H,
   CONTAINER_MIN_W,
   HEADING_MIN_H,
@@ -49,7 +50,7 @@ const CONTAINER_HANDLE_HEIGHT = GRID_SIZE
 /** Below this screen-space movement, a drag gesture counts as a plain click instead (matches the prototype's `MARQUEE_DRAG_THRESHOLD`). */
 const DRAG_THRESHOLD = 3
 
-export type ResizeKind = 'container' | 'heading'
+export type ResizeKind = 'container' | 'heading' | 'board'
 export type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 interface ScreenRect {
@@ -429,8 +430,20 @@ export function useBoardInteraction({
     if (!state) return
     const dx = (e.clientX - state.startX) / view.zoom
     const dy = (e.clientY - state.startY) / view.zoom
-    const minW = state.kind === 'container' ? CONTAINER_MIN_W : HEADING_MIN_W
-    const minH = state.kind === 'container' ? CONTAINER_MIN_H : HEADING_MIN_H
+    const minW =
+      state.kind === 'container'
+        ? CONTAINER_MIN_W
+        : state.kind === 'board'
+          ? BOARD_MIN_W
+          : HEADING_MIN_W
+    // Board resize is east/west only (see `resizeRect`'s dir check), so its
+    // height is never actually touched — 0 just keeps `Math.max` a no-op.
+    const minH =
+      state.kind === 'container'
+        ? CONTAINER_MIN_H
+        : state.kind === 'board'
+          ? 0
+          : HEADING_MIN_H
 
     const { x, y, w, h } = resizeRect(
       state.dir,

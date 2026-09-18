@@ -59,6 +59,58 @@ function useMeasuredHeight(
   }, [skip, onHeightChange, cardElRef])
 }
 
+// Which (if any) resize handles a card kind gets: a heading-sized text
+// card resizes 8-way, a board card (to accommodate longer board names)
+// east/west only.
+// CRAP scoring penalizes this component's 0% coverage — component tests
+// aren't a required tier for v0 (spec §13); real coverage of this
+// rendering logic comes from e2e specs, which fallow's static analysis
+// can't see.
+// fallow-ignore-next-line complexity
+function CardResizeHandles({
+  node,
+  isHeading,
+  onResizePointerDown,
+  onResizePointerMove,
+  onResizePointerUp,
+  onResizePointerCancel,
+}: {
+  node: CardNode
+  isHeading: boolean
+  onResizePointerDown?: (
+    id: string,
+    dir: ResizeDir,
+    kind: ResizeKind,
+    e: React.PointerEvent,
+  ) => void
+  onResizePointerMove?: (e: React.PointerEvent) => void
+  onResizePointerUp?: (e: React.PointerEvent) => void
+  onResizePointerCancel?: (e: React.PointerEvent) => void
+}) {
+  if (!onResizePointerDown || !onResizePointerMove || !onResizePointerUp) {
+    return null
+  }
+  const kind: ResizeKind | null = isHeading
+    ? 'heading'
+    : node.kind === 'board'
+      ? 'board'
+      : null
+  if (!kind) return null
+  return (
+    <ResizeHandles
+      id={node.id}
+      kind={kind}
+      {...(kind === 'board' ? { dirs: ['e', 'w'] as ResizeDir[] } : {})}
+      onPointerDown={onResizePointerDown}
+      onPointerMove={onResizePointerMove}
+      onPointerUp={onResizePointerUp}
+      {...(onResizePointerCancel
+        ? { onPointerCancel: onResizePointerCancel }
+        : {})}
+    />
+  )
+}
+
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage of this
 // rendering logic comes from e2e/visual-regression specs (Stages 4-10),
@@ -205,21 +257,14 @@ export function Card({
           ? { onContentBlur: () => onContentBlur(node.id) }
           : {})}
       />
-      {isHeading &&
-        onResizePointerDown &&
-        onResizePointerMove &&
-        onResizePointerUp && (
-          <ResizeHandles
-            id={node.id}
-            kind="heading"
-            onPointerDown={onResizePointerDown}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
-            {...(onResizePointerCancel
-              ? { onPointerCancel: onResizePointerCancel }
-              : {})}
-          />
-        )}
+      <CardResizeHandles
+        node={node}
+        isHeading={isHeading}
+        onResizePointerDown={onResizePointerDown}
+        onResizePointerMove={onResizePointerMove}
+        onResizePointerUp={onResizePointerUp}
+        onResizePointerCancel={onResizePointerCancel}
+      />
       {(hovered || selected || connectorsVisible) &&
         onConnectorPointerDown &&
         onConnectorPointerMove &&
