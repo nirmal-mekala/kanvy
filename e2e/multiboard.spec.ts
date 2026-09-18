@@ -4,12 +4,12 @@ import { dispatchPaste } from './fixtures/clipboard'
 
 // Multiboard support, Sub-phases 3-4 (ctx/notes/260917-multiboard-
 // implementation-plan.md §5-6): TanStack Router adoption,
-// `/board/$boardId` route, breadcrumb (Sub-phase 3), then the `board`
-// card kind itself — create/rename/click-to-navigate, root content-gating
-// (Sub-phase 4). The Sub-phase 3 tests below seed a schema v3 document
-// with a second board directly into localStorage (no board-creation UI
-// existed yet at that point); the Sub-phase 4 tests exercise the real
-// create-a-board-from-the-UI flow end to end.
+// `/`(home) + `/$boardId` routes, breadcrumb (Sub-phase 3), then the
+// `board` card kind itself — create/rename/click-to-navigate, root
+// content-gating (Sub-phase 4). The Sub-phase 3 tests below seed a schema
+// v3 document with a second board directly into localStorage (no
+// board-creation UI existed yet at that point); the Sub-phase 4 tests
+// exercise the real create-a-board-from-the-UI flow end to end.
 
 const NOW = '2026-01-01T00:00:00.000Z'
 
@@ -59,16 +59,23 @@ const TWO_BOARD_DOCUMENT = {
   images: {},
 }
 
-test('the root path redirects to /board/root', async ({ page }) => {
+test('the root path is the home board', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveURL(/\/board\/root$/)
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
 })
 
-test('navigating to an unknown board id redirects to /board/root', async ({
+test('navigating to an unknown board id redirects to /', async ({ page }) => {
+  await page.goto('/does-not-exist')
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
+})
+
+test('navigating to /root (the reserved root board id as a path segment) redirects to /', async ({
   page,
 }) => {
-  await page.goto('/board/does-not-exist')
-  await expect(page).toHaveURL(/\/board\/root$/)
+  await page.goto('/root')
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
 })
 
@@ -84,9 +91,9 @@ test("navigating to a second board shows only that board's own content, scoped i
   page,
 }) => {
   await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
-  await page.goto('/board/child-1')
+  await page.goto('/child-1')
 
-  await expect(page).toHaveURL(/\/board\/child-1$/)
+  await expect(page).toHaveURL(/\/child-1$/)
   await expect(page.getByText('Child content')).toBeVisible()
   await expect(page.getByText('Root content')).toHaveCount(0)
   await expect(page.locator('.breadcrumb__title')).toHaveText('Untitled board')
@@ -94,24 +101,31 @@ test("navigating to a second board shows only that board's own content, scoped i
   // Home icon still navigates back to root, showing root's own content
   // instead.
   await page.locator('.breadcrumb__home').click()
-  await expect(page).toHaveURL(/\/board\/root$/)
+  await expect(page).toHaveURL(/\/$/)
   await expect(page.getByText('Root content')).toBeVisible()
   await expect(page.getByText('Child content')).toHaveCount(0)
 })
 
-test('breadcrumb rename commits on blur and writes the same title the on-canvas rename will read (design doc §6)', async ({
+test('breadcrumb title is a hover-to-edit control: pencil on hover, checkmark while editing, commits via checkmark click (design doc §6, shared with the on-canvas board name)', async ({
   page,
 }) => {
   await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
-  await page.goto('/board/child-1')
+  await page.goto('/child-1')
 
-  await page.locator('.breadcrumb__title').click()
-  const input = page.locator('.breadcrumb__title-input')
+  const title = page.locator('.breadcrumb__title')
+  const editBtn = title.locator('.board-name__edit-btn')
+  await expect(title.locator('.board-name__text')).toHaveText('Untitled board')
+
+  await title.hover()
+  await editBtn.click()
+  const input = title.locator('.board-name__input')
   await expect(input).toBeFocused()
+  await expect(title.locator('.board-name__edit-btn--confirm')).toBeVisible()
   await input.fill('Project Alpha')
-  await input.blur()
+  await title.locator('.board-name__edit-btn--confirm').click()
 
-  await expect(page.locator('.breadcrumb__title')).toHaveText('Project Alpha')
+  await expect(title.locator('.board-name__text')).toHaveText('Project Alpha')
+  await expect(title.locator('.board-name__input')).toHaveCount(0)
 
   // Persisted, not just in-memory. Autosave is debounced
   // (state/persistence/storage.ts, 500ms default) — poll for the write
@@ -125,17 +139,43 @@ test('breadcrumb rename commits on blur and writes the same title the on-canvas 
     .toContain('Project Alpha')
 })
 
-test('breadcrumb rename cancels on Escape without committing', async ({
+test('breadcrumb rename commits via Enter too, not just the checkmark', async ({
   page,
 }) => {
   await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
-  await page.goto('/board/child-1')
+  await page.goto('/child-1')
 
-  await page.locator('.breadcrumb__title').click()
-  await page.locator('.breadcrumb__title-input').fill('Should not stick')
+  const title = page.locator('.breadcrumb__title')
+  await title.hover()
+  await title.locator('.board-name__edit-btn').click()
+  await title.locator('.board-name__input').fill('Committed via Enter')
+  await page.keyboard.press('Enter')
+  await expect(title.locator('.board-name__text')).toHaveText(
+    'Committed via Enter',
+  )
+})
+
+test('breadcrumb rename discards the draft on Escape or on blur — a checkmark-confirm UI would be pointless if either committed anyway', async ({
+  page,
+}) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
+  await page.goto('/child-1')
+
+  const title = page.locator('.breadcrumb__title')
+
+  await title.hover()
+  await title.locator('.board-name__edit-btn').click()
+  await title.locator('.board-name__input').fill('Should not stick (Escape)')
   await page.keyboard.press('Escape')
+  await expect(title.locator('.board-name__text')).toHaveText('Untitled board')
 
-  await expect(page.locator('.breadcrumb__title')).toHaveText('Untitled board')
+  // Blurring (clicking away) without hitting Enter/checkmark also discards
+  // — only an explicit commit (Enter or the checkmark) should save.
+  await title.hover()
+  await title.locator('.board-name__edit-btn').click()
+  await title.locator('.board-name__input').fill('Should not stick (blur)')
+  await page.locator('.breadcrumb__home').focus()
+  await expect(title.locator('.board-name__text')).toHaveText('Untitled board')
 })
 
 // The default fresh-install seed board (schema/seed.ts) already has a
@@ -172,6 +212,25 @@ test.describe('board card kind (Sub-phase 4)', () => {
     await expect(card).toHaveClass(/card--board/)
   })
 
+  test('a board card shows a "this is a board" icon centered in its drag bar, and its name on the canvas even when not selected', async ({
+    page,
+  }) => {
+    await seedBoard(page, EMPTY_ROOT_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+    await page
+      .locator('[data-testid="canvas-root"]')
+      .dblclick({ position: { x: 400, y: 300 } })
+
+    const boardCard = page.locator('[data-testid="card"]')
+    await expect(boardCard).not.toHaveClass(/card--selected/)
+    await expect(
+      boardCard.locator('.card__bar .card__board-icon'),
+    ).toBeVisible()
+    await expect(boardCard.locator('.board-name__text')).toHaveText(
+      'Untitled board',
+    )
+  })
+
   test('root only ever creates board/container nodes — text/image/link creation paths are disabled there (design doc §3)', async ({
     page,
   }) => {
@@ -199,34 +258,43 @@ test.describe('board card kind (Sub-phase 4)', () => {
     const boardCard = page.locator('[data-testid="card"]')
     await expect(boardCard).toHaveClass(/card--board/)
 
-    // Select via the border (card__bar) — the interior is the
-    // click-to-navigate activation target, same as a link card.
-    await boardCard.locator('.card__bar').click()
-    const titleField = page.locator('.card__content[aria-label="Board title"]')
-    await expect(titleField).toBeVisible()
-    await titleField.fill('Project Alpha')
+    // The name row is always visible (not select-gated). Editing goes
+    // through the shared hover-to-edit control: hover reveals a pencil,
+    // clicking it swaps in the input plus a checkmark to confirm.
+    const nameText = boardCard.locator('.board-name__text')
+    await expect(nameText).toBeVisible()
+    await boardCard.locator('.board-name').hover()
+    await boardCard.locator('.board-name__edit-btn').click()
+    await boardCard.locator('.board-name__input').fill('Project Alpha')
+    await boardCard.locator('.board-name__edit-btn--confirm').click()
+    await expect(nameText).toHaveText('Project Alpha')
 
-    // Interior click navigates in.
-    await boardCard.locator('.card__board-body').click()
-    await expect(page).not.toHaveURL(/\/board\/root$/)
-    await expect(page.locator('.breadcrumb__title')).toHaveText('Project Alpha')
+    // Clicking the icon+text activates (navigates in) — same click-to-
+    // navigate semantics the link card uses for its interior.
+    await boardCard.locator('.board-name__activate').click()
+    await expect(page).not.toHaveURL(/\/$/)
+    await expect(
+      page.locator('.breadcrumb__title .board-name__text'),
+    ).toHaveText('Project Alpha')
 
-    // Rename via breadcrumb — same underlying field as the on-canvas one.
-    await page.locator('.breadcrumb__title').click()
-    await page
-      .locator('.breadcrumb__title-input')
+    // Rename via breadcrumb — same underlying field/control as the
+    // on-canvas one.
+    const breadcrumbTitle = page.locator('.breadcrumb__title')
+    await breadcrumbTitle.hover()
+    await breadcrumbTitle.locator('.board-name__edit-btn').click()
+    await breadcrumbTitle
+      .locator('.board-name__input')
       .fill('Renamed via breadcrumb')
-    await page.locator('.breadcrumb__title-input').blur()
-    await expect(page.locator('.breadcrumb__title')).toHaveText(
+    await breadcrumbTitle.locator('.board-name__edit-btn--confirm').click()
+    await expect(breadcrumbTitle.locator('.board-name__text')).toHaveText(
       'Renamed via breadcrumb',
     )
 
-    // Navigate back out via the home icon; the board-node's title field
-    // reflects the breadcrumb rename, proving both write the same field.
+    // Navigate back out via the home icon; the board-node's name reflects
+    // the breadcrumb rename, proving both write the same field.
     await page.locator('.breadcrumb__home').click()
-    await expect(page).toHaveURL(/\/board\/root$/)
-    await boardCard.locator('.card__bar').click()
-    await expect(titleField).toHaveValue('Renamed via breadcrumb')
+    await expect(page).toHaveURL(/\/$/)
+    await expect(nameText).toHaveText('Renamed via breadcrumb')
   })
 
   test('a board card is never convertible (no kind-conversion path applies to it)', async ({
@@ -307,7 +375,7 @@ test.describe('confirm modal + board delete/duplicate/paste (Sub-phase 5)', () =
       .dblclick({ position: { x: 400, y: 300 } })
     await page
       .locator('[data-testid="card"]')
-      .locator('.card__board-body')
+      .locator('.board-name__activate')
       .click()
     await page
       .locator('[data-testid="canvas-root"]')

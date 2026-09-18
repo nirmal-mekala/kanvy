@@ -90,11 +90,23 @@ explicitly stated.
 - **Click semantics: reuse the link-node model exactly** (spec §5.4) —
   border/drag-handle = select, interior click = activate. The only
   deviation from the link node is *what* activation does: in-app navigation
-  (route change, §5) rather than an `<a target="_blank">`.
-- **Rename:** reuse the existing `showCaption`-style visibility rule
-  (content-or-selected) that already governs link/image caption fields —
-  the title field grows on select, pre-populated, fixed width (`CARD_WIDTH`,
-  never resizes). Committing an edit writes to `boards[boardRef].title`.
+  (route change, §5) rather than an `<a target="_blank">`. Within the
+  interior, the edit-pencil button (see below) is an exception carved out
+  of "activate" — it starts a rename instead of navigating.
+- **Layout & rename** (twice-revised, 260918 — see ctx/notes/260918-url-
+  scheme-and-board-title-visibility.md then ctx/notes/260918-board-node-
+  redesign.md for the full history; this bullet describes the current
+  shape only): the board node is a single primary row — a leading
+  `LayoutDashboard` icon, then the board's name at a larger-than-usual
+  font size — always visible, not select-gated, fixed width (`CARD_WIDTH`,
+  never resizes). No separate big centered icon and no second caption row
+  (both of those were tried and superseded, see the redesign note).
+  Renaming uses the shared `BoardNameEditor` component (`components/board/`)
+  — hover reveals a pencil button; clicking it enters edit mode (swapping
+  the pencil for a checkmark in the same slot); blur, Enter, or the
+  checkmark commit, Escape cancels. The same component/pattern is reused
+  by the breadcrumb's title (§6) for visual and behavioral consistency.
+  Committing an edit writes to `boards[boardRef].title`.
 - **Duplicate (⌘/Ctrl+D) and paste** of one or more board nodes: mint fresh
   `boards` entries and deep-copy every node/edge belonging to the source
   board(s) with new ids and the new `boardId`. Gated by the confirm modal
@@ -183,13 +195,15 @@ Rules:
   serve boards over a network makes router loaders the natural place to
   colocate per-board fetch/cache/pending-state logic later; a hand-rolled
   atom-based nav would need a second migration to retrofit that.
-- Route shape: one pattern, `/board/:boardId`. The root board is the "home"
-  screen and is the root of the URL — `/` redirects to `/board/root`.
+- Route shape (revised 260918, see ctx/notes/260918-url-scheme-and-board-
+  title-visibility.md): two patterns, `/` (the root/home board) and
+  `/:boardId` (every other board) — no `/board` prefix. `/:boardId`
+  redirects to `/` for the root board id itself or an unknown/trashed id.
 - The route's loader reads the board from local state for now. Structure it
   so a future swap to a network fetch is a loader-implementation change
   only — it should not require touching breadcrumb/navigation call sites.
-- **Breadcrumb** (header bar): home icon (→ `/board/root`) + chevron +
-  current board's title, editable inline, writing to the same
+- **Breadcrumb** (header bar): home icon (→ `/`) + chevron + current
+  board's title, editable inline, writing to the same
   `boards[boardId].title` as the on-canvas rename (§3). Nesting is capped at
   one level, so the breadcrumb never renders more than these two segments.
   The rename control must not appear (or must be disabled) when

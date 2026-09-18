@@ -24,14 +24,14 @@ export async function seedBoard(
  * multiboard support (ctx/notes/260917-multiboard-support-design.md §3):
  * root only ever creates `board`/`container` nodes, so any scenario that
  * exercises double-click/drop/paste/⌘N text-image-link *creation* needs a
- * non-root board to run on, not `/board/root`.
+ * non-root board to run on, not `/root`.
  */
 export const CHILD_BOARD_ID = 'e2e-child'
 
 /**
  * Wraps `nodes`/`edges` into a schema v3 document with a non-root child
  * board, stamping `boardId: CHILD_BOARD_ID` onto every one of them.
- * Pair with `page.goto('/board/' + CHILD_BOARD_ID)`, not `page.goto('/')`
+ * Pair with `page.goto('/' + CHILD_BOARD_ID)`, not `page.goto('/')`
  * — the latter lands on root, where new text/image/link cards can't be
  * created at all.
  */

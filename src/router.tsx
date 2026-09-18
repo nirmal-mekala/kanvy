@@ -1,14 +1,16 @@
 // TanStack Router setup (multiboard support, ctx/notes/260917-multiboard-
-// support-design.md §6): a single route pattern, `/board/$boardId` — the
-// root board is the home screen and the root of the URL (`/` redirects to
-// `/board/root`). The route's loader reads the live `boards` collection
-// via jotai's default store (this app doesn't use a scoped Provider, so
-// the default store is the one and only store, safely readable outside
-// React) and falls back to root for an unknown or trashed board id — a
-// stale/hand-edited URL shouldn't hard-crash the router. Root itself is
-// never redirected, even if (through some broken invariant) it were
-// somehow missing from `boards` — redirecting root to itself on a failed
-// check would infinite-loop.
+// support-design.md §6, revised 260918 — see ctx/notes/260918-url-scheme-
+// and-board-title-visibility.md): the root board is the home screen and
+// lives at `/`, the root of the URL; every other board lives at `/$boardId`
+// (no `/board` prefix). The `/$boardId` route's `beforeLoad` reads the live
+// `boards` collection via jotai's default store (this app doesn't use a
+// scoped Provider, so the default store is the one and only store, safely
+// readable outside React) and redirects to `/` for the root board id itself
+// (it has its own route already) or for an unknown/trashed board id — a
+// stale/hand-edited URL shouldn't hard-crash the router. `/` is never
+// redirected, even if (through some broken invariant) root were somehow
+// missing from `boards` — redirecting it to itself on a failed check would
+// infinite-loop.
 
 import {
   createRootRoute,
@@ -36,15 +38,10 @@ function RootLayout() {
 
 export const rootRoute = createRootRoute({ component: RootLayout })
 
-const rootRedirectRoute = createRoute({
+const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({
-      to: '/board/$boardId',
-      params: { boardId: ROOT_BOARD_ID },
-    })
-  },
+  component: () => <BoardPage boardId={ROOT_BOARD_ID} />,
 })
 
 function boardExists(boardId: string): boolean {
@@ -53,22 +50,23 @@ function boardExists(boardId: string): boolean {
     .some((board) => board.id === boardId && board.status !== 'trashed')
 }
 
+function BoardRouteComponent() {
+  const { boardId } = boardRoute.useParams()
+  return <BoardPage boardId={boardId} />
+}
+
 export const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/board/$boardId',
+  path: '/$boardId',
   beforeLoad: ({ params }) => {
-    if (params.boardId === ROOT_BOARD_ID) return
-    if (!boardExists(params.boardId)) {
-      throw redirect({
-        to: '/board/$boardId',
-        params: { boardId: ROOT_BOARD_ID },
-      })
+    if (params.boardId === ROOT_BOARD_ID || !boardExists(params.boardId)) {
+      throw redirect({ to: '/' })
     }
   },
-  component: BoardPage,
+  component: BoardRouteComponent,
 })
 
-const routeTree = rootRoute.addChildren([rootRedirectRoute, boardRoute])
+const routeTree = rootRoute.addChildren([homeRoute, boardRoute])
 
 export const router = createRouter({ routeTree })
 

@@ -476,6 +476,7 @@ body {
 }
 
 .card__bar {
+  position: relative; /* anchors .card__board-icon, absolutely centered */
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1004,26 +1005,83 @@ input:focus-visible,
   opacity: 0.6;
 }
 
-.breadcrumb__title {
-  font-family: inherit;
-  font-size: inherit;
+.breadcrumb .board-name.breadcrumb__title {
   font-weight: 600;
-  color: var(--color-ink);
-  background: transparent;
-  border: none;
-  padding: 2px 4px;
-  cursor: text;
-  border-radius: 4px;
 }
 
-.breadcrumb__title:hover {
+/* ---------- board name: shared hover-to-edit control (260918 board-node
+   redesign) — used by both the breadcrumb's current-board title and the
+   board card's on-canvas name below, so the two are visually and
+   behaviorally identical. ---------- */
+
+.board-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+/* Only the board card wants the name row to fill the available width
+   (so the edit button lands at the card's right edge regardless of title
+   length, spec/redesign notes 260918) — the breadcrumb's own layout is
+   shrink-to-fit (design doc §6: home icon + chevron + title, not a
+   full-width bar), so its edit/checkmark button should stay snug against
+   the title text instead of drifting to the far edge of the viewport. */
+.card__board-body .board-name {
+  flex: 1;
+}
+
+/* Extra breathing room while editing specifically — the input's own focus
+   outline otherwise sits flush against the confirm button, visually
+   competing with it. */
+.board-name--editing {
+  gap: 8px;
+}
+
+.board-name__activate {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  -webkit-user-drag: none;
+}
+
+.board-name__activate:hover {
   background: var(--color-surface-hover);
 }
 
-.breadcrumb__title-input {
-  font-family: inherit;
-  font-size: inherit;
-  font-weight: 600;
+.board-name__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: 0.85rem;
+}
+
+/* No `.board-name__activate` wraps the text in the breadcrumb (it has no
+   "activate" concept for the board it's already on) — this padding/radius
+   otherwise only comes from that button, so it's repeated here to keep the
+   text's box (and its hover/edit-button spacing) visually identical. */
+.breadcrumb .board-name__text {
+  padding: 2px 4px;
+}
+
+.board-name__input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.85rem;
   color: var(--color-ink);
   background: var(--color-surface);
   border: 2px solid var(--color-outline);
@@ -1031,19 +1089,73 @@ input:focus-visible,
   padding: 2px 4px;
 }
 
-/* ---------- board card (multiboard support) ---------- */
+/* Breadcrumb only (board card is untouched — its input still fills the
+   card's fixed width via the base rule above): size the field to its
+   value instead of the browser's default ~20ch input width, so the
+   edit/checkmark button doesn't jump away from a short title. Progressive
+   enhancement — browsers without `field-sizing` support just keep the
+   default width, same as before this change. */
+.breadcrumb .board-name__input {
+  flex: 0 0 auto;
+  field-sizing: content;
+  min-width: 24px;
+}
+
+.board-name__edit-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.1s ease,
+    background-color 0.1s ease,
+    border-color 0.1s ease,
+    color 0.1s ease;
+  -webkit-user-drag: none;
+}
+
+.board-name:where(:hover, :focus-within) .board-name__edit-btn,
+.board-name--editing .board-name__edit-btn {
+  opacity: 1;
+}
+
+/* Touch devices don't hover — always show the affordance rather than
+   hiding it behind an interaction that doesn't exist there. */
+@media (hover: none) {
+  .board-name__edit-btn {
+    opacity: 1;
+  }
+}
+
+.board-name__edit-btn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-outline);
+  color: var(--color-ink);
+}
+
+.board-name__edit-btn--confirm {
+  color: var(--color-ink);
+}
+
+/* ---------- board card (multiboard support, revised 260918 — single
+   icon+name row replacing the earlier centered big-icon layout, see
+   ctx/notes/260918-board-node-redesign.md) ---------- */
 
 .card__board-body {
   display: flex;
   align-items: center;
-  justify-content: center;
   width: 100%;
-  min-height: 64px;
-  padding: 16px 8px;
-  border: none;
-  background: transparent;
+  min-height: 40px;
+  padding: 10px 8px;
   color: var(--color-ink-soft);
-  cursor: pointer;
   -webkit-user-drag: none;
 }
 
@@ -1051,6 +1163,21 @@ input:focus-visible,
 .card--dimmed .card__board-body {
   color: var(--color-ink-soft);
   opacity: 0.6;
+}
+
+/* The board-kind "this is a board" glyph now lives centered in the drag
+   bar (space is precious — it no longer shares the name row) rather than
+   inline with the name/edit control. Absolutely centered (against
+   `.card__bar`'s own `position: relative`, set above) so it's independent
+   of the bar's other, edge-anchored children (recency indicator on the
+   left, task-status glyph pinned right). */
+.card__board-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-ink-soft);
+  pointer-events: none;
 }
 
 /* ---------- confirm modal (multiboard support) ---------- */

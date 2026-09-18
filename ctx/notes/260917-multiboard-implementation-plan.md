@@ -10,6 +10,14 @@ implementation-plan.md`). Nothing here should be read as revisiting a design
 doc decision — where this plan makes a new call, it's sequencing/file
 organization only, and it's flagged as such.
 
+Post-implementation revision (260918): the URL scheme (`/board/:boardId`
+below) and the board-title-on-canvas visibility rule (`showCaption`-gated
+below) were both changed after this plan was executed — see
+`ctx/notes/260918-url-scheme-and-board-title-visibility.md` and the
+corresponding update to the design doc's §6/§3. This plan's text below is
+left as the historical record of what was actually built at the time,
+same convention as the v0.1 spatial-containers revision.
+
 Developer decisions already made for this plan (not re-litigated below):
 - This implementation-plan doc precedes code, matching the phase1–7
   convention.

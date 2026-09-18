@@ -387,7 +387,7 @@ test.describe('OS clipboard priority (spec §7)', () => {
     page,
   }) => {
     await seed(page, childBoardDocument([]))
-    await page.goto(`/board/${CHILD_BOARD_ID}`)
+    await page.goto(`/${CHILD_BOARD_ID}`)
     await dispatchPaste(page, { text: 'hello from the OS clipboard' })
     await expect(
       page.locator('[data-node-id]:not(.node-connector)'),
@@ -401,7 +401,7 @@ test.describe('OS clipboard priority (spec §7)', () => {
 test.describe('keyboard shortcuts (spec §4.2)', () => {
   test('⌘/Ctrl+N creates a new empty text card, focused', async ({ page }) => {
     await seed(page, childBoardDocument([]))
-    await page.goto(`/board/${CHILD_BOARD_ID}`)
+    await page.goto(`/${CHILD_BOARD_ID}`)
     await page.keyboard.press('ControlOrMeta+n')
     await expect(
       page.locator('[data-node-id]:not(.node-connector)'),

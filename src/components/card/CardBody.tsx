@@ -8,19 +8,20 @@
 // a board card's title lives on `boards[boardRef].title`, not the node
 // itself, and `boardFamily`/`renameBoardAtom` (state/atoms/boards.ts) are
 // exactly the granular per-id atoms this codebase already uses for this
-// shape of lookup (see nodes.ts's `nodeFamily` and Breadcrumb.tsx, which
-// does the identical thing) — threading a title string plus a rename
-// callback through Card.tsx's already-large prop list for one card kind
-// would cost more than it buys.
+// shape of lookup (see nodes.ts's `nodeFamily`) — threading a title string
+// plus a rename callback through Card.tsx's already-large prop list for
+// one card kind would cost more than it buys. `BoardNameEditor` (../board)
+// owns the actual name/edit UI, shared with Breadcrumb.tsx.
 
 import { useNavigate } from '@tanstack/react-router'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
 import type { CardNode } from '../../schema/node'
 import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
+import { BoardNameEditor } from '../board/BoardNameEditor'
 import { CardLinkMeta } from './CardLinkMeta'
 import { CardMedia } from './CardMedia'
 import { RecencyIndicator } from './RecencyIndicator'
@@ -69,6 +70,18 @@ export function CardBody({
             className="recency-indicator"
           />
         )}
+        {node.kind === 'board' && (
+          // Centered in the bar rather than inline with the name (260918
+          // redesign, see ctx/notes/260918-board-node-redesign.md) — a
+          // subtle "this is a board" glyph, not competing with the
+          // name/edit row for space.
+          <LayoutDashboard
+            className="card__board-icon"
+            size={12}
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+        )}
         {node.task && (
           <TaskStatusIcon
             status={node.task.status}
@@ -114,28 +127,22 @@ export function CardBody({
         // Reuses the link node's click-semantics model exactly (border/
         // drag-handle = select, interior click = activate) — the only
         // deviation is *what* activation does: in-app navigation instead
-        // of `target="_blank"` (multiboard support design doc §3).
-        <button
-          type="button"
-          className="card__board-body no-drag"
-          onClick={() =>
-            navigate({
-              to: '/board/$boardId',
-              params: { boardId: node.boardRef },
-            })
-          }
-        >
-          <LayoutGrid size={32} strokeWidth={1.5} />
-        </button>
-      )}
-
-      {showCaption && node.kind === 'board' && (
-        <input
-          className="card__content no-drag"
-          aria-label="Board title"
-          value={referencedBoard?.title ?? ''}
-          onChange={(e) => renameBoard(node.boardRef, e.target.value)}
-        />
+        // of `target="_blank"` (multiboard support design doc §3, revised
+        // 260918 — see ctx/notes/260918-board-node-redesign.md — for the
+        // single-row name layout and the shared hover-to-edit pattern; the
+        // "this is a board" icon lives in the drag bar above, not here).
+        <div className="card__board-body no-drag">
+          <BoardNameEditor
+            title={referencedBoard?.title ?? ''}
+            onRename={(value) => renameBoard(node.boardRef, value)}
+            onActivate={() =>
+              navigate({
+                to: '/$boardId',
+                params: { boardId: node.boardRef },
+              })
+            }
+          />
+        </div>
       )}
 
       {showCaption && node.kind !== 'board' && (
