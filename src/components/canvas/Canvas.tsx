@@ -559,7 +559,6 @@ export function Canvas() {
       {pendingConfirm && (
         <ConfirmModal
           title={pendingConfirm.title}
-          body={pendingConfirm.body}
           confirmLabel={pendingConfirm.confirmLabel}
           onConfirm={confirmPending}
           onCancel={cancelPending}

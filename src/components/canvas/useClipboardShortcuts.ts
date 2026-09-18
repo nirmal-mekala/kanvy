@@ -55,7 +55,6 @@ import { worldPoint } from './viewportCoords'
 // fallow-ignore-next-line unused-type
 export interface PendingBoardConfirm {
   title: string
-  body: string
   confirmLabel: string
   run: () => void
 }
@@ -69,7 +68,7 @@ function boardConfirmCopy(
   verb: string,
   boardRefs: readonly string[],
   allNodes: readonly Node[],
-): { title: string; body: string } {
+): { title: string } {
   const { boardCount, nodeCount } = computeBoardActionImpact(
     boardRefs,
     allNodes,
@@ -78,7 +77,6 @@ function boardConfirmCopy(
   const nodesWord = nodeCount === 1 ? 'node' : 'nodes'
   return {
     title: `${verb} ${boardCount} ${boards} (${nodeCount} ${nodesWord} total)?`,
-    body: 'This can be undone from Home.',
   }
 }
 

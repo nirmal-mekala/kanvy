@@ -14,7 +14,7 @@ import { useEffect } from 'react'
 
 export interface ConfirmModalProps {
   title: string
-  body: string
+  body?: string
   confirmLabel: string
   cancelLabel?: string
   onConfirm: () => void
@@ -57,14 +57,16 @@ export function ConfirmModal({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-modal__title"
-        aria-describedby="confirm-modal__body"
+        aria-describedby={body ? 'confirm-modal__body' : undefined}
       >
         <h2 id="confirm-modal__title" className="confirm-modal__title">
           {title}
         </h2>
-        <p id="confirm-modal__body" className="confirm-modal__body">
-          {body}
-        </p>
+        {body && (
+          <p id="confirm-modal__body" className="confirm-modal__body">
+            {body}
+          </p>
+        )}
         <div className="confirm-modal__actions">
           <button
             type="button"
