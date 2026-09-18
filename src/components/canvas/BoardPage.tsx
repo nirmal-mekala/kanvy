@@ -18,7 +18,6 @@ import { useEffect } from 'react'
 import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { clearSelectionAtom } from '../../state/atoms/selection'
-import { Breadcrumb } from '../breadcrumb/Breadcrumb'
 import { Canvas } from './Canvas'
 
 export function BoardPage({ boardId }: { boardId: string }) {
@@ -32,10 +31,5 @@ export function BoardPage({ boardId }: { boardId: string }) {
     setFocusNodeId(null)
   }, [boardId, setCurrentBoardId, clearSelection, setFocusNodeId])
 
-  return (
-    <>
-      <Breadcrumb boardId={boardId} />
-      <Canvas />
-    </>
-  )
+  return <Canvas />
 }

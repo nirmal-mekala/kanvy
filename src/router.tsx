@@ -18,6 +18,7 @@ import {
   createRouter,
   Outlet,
   redirect,
+  useParams,
 } from '@tanstack/react-router'
 import { getDefaultStore } from 'jotai'
 import { BoardPage } from './components/canvas/BoardPage'
@@ -27,10 +28,14 @@ import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
 
 function RootLayout() {
+  // Rendered above the route Outlet for every route, so `boardId` isn't a
+  // route param here directly — `strict: false` reads it from whichever
+  // matched route has it, falling back to the root board on `/`.
+  const { boardId = ROOT_BOARD_ID } = useParams({ strict: false })
   return (
     <div className="app">
       <RecoveryBanner />
-      <Toolbar />
+      <Toolbar boardId={boardId} />
       <Outlet />
     </div>
   )

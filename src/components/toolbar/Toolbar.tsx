@@ -25,6 +25,7 @@ import {
   loadImportedBoardAtom,
 } from '../../state/history/boardHistoryAtom'
 import { exportBoard, parseImportedBoard } from '../../state/persistence/import'
+import { Breadcrumb } from '../breadcrumb/Breadcrumb'
 import { Banner } from '../notifications/Banner'
 
 const VIEW_MODES: readonly {
@@ -54,7 +55,7 @@ function downloadBoardJson(json: string) {
 // aren't a required tier for v0 (spec §13); real coverage comes from
 // e2e/visual-regression specs, same precedent as CardBody/Container/Canvas.
 // fallow-ignore-next-line complexity
-export function Toolbar() {
+export function Toolbar({ boardId }: { boardId: string }) {
   const [board] = useAtom(boardAtom)
   const [theme] = useAtom(themeAtom)
   const toggleTheme = useSetAtom(toggleThemeAtom)
@@ -121,6 +122,7 @@ export function Toolbar() {
           style={{ display: 'none' }}
         />
         <span className="toolbar__brand">kanvy</span>
+        <Breadcrumb boardId={boardId} />
 
         <div className="toolbar__view-menu-wrap" ref={wrapRef}>
           <button

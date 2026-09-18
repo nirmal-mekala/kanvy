@@ -1,5 +1,8 @@
-// Header-bar breadcrumb (multiboard support design doc §6): home icon (→
-// /) + chevron + the current board's title. The title uses the shared
+// Breadcrumb (multiboard support design doc §6), rendered inline in the
+// Toolbar's top nav row rather than its own bar (260918 nav consolidation
+// — keeps a single, constant-height header regardless of whether the
+// title is idle or being edited): home icon (→ /) + chevron + the
+// current board's title. The title uses the shared
 // `BoardNameEditor` (../board) — hover-to-reveal pencil, click to edit,
 // checkmark/blur/Enter to commit, Escape to cancel — the same control the
 // on-canvas board-node rename uses (revised 260918, see ctx/notes/260918-

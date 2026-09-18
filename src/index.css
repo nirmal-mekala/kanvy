@@ -977,16 +977,18 @@ input:focus-visible,
   }
 }
 
-/* ---------- breadcrumb (multiboard support) ---------- */
+/* ---------- breadcrumb (multiboard support) ----------
+   Lives inline in the toolbar row (not its own bar) so the toolbar's
+   fixed-height buttons — not the breadcrumb's variable content (bare
+   home icon vs. board title vs. title being edited) — set the row's
+   height; see .toolbar's align-items: center. */
 
 .breadcrumb {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  background: var(--color-paper);
-  border-bottom: 2px solid var(--color-border-soft);
+  min-width: 0;
   color: var(--color-ink-soft);
   font-size: 0.85rem;
 }
