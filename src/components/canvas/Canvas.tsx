@@ -249,6 +249,22 @@ export function Canvas() {
     })
   }, [boardNodes])
 
+  // Entering a board (initial load or switching boards) snaps straight to
+  // the zoom-to-fit position rather than keeping whatever pan/zoom the
+  // previously-viewed board left behind (spec §4.1) — an empty board has
+  // nothing to fit, so it gets the plain default view instead. Deliberately
+  // keyed on `currentBoardId` alone — this should run once per board
+  // switch, not every time `boardNodes`/`zoomToFitAll` change as a result
+  // of editing the board's own content.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see comment above
+  useEffect(() => {
+    if (boardNodes.length === 0) {
+      setView({ x: 0, y: 0, zoom: 1 })
+      return
+    }
+    zoomToFitAll()
+  }, [currentBoardId])
+
   useEffect(() => {
     const el = boardElRef.current
     if (!el) return

@@ -84,8 +84,12 @@ test('pan via right-click drag moves the viewport', async ({ page }) => {
   await page.mouse.up({ button: 'right' })
 
   const after = await getView(page)
-  expect(after.x).toBe(before.x + 80)
-  expect(after.y).toBe(before.y + 40)
+  // toBeCloseTo, not toBe: `before` is now a zoom-to-fit position (this
+  // board auto-fits on entry) rather than the old fixed {0,0,1} default,
+  // so it's not necessarily an integer and exact float equality isn't
+  // reliable here.
+  expect(after.x).toBeCloseTo(before.x + 80, 2)
+  expect(after.y).toBeCloseTo(before.y + 40, 2)
 })
 
 test('pan via mouse wheel (non-zoom axis) moves the viewport', async ({
@@ -192,4 +196,107 @@ test('zoom to fit (Ctrl+Shift+Enter) never zooms in past 100% and centers the co
       boardBox.y + boardBox.height + 1,
     )
   }
+})
+
+async function expectFullyVisible(
+  page: import('@playwright/test').Page,
+  locator: import('@playwright/test').Locator,
+) {
+  const boardBox = await page
+    .locator('[data-testid="canvas-root"]')
+    .boundingBox()
+  const box = await locator.boundingBox()
+  if (!box || !boardBox) throw new Error('missing bounding box')
+  expect(box.x).toBeGreaterThanOrEqual(boardBox.x - 1)
+  expect(box.y).toBeGreaterThanOrEqual(boardBox.y - 1)
+  expect(box.x + box.width).toBeLessThanOrEqual(boardBox.x + boardBox.width + 1)
+  expect(box.y + box.height).toBeLessThanOrEqual(
+    boardBox.y + boardBox.height + 1,
+  )
+}
+
+test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit for that board, both ways', async ({
+  page,
+}) => {
+  const NOW = '2026-01-01T00:00:00.000Z'
+  // Root's only content is a board card referencing `child-1`; child-1's
+  // only content is a card placed far from the origin — if the previous
+  // board's pan/zoom were carried over instead of refitting on entry, it
+  // would not be anywhere near the viewport.
+  const BOARD_CARD = {
+    id: 'board-card',
+    boardId: 'root',
+    type: 'card',
+    kind: 'board',
+    boardRef: 'child-1',
+    x: 400,
+    y: 300,
+    w: 224,
+    h: 90,
+    color: 'gray',
+    content: '',
+    createdAt: NOW,
+    updatedAt: NOW,
+  }
+  const CHILD_CARD = {
+    ...NODE_A,
+    id: 'far-child-card',
+    boardId: 'child-1',
+    x: 3000,
+    y: 2000,
+  }
+  const doc = {
+    version: 3,
+    nodes: [BOARD_CARD, CHILD_CARD],
+    edges: [],
+    boards: [
+      {
+        id: 'root',
+        title: 'Home',
+        status: 'active',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: 'child-1',
+        title: 'Child board',
+        status: 'active',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    ],
+    images: {},
+  }
+  await seedBoard(page, doc, 'kanvy.board')
+  await page.goto('/')
+
+  const boardCard = page.locator('[data-testid="card"]')
+  await expect(boardCard).toHaveClass(/card--board/)
+  await expectFullyVisible(page, boardCard)
+
+  // Pan/zoom away from root's fit position (a small nudge, so the board
+  // card stays on-screen and clickable) before navigating in — a
+  // carried-over camera would otherwise happen to already still show it.
+  await page.getByTitle('Zoom in').click()
+  await page.mouse.wheel(60, 40)
+  const panned = await getView(page)
+
+  await boardCard.locator('.board-name__activate').click()
+  await expect(page).toHaveURL(/\/child-1$/)
+  // The child board's content sits far from the origin (x: 3000, y: 2000)
+  // — only reachable if the camera actually refit to it rather than
+  // keeping root's (unrelated) panned/zoomed view.
+  await expectFullyVisible(page, page.locator('.card'))
+  expect(await getView(page)).not.toEqual(panned)
+
+  // Pan/zoom away again, then navigate back out — the reset happens on
+  // every entry, not just the first.
+  await page.getByTitle('Zoom in').click()
+  await page.mouse.wheel(60, 40)
+  const pannedAgain = await getView(page)
+
+  await page.locator('.breadcrumb__home').click()
+  await expect(page).toHaveURL(/\/$/)
+  await expectFullyVisible(page, page.locator('[data-testid="card"]'))
+  expect(await getView(page)).not.toEqual(pannedAgain)
 })

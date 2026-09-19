@@ -265,15 +265,23 @@ test.describe('in-app clipboard (spec §7)', () => {
         images: {},
       })
       await page.goto('/')
-      const boardBox = await page
-        .locator('[data-testid="canvas-root"]')
-        .boundingBox()
-      if (!boardBox) throw new Error('board not rendered')
 
       // Marquee-select both the container and its child, then copy/paste.
-      await page.mouse.move(boardBox.x + 30, boardBox.y + 30)
+      // Reads the container's actual rendered position (with margin)
+      // rather than assuming board-viewport pixels equal world
+      // coordinates, since a board now auto-fits its content on entry
+      // (spec §4.1) rather than always opening at pan {0,0}/zoom 100%.
+      const containerBox = await page
+        .locator('[data-node-id="c1"]:not(.node-connector)')
+        .boundingBox()
+      if (!containerBox) throw new Error('container not rendered')
+      await page.mouse.move(containerBox.x - 20, containerBox.y - 20)
       await page.mouse.down()
-      await page.mouse.move(boardBox.x + 450, boardBox.y + 450, { steps: 10 })
+      await page.mouse.move(
+        containerBox.x + containerBox.width + 20,
+        containerBox.y + containerBox.height + 20,
+        { steps: 10 },
+      )
       await page.mouse.up()
       await page.keyboard.press('ControlOrMeta+c')
       await page.keyboard.press('ControlOrMeta+v')
@@ -448,14 +456,23 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
         images: {},
       })
       await page.goto('/')
-      const boardBox = await page
-        .locator('[data-testid="canvas-root"]')
-        .boundingBox()
-      if (!boardBox) throw new Error('board not rendered')
 
-      await page.mouse.move(boardBox.x + 30, boardBox.y + 30)
+      // Marquee-select both the container and its child. Reads the
+      // container's actual rendered position (with margin) rather than
+      // assuming board-viewport pixels equal world coordinates, since a
+      // board now auto-fits its content on entry (spec §4.1) rather than
+      // always opening at pan {0,0}/zoom 100%.
+      const containerBox = await page
+        .locator('[data-node-id="c1"]:not(.node-connector)')
+        .boundingBox()
+      if (!containerBox) throw new Error('container not rendered')
+      await page.mouse.move(containerBox.x - 20, containerBox.y - 20)
       await page.mouse.down()
-      await page.mouse.move(boardBox.x + 450, boardBox.y + 450, { steps: 10 })
+      await page.mouse.move(
+        containerBox.x + containerBox.width + 20,
+        containerBox.y + containerBox.height + 20,
+        { steps: 10 },
+      )
       await page.mouse.up()
       await page.keyboard.press('ControlOrMeta+d')
 

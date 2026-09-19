@@ -239,6 +239,11 @@ meaningful) node/edge data isn't buried under base64 blobs.
 - **Zoom to fit** (⌘/Ctrl+Shift+Enter): zooms out (never in past 100%) and
   centers so every card/container's combined bounding box is fully visible,
   with fixed world-space padding.
+- **Entering a board** (initial load, or navigating to a different board)
+  snaps straight to this zoom-to-fit position, rather than preserving
+  whatever pan/zoom the previously-viewed board was left at. An empty board
+  has nothing to fit, so it gets the plain default view (100% zoom, origin
+  pan) instead.
 
 ### 4.2 Keyboard shortcuts (current, authoritative set)
 

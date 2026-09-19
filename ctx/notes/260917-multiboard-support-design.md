@@ -214,6 +214,12 @@ Rules:
 - Deep-linking (share/bookmark a URL straight to a board) falls out of this
   route shape for free. It's not itself a requirement to build extra
   scaffolding around yet — just don't do anything that would prevent it.
+- Viewport: entering a board (via any route, including the initial load)
+  resets pan/zoom to the zoom-to-fit position for that board's content
+  (spec §4.1), rather than carrying over the previous board's camera.
+  `Canvas` does not unmount across a `BoardPage` `boardId` change, so this
+  is an explicit effect keyed on `currentBoardId`, not something that falls
+  out of remounting.
 
 ## 7. Explicitly deferred / open questions for the implementer
 

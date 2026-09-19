@@ -722,17 +722,30 @@ test.describe('containers (spec §2.3, §4.5)', () => {
       images: {},
     })
     await page.goto('/')
-    const board = page.locator('[data-testid="canvas-root"]')
-    const boardBox = await board.boundingBox()
-    if (!boardBox) throw new Error('board not rendered')
 
-    // Draw a box completely around both cards, with margin on every side —
-    // full containment is required to be carried along (spec §2.3/§4.4/
-    // §4.5), not mere overlap.
+    // Draw a box completely around both cards' actual rendered positions,
+    // with margin on every side — full containment is required to be
+    // carried along (spec §2.3/§4.4/§4.5), not mere overlap. Reads their
+    // real bounding boxes rather than assuming board-viewport pixels equal
+    // world coordinates, since a board now auto-fits its content on entry
+    // (spec §4.1) rather than always opening at pan {0,0}/zoom 100%.
+    const cardABox = await page
+      .locator('[data-node-id="a"]:not(.node-connector)')
+      .boundingBox()
+    const cardBBox = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
+    if (!cardABox || !cardBBox) throw new Error('missing bounding box')
+    const minX = Math.min(cardABox.x, cardBBox.x) - 20
+    const minY = Math.min(cardABox.y, cardBBox.y) - 20
+    const maxX =
+      Math.max(cardABox.x + cardABox.width, cardBBox.x + cardBBox.width) + 20
+    const maxY =
+      Math.max(cardABox.y + cardABox.height, cardBBox.y + cardBBox.height) + 20
     await page.keyboard.down('Control')
-    await page.mouse.move(boardBox.x + 50, boardBox.y + 50)
+    await page.mouse.move(minX, minY)
     await page.mouse.down()
-    await page.mouse.move(boardBox.x + 600, boardBox.y + 300, { steps: 10 })
+    await page.mouse.move(maxX, maxY, { steps: 10 })
     await page.mouse.up()
     await page.keyboard.up('Control')
     await expect(page.locator('.container-node')).toHaveCount(1)
@@ -775,15 +788,24 @@ test.describe('containers (spec §2.3, §4.5)', () => {
       images: {},
     })
     await page.goto('/')
-    const board = page.locator('[data-testid="canvas-root"]')
-    const boardBox = await board.boundingBox()
-    if (!boardBox) throw new Error('board not rendered')
 
-    // Draw a box around the whole existing "parent" container.
+    // Draw a box around the whole existing "parent" container's actual
+    // rendered position, with margin — reads its real bounding box rather
+    // than assuming board-viewport pixels equal world coordinates, since a
+    // board now auto-fits its content on entry (spec §4.1) rather than
+    // always opening at pan {0,0}/zoom 100%.
+    const parentBoxBefore = await page
+      .locator('[data-node-id="parent"]:not(.node-connector)')
+      .boundingBox()
+    if (!parentBoxBefore) throw new Error('parent not rendered')
     await page.keyboard.down('Control')
-    await page.mouse.move(boardBox.x + 20, boardBox.y + 20)
+    await page.mouse.move(parentBoxBefore.x - 20, parentBoxBefore.y - 20)
     await page.mouse.down()
-    await page.mouse.move(boardBox.x + 450, boardBox.y + 450, { steps: 10 })
+    await page.mouse.move(
+      parentBoxBefore.x + parentBoxBefore.width + 20,
+      parentBoxBefore.y + parentBoxBefore.height + 20,
+      { steps: 10 },
+    )
     await page.mouse.up()
     await page.keyboard.up('Control')
     await expect(page.locator('.container-node')).toHaveCount(2)
