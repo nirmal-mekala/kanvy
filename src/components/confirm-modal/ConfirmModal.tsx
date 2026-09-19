@@ -32,10 +32,11 @@ export function ConfirmModal({
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onCancel()
+      if (e.key === 'Enter') onConfirm()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onCancel])
+  }, [onCancel, onConfirm])
 
   return (
     <div
