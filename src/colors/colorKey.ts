@@ -36,15 +36,6 @@ const COLORS: Record<ColorKey, string> = {
 const GRAY_LIGHT = '#b8c0cc'
 
 /**
- * The fixed neutral tone a container's pattern is always tinted with
- * (spec §3) — independent of theme and of the container's own selected
- * `color`, unlike `resolveColorHex('gray', theme)` (which is
- * theme-*varying* for `gray` specifically, for border/accent rendering —
- * the wrong value here, ported from the prototype's plain `COLORS.gray`).
- */
-export const PATTERN_TINT = COLORS.gray
-
-/**
  * Resolved hex value for `color` in `theme`. Every color but `gray` uses
  * the same hex in both themes; `gray` has a genuinely distinct light-mode
  * value (spec §3).

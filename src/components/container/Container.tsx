@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
-import { PATTERN_TINT, type Theme } from '../../colors/colorKey'
+import { resolveColorHex, type Theme } from '../../colors/colorKey'
 import { patternBackgroundImage } from '../../colors/patterns'
 import type { Side } from '../../geometry/anchor'
 import type { ContainerNode } from '../../schema/node'
@@ -70,14 +70,14 @@ export function Container({
 }) {
   const [hovered, setHovered] = useState(false)
   const borderColor = resolveNodeBorderColor(node, theme, viewMode)
-  // The pattern tint is always this one fixed neutral tone, regardless of
-  // the container's own selected color (spec §3) — that color applies only
-  // to the border. Task view mode strips container backgrounds entirely
-  // (spec §6.2) so the border's status color isn't competing with a pattern.
+  // The pattern tint matches the container's own selected color (spec §3)
+  // — the same flat hex the border would use outside task/recency view
+  // modes. Task view mode strips container backgrounds entirely (spec
+  // §6.2) so the border's status color isn't competing with a pattern.
   const patternImage =
     viewMode === 'task'
       ? undefined
-      : patternBackgroundImage(node.pattern, PATTERN_TINT)
+      : patternBackgroundImage(node.pattern, resolveColorHex(node.color, theme))
 
   const classNames = [
     'container-node',

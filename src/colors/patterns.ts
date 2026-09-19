@@ -32,9 +32,9 @@ const PATTERN_FNS: Partial<Record<PatternKey, PatternFn>> = {
 const PATTERN_OPACITY = 0.5
 
 /**
- * CSS `background-image` value for `pattern`, tinted `colorHex` — always
- * the fixed neutral tone (spec §3), never the container's own accent
- * color. Returns `undefined` for `'none'` (plain, no background image).
+ * CSS `background-image` value for `pattern`, tinted `colorHex` — the
+ * container's own selected accent color (spec §3). Returns `undefined` for
+ * `'none'` (plain, no background image).
  */
 export function patternBackgroundImage(
   pattern: PatternKey,

@@ -210,11 +210,11 @@ meaningful) node/edge data isn't buried under base64 blobs.
 - **Font:** Fira Code Mono (Google Fonts), light weight everywhere except the
   `kanvy` wordmark in the top bar, which is bold. Lowercase wordmark.
 - **Container backgrounds:** SVG patterns from the `hero-patterns` package
-  (MIT-licensed), always rendered in the fixed neutral tone (never the
-  container's own accent color) at a fixed opacity, tiled. Available
-  patterns: none (plain), diagonal lines, graph paper, wiggle, plus,
-  jupiter, topography, yyy, corkscrew. A container's accent color applies
-  only to its border, never its background/pattern.
+  (MIT-licensed), tiled at a fixed opacity and tinted with the container's
+  own selected accent color (the same flat hex its border uses outside
+  task/recency view modes) over the container's neutral base fill.
+  Available patterns: none (plain), diagonal lines, graph paper, wiggle,
+  plus, jupiter, topography, yyy, corkscrew.
 - **Grid:** a dot-matrix background at `GRID_SIZE = 16px` pitch. Card/edge
   geometry snaps to the *midpoints* between dots (offset by half a cell), so
   corners land in the gaps rather than on the dots themselves.

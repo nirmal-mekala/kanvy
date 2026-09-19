@@ -13,7 +13,7 @@ import {
   Type,
 } from 'lucide-react'
 import {
-  PATTERN_TINT,
+  resolveColorHex,
   swatchBackground,
   type Theme,
 } from '../../colors/colorKey'
@@ -126,7 +126,7 @@ export function SelectionMenu({
                 style={{
                   backgroundImage: patternBackgroundImage(
                     pattern,
-                    PATTERN_TINT,
+                    resolveColorHex(commonColor ?? 'gray', theme),
                     1,
                   ),
                 }}
