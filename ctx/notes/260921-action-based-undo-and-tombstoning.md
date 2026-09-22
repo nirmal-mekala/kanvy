@@ -13,12 +13,24 @@ still a hard removal for nodes/edges (`removeEntitiesAtom` in
 change and its open questions rather than deciding them — it's
 investigation/design output, not permission to implement.
 
-Context: this follows the TanStack Query + localStorage-as-backend
-integration (`src/api/`, `src/state/persistence/useBoardPersistence.ts`),
-which deliberately kept the network boundary at whole-board granularity
-(see `src/api/boardApi.ts`'s header comment) because the undo stack itself
-is whole-snapshot today. This doc is what moving both of those to
-per-entity granularity would actually take.
+Context, corrected as of 260922: there is no TanStack Query integration
+and no `src/api/` layer today — that doesn't exist yet anywhere in the
+codebase. Persistence is 100% synchronous `localStorage` via
+`src/state/persistence/storage.ts` (a hand-rolled debounced saver), so
+there's no network boundary yet to be coarse or fine-grained. TanStack
+*Router* is installed and load-bearing (`src/router.tsx`, wired as the
+app's root in `src/App.tsx`) but it's purely a navigation layer for
+multiboard — unrelated to persistence, and not something this doc follows
+from.
+
+This doc's actual scope is therefore broader than "move an existing
+integration to per-entity granularity": it's (1) the action-based undo
+stack and tombstoning work described below, done against the current
+whole-snapshot/localStorage setup, and (2) introducing TanStack Query
+itself as the mutation layer once the ops model exists to map onto it,
+including dev-only env vars that inject simulated latency and error rate
+into every query *and* mutation (not just writes) for testing against a
+flaky backend before a real one exists. Both are still unbuilt.
 
 ## 1. Why whole-snapshot is limiting
 
@@ -46,8 +58,9 @@ and `pushUpdate`'s "compare-by-reference, swap `present`" logic becomes
 **Getting the ops — two strategies:**
 - *Hand-authored at each call site*: rewrite every mutation atom in
   `nodes.ts`/`edges.ts`/`boards.ts` (~15 of them) to explicitly construct
-  op objects instead of `board.nodes.map(...)`.
-- *Auto-diff the existing whole-board updater's output* (recommended):
+  op objects instead of `board.nodes.map(...)`. **DEVELOPER MARKING THIS AS
+  PREFERRED**
+- ~~*Auto-diff the existing whole-board updater's output* (recommended):
   keep every atom's current shape (`updater: (board) => Board`), and diff
   `prevBoard` vs `nextBoard` by walking `nodes`/`edges`/`boards`/`images`
   by id + **object identity** wherever the diff runs (today that'd be
@@ -57,7 +70,7 @@ and `pushUpdate`'s "compare-by-reference, swap `present`" logic becomes
   free. A ref in new-but-not-old is a create, old-but-not-new is a delete,
   changed-in-both is an update (shallow-diff its own fields for
   `updatedValues`, treating nested shapes like `task`/`link` as opaque
-  replace-whole-subobject leaves rather than deep-diffing them).
+  replace-whole-subobject leaves rather than deep-diffing them).~~
 
 **Grouping** (one entry, multiple ops — group-drag, container-carry,
 delete's cascades) mostly falls out for free either way, since most
@@ -118,6 +131,10 @@ read *everywhere*. Concrete call sites that would need updating:
 - `state/persistence/serialize.ts` / `import.ts` (does export include
   trashed content? — see Q5)
 
+-> note: in a few different places, we have noted "needs to be added to every
+site". look for ways to organize code so that this pattern is harder to screw
+up. encapsulate logic where possible
+
 **Reap-window becomes a higher-stakes knob.** Board deletion is rare;
 node/card deletion happens constantly during normal use. A
 tombstone-everything model means the trashed set — and the saved
@@ -125,6 +142,8 @@ localStorage payload, since nothing's purged until reaped — grows much
 faster than it does for boards today. `reaper.ts`'s `REAP_AGE_MS` (24h) is
 tuned for board-delete frequency; nodes/edges would very likely need their
 own, shorter window (Q6).
+
+-> dev note: im okay with keeping this around for now as is.
 
 **Images are a different kind of thing.** They're not a user-facing
 entity with a visible lifecycle — they're blobs, reference-counted and
@@ -158,31 +177,43 @@ nodes aligns the two: "delete" becomes soft everywhere, and the
 one-gesture-two-effects case collapses into "two update ops in one entry"
 instead of "a delete op plus an update op."
 
-## 3. Consequences for the TanStack Query / mutation mapping
+## 3. Consequences for a future TanStack Query / mutation mapping
 
-- Once delete is tombstone-as-update, the network mapping simplifies:
-  node delete becomes a `PATCH`-shaped op (`{status: 'trashed'}`), the same
-  call shape as any other field update — not a `DELETE` that needs the
-  full prior payload preserved for undo. This resolves the earlier
-  complication (flagged in conversation, not written up before now) that
-  undoing a real `DELETE` would otherwise require re-`POST`ing the entity
-  with its original id.
-- The only thing that ever needs a real `DELETE` call is the reaper's
-  permanent purge — which, per the invariant above, happens outside the
-  undo stack and isn't user-facing/optimistic, so it doesn't need
-  rollback semantics the way in-session mutations do.
+Unlike §1-2, none of this has a partial implementation to correct against
+— there's no `src/api/` layer, no `QueryClient`, no `useMutation` anywhere
+in the codebase today (confirmed 260922). This section describes the
+shape a TanStack Query layer *would* take once it's introduced on top of
+the ops model, plus the dev-tooling that should ship with it. TanStack
+*Router* is already installed but is unrelated (navigation only).
+
+- Once delete is tombstone-as-update, the eventual network mapping
+  simplifies: node delete becomes a `PATCH`-shaped op (`{status:
+  'trashed'}`), the same call shape as any other field update — not a
+  `DELETE` that needs the full prior payload preserved for undo. This
+  resolves the earlier complication (flagged in conversation, not written
+  up before now) that undoing a real `DELETE` would otherwise require
+  re-`POST`ing the entity with its original id.
+- The only thing that would ever need a real `DELETE` call is the
+  reaper's permanent purge — which, per the invariant above, happens
+  outside the undo stack and isn't user-facing/optimistic, so it doesn't
+  need rollback semantics the way in-session mutations do.
 - Still recommend batching network mutations at the **history-entry
   (gesture)** level, not per-op — a group-drag of 3 nodes should still be
   one network call, both to avoid a mutation storm on a fast drag and to
-  match "one gesture = one undo step = one save." `boardApi.ts` can keep
-  applying the whole ops batch to its own document copy under
-  localStorage; only its internals change when a real per-entity backend
-  eventually lands.
+  match "one gesture = one undo step = one save." Whatever plays the role
+  `boardApi.ts` would have played can keep applying the whole ops batch
+  to its own document copy under localStorage; only its internals change
+  when a real per-entity backend eventually lands.
 - Update/tombstone ops ("set field to X") are naturally idempotent under
   retry. True creates already are, since ids are client-generated
   (`nanoid`, `schema/legacy.ts`'s `generateId`) — retrying a `POST` with
   the same id doesn't produce a duplicate against any backend that treats
   id as the primary key.
+- **Dev tooling:** once mutations are wired through TanStack Query, add
+  dev-only env vars for a simulated network delay (ms) and error rate
+  (%), applied uniformly to every query *and* mutation — not mutations
+  only — so read-path loading/error states get exercised too, ahead of a
+  real backend existing to be slow or flaky against.
 
 ## 4. Open questions (flagging, not deciding)
 
@@ -190,36 +221,63 @@ instead of "a delete op plus an update op."
   `Node`/`Edge` (and maybe image entries) is a schema change requiring a
   version bump + migration in `schema/legacy.ts`, same pattern as past
   revisions (see `260916-v0.1-spatial-containers.md`).
+
+-> sounds good
+
 - **Q2 — container cascade.** Does tombstoning a container cascade to its
   spatially-contained nodes, or does it leave them exactly as today's hard
   delete does (no cascade — they just stop being "contained" once the
   container's gone, since containment is purely derived/spatial, v0.1)?
   Leaning toward matching today's no-cascade behavior for consistency, but
   this is a real decision, not an obvious default.
+
+-> no cascade. user needs to explicity multi-select container + children to
+delete all, if only the container is selected and deleted, no cascae, just
+tombstone one node
+
 - **Q3 — image lifecycle.** Eager prune (current, smaller storage
   footprint between saves) vs. deferred reaper sweep (tombstone-consistent,
   larger footprint until reaped). Needs a real answer, not just "whichever
   is more consistent."
+
+-> deferred reaper sweep is OK w me
+
 - **Q4 — reorder representation.** Own op type for `reorderNodesAtom`
   (recommended, no schema change) vs. an explicit `zIndex` field (bigger
   change, but makes reorder an ordinary per-entity update). See §2a.
+
+-> good call out - i actually do think that we want an explict "index" field.
+the app can just order by index on read and then keep existing logic that uses
+array order as source of truth, but we expect a wide variety of backends to
+support this (JSON + json-server, but also potentially SQLite and PG
+implementations, for which we would want something explicit)
+
 - **Q5 — export/import scope for trashed content.** Presumably trashed
   entities travel with JSON export/import until reaped, same as boards
   today — but this wasn't asked explicitly when boards got tombstoned
   either (see the multiboard implementation plan's own Q1 on export
   scope), so it's worth confirming rather than assuming.
+
+-> yeah keep it all around for now
+  
 - **Q6 — reap-window tuning for nodes/edges/images.** Very likely needs a
   shorter `REAP_AGE_MS`-equivalent than boards' 24h, given how much more
   often individual cards are deleted than whole boards — and eventually
   probably wants a real "trash" UI rather than a silent timed sweep, though
   that's out of scope for this doc.
 
+-> can keep for now. you're right that this will likely be revisited
+
 ## 5. Rough sequencing (not a committed plan)
 
-A possible order, front-loading tombstoning since it's what makes delete
-regular *before* the diff model has to represent it — and because it's
-independently useful/shippable on its own if the team wants to stop and
-reassess before touching the undo stack:
+A possible starting point, not a strict order — front-loading
+tombstoning since it's what makes delete regular *before* the diff model
+has to represent it, and because it's independently useful/shippable on
+its own if the team wants to stop and reassess before touching the undo
+stack. Whoever picks this up should reshuffle freely based on whatever's
+already landed on the branch by then (per §1a/2a, hand-authored ops at
+each call site is the preferred strategy, not auto-diff, which changes
+what step 4 actually involves):
 
 1. Schema: add status (+ tombstone timestamp) to `Node`/`Edge` (and
    `images` entries, pending Q3); version bump + migration.
@@ -229,15 +287,17 @@ reassess before touching the undo stack:
    deliberately not interleaved with the ops-model work below).
 3. Extend `reaper.ts`'s sweep to nodes/edges/(images), with its own
    tuned age threshold (Q6).
-4. Build the auto-diff mechanism (wherever it lands — likely
-   `updateBoardAtom`) plus the reorder op special case (Q4); change
+4. Add the explicit `index` field (Q4) and rewrite each mutation atom in
+   `nodes.ts`/`edges.ts`/`boards.ts` to construct ops directly at the call
+   site instead of returning a whole updated `Board`; change
    `HistoryEntry` to the ops shape; rewrite `pushUpdate`'s coalescing to
    merge ops instead of swapping `present` wholesale.
-5. Change `useBoardPersistence.ts`'s mutation payload from whole `Board`
-   to an ops batch, still batched at the debounce/history-entry
-   granularity; `boardApi.ts` still applies the batch to its own
-   whole-document copy under localStorage — but the call sites are now
-   REST-shaped.
-6. Only once a real backend exists: split `boardApi.ts`'s single
-   `saveBoardApi` into per-entity `POST`/`PATCH`/`DELETE`, fed by the same
-   ops, per entity kind.
+5. Introduce TanStack Query as the mutation layer: a `src/api/`-equivalent
+   that takes an ops batch and applies it to a document copy under
+   localStorage for now (no real backend yet), batched at the
+   debounce/history-entry granularity, not per-op. Wire in the dev-only
+   delay/error-rate env vars (§3) at the same time, since they only make
+   sense once queries/mutations exist to inject them into.
+6. Only once a real backend exists: split the single save call into
+   per-entity `POST`/`PATCH`/`DELETE`, fed by the same ops, per entity
+   kind.

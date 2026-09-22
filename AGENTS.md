@@ -16,11 +16,17 @@ Two schema revisions since the initial migration (see spec §2.3):
 - Drag-carry requires a node to be *completely within* the dragged
   container, not merely overlapping it.
 
-Multi-board support (spec §14's deferred "Multiboard support" item) has a
-design doc but is **not yet implemented**: see
-`ctx/notes/260917-multiboard-support-design.md` for the schema v3 shape
-(`boards` collection, `boardId`-scoped shared `nodes`/`edges`, a new `board`
-card kind) and the home-board UI/navigation plan (TanStack Router adoption).
+Multi-board support (spec §14's deferred "Multiboard support" item) is
+implemented: the schema v3 shape (`boards` collection, `boardId`-scoped
+shared `nodes`/`edges`, a `board` card kind) and TanStack Router-based
+home-board navigation are in place — see
+`ctx/notes/260917-multiboard-support-design.md` for the design rationale.
+
+The undo stack is still whole-`Board`-snapshot, and node/edge delete is
+still hard removal (only boards are tombstoned) — moving both to an
+action-based ops model with tombstoning for all entity kinds, plus
+introducing TanStack Query as the mutation layer, is designed but not yet
+implemented: see `ctx/notes/260921-action-based-undo-and-tombstoning.md`.
 
 Do not use this file to track test/build pass counts or a changelog of
 fixed bugs — that state goes stale immediately and belongs in test output
