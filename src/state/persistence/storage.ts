@@ -89,9 +89,9 @@ export function writeBoard(board: Board): void {
   }
 }
 
-export interface DebouncedSaver {
-  save: (board: Board) => void
-  /** Writes the most recent pending board immediately, if any, and clears the timer. */
+export interface DebouncedSaver<T = Board> {
+  save: (value: T) => void
+  /** Writes the most recent pending value immediately, if any, and clears the timer. */
   flush: () => void
   /** Drops any pending save without writing it. */
   cancel: () => void
@@ -99,17 +99,35 @@ export interface DebouncedSaver {
 
 const DEFAULT_DEBOUNCE_MS = 500
 
-/** Hand-rolled debounce (no lodash/use-debounce dependency, per phase3 stack decision). */
-export function createDebouncedSaver(
+/**
+ * Hand-rolled debounce (no lodash/use-debounce dependency, per phase3 stack
+ * decision), generic over the value being debounced (defaults to `Board`
+ * for the original localStorage-write use case). `write`, when given,
+ * replaces the actual write call — used by state/history/
+ * boardHistoryAtom.ts to route saves through the TanStack Query mutation
+ * layer (src/api/boardApi.ts) instead of writing localStorage directly,
+ * while keeping this module's own debounce/flush/cancel mechanics as the
+ * single source of truth for save batching.
+ *
+ * `merge`, when given, combines a still-pending value with a newly-saved
+ * one instead of the default last-write-wins replace — used by
+ * boardHistoryAtom.ts to accumulate the ops from several rapid edits
+ * (same shape as reducer.ts's `pushUpdate` `merge` param, for the same
+ * reason: an ops-based payload doesn't already contain everything a later
+ * increment touched, unlike a plain value that can just be replaced).
+ */
+export function createDebouncedSaver<T = Board>(
   delayMs = DEFAULT_DEBOUNCE_MS,
-): DebouncedSaver {
+  write: (value: T) => void = writeBoard as unknown as (value: T) => void,
+  merge?: (prev: T, next: T) => T,
+): DebouncedSaver<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  let pending: Board | undefined
+  let pending: T | undefined
 
   const flush = () => {
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
-    if (pending) writeBoard(pending)
+    if (pending !== undefined) write(pending)
     pending = undefined
   }
 
@@ -119,8 +137,8 @@ export function createDebouncedSaver(
     pending = undefined
   }
 
-  const save = (board: Board) => {
-    pending = board
+  const save = (value: T) => {
+    pending = pending === undefined || !merge ? value : merge(pending, value)
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(flush, delayMs)
   }

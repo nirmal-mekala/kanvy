@@ -19,9 +19,11 @@ import { NodeSchema } from './node'
  * support (ctx/notes/260917-multiboard-support-design.md §2): a `boards`
  * metadata collection, plus a `boardId` FK on every node/edge — `nodes`/
  * `edges` are now shared flat arrays across all boards, not one board's
- * worth of content.
+ * worth of content. v4 adds tombstoning + explicit ordering to nodes/edges
+ * (ctx/notes/260921-action-based-undo-and-tombstoning.md): `status` on
+ * both, `index` on nodes only — see schema/node.ts and schema/edge.ts.
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export const BoardSchema = z.object({
   version: z.number(),

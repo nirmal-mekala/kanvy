@@ -38,9 +38,10 @@ import type {
   TextSize,
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
+import { getLiveNodes, nextNodeIndex } from '../liveEntities'
+import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
-import { pruneOrphanedImages } from './images'
 
 /**
  * Fields common to every node kind (position/size, accent color, task
@@ -63,9 +64,7 @@ interface NodeCommonPatch {
 
 export const nodeIdsAtom = atom((get) => {
   const currentBoardId = get(currentBoardIdAtom)
-  return get(boardAtom)
-    .nodes.filter((node) => node.boardId === currentBoardId)
-    .map((node) => node.id)
+  return getLiveNodes(get(boardAtom), currentBoardId).map((node) => node.id)
 })
 
 export const nodeFamily = atomFamily((id: NodeId) =>
@@ -93,14 +92,18 @@ export const addNodeAtom = atom(
   null,
   (get, set, node: Node, newImage?: { id: string; dataUri: string }) => {
     const boardId = get(currentBoardIdAtom)
-    const stamped = { ...node, boardId }
-    set(updateBoardAtom, boardId, (board: Board) => ({
-      ...board,
-      nodes: [...board.nodes, stamped],
-      images: newImage
-        ? { ...board.images, [newImage.id]: newImage.dataUri }
-        : board.images,
-    }))
+    const board = get(boardAtom)
+    const stamped = { ...node, boardId, index: nextNodeIndex(board, boardId) }
+    const ops: Op[] = [{ kind: 'create', entity: 'node', value: stamped }]
+    if (newImage) {
+      ops.push({
+        kind: 'image',
+        id: newImage.id,
+        before: board.images[newImage.id],
+        after: newImage.dataUri,
+      })
+    }
+    set(updateBoardAtom, boardId, ops)
   },
 )
 
@@ -113,11 +116,14 @@ export const addNodeAtom = atom(
 export const addNodesAtom = atom(null, (get, set, nodes: readonly Node[]) => {
   if (nodes.length === 0) return
   const boardId = get(currentBoardIdAtom)
-  const stamped = nodes.map((node) => ({ ...node, boardId }))
-  set(updateBoardAtom, boardId, (board: Board) => ({
-    ...board,
-    nodes: [...board.nodes, ...stamped],
+  const board = get(boardAtom)
+  let index = nextNodeIndex(board, boardId)
+  const ops: Op[] = nodes.map((node) => ({
+    kind: 'create',
+    entity: 'node',
+    value: { ...node, boardId, index: index++ },
   }))
+  set(updateBoardAtom, boardId, ops)
 })
 
 /**
@@ -138,23 +144,29 @@ export const replaceNodeAtom = atom(
     next: Node,
     newImage?: { id: string; dataUri: string },
   ) => {
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id) return node
-        changed = true
-        return next
+    const board = get(boardAtom)
+    const existing = board.nodes.find((node) => node.id === id)
+    if (!existing) return
+    // Wholesale replace: `before`/`after` are the entire old/new node —
+    // `applyOps`'s `update` interpreter merges shallowly, but since `next`
+    // already carries every field (kind conversion, phase2 schema §2),
+    // that merge *is* the full replacement.
+    const ops: Op[] = [
+      { kind: 'update', entity: 'node', id, before: existing, after: next },
+    ]
+    if (newImage) {
+      // No eager prune here (schema v4 Q3, ctx/notes/260921-action-based-
+      // undo-and-tombstoning.md) — an orphaned image blob (e.g. from
+      // converting a node away from `kind: 'image'`) is cleaned up by the
+      // reaper's deferred sweep (state/reaper.ts) instead of per-mutation.
+      ops.push({
+        kind: 'image',
+        id: newImage.id,
+        before: board.images[newImage.id],
+        after: newImage.dataUri,
       })
-      if (!changed) return board
-      const withNewImage = newImage
-        ? { ...board.images, [newImage.id]: newImage.dataUri }
-        : board.images
-      return {
-        ...board,
-        nodes,
-        images: pruneOrphanedImages(nodes, withNewImage),
-      }
-    })
+    }
+    set(updateBoardAtom, get(currentBoardIdAtom), ops)
   },
 )
 
@@ -167,16 +179,19 @@ export const replaceNodeAtom = atom(
 export const updateCardContentAtom = atom(
   null,
   (get, set, id: NodeId, content: string) => {
+    const board = get(boardAtom)
+    const node = board.nodes.find((n) => n.id === id)
+    if (node?.type !== 'card') return
     const now = nowISO()
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id || node.type !== 'card') return node
-        changed = true
-        return { ...node, content, updatedAt: now }
-      })
-      return changed ? { ...board, nodes } : board
-    })
+    set(updateBoardAtom, get(currentBoardIdAtom), [
+      {
+        kind: 'update',
+        entity: 'node',
+        id,
+        before: { content: node.content, updatedAt: node.updatedAt },
+        after: { content, updatedAt: now },
+      },
+    ])
   },
 )
 
@@ -192,15 +207,18 @@ export const updateCardContentAtom = atom(
 export const setNodeHeightAtom = atom(
   null,
   (get, set, id: NodeId, h: number) => {
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id || node.h === h) return node
-        changed = true
-        return { ...node, h }
-      })
-      return changed ? { ...board, nodes } : board
-    })
+    const board = get(boardAtom)
+    const node = board.nodes.find((n) => n.id === id)
+    if (!node || node.h === h) return
+    set(updateBoardAtom, get(currentBoardIdAtom), [
+      {
+        kind: 'update',
+        entity: 'node',
+        id,
+        before: { h: node.h },
+        after: { h },
+      },
+    ])
   },
 )
 
@@ -213,16 +231,22 @@ export const setNodeHeightAtom = atom(
 export const updateNodeAtom = atom(
   null,
   (get, set, id: NodeId, patch: NodeCommonPatch) => {
+    const board = get(boardAtom)
+    const node = board.nodes.find((n) => n.id === id)
+    if (!node) return
     const now = nowISO()
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id) return node
-        changed = true
-        return { ...node, ...patch, updatedAt: now } as Node
-      })
-      return changed ? { ...board, nodes } : board
-    })
+    const asRecord = node as unknown as Record<string, unknown>
+    const before: Record<string, unknown> = { updatedAt: node.updatedAt }
+    for (const key of Object.keys(patch)) before[key] = asRecord[key]
+    set(updateBoardAtom, get(currentBoardIdAtom), [
+      {
+        kind: 'update',
+        entity: 'node',
+        id,
+        before,
+        after: { ...patch, updatedAt: now },
+      },
+    ])
   },
 )
 
@@ -236,17 +260,22 @@ export const moveNodesAtom = atom(
   (get, set, moves: readonly { id: NodeId; x: number; y: number }[]) => {
     if (moves.length === 0) return
     const now = nowISO()
-    const byId = new Map(moves.map((move) => [move.id, move]))
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        const move = byId.get(node.id)
-        if (!move) return node
-        changed = true
-        return { ...node, x: move.x, y: move.y, updatedAt: now }
+    const board = get(boardAtom)
+    const byId = new Map(board.nodes.map((node) => [node.id, node]))
+    const ops: Op[] = []
+    for (const move of moves) {
+      const node = byId.get(move.id)
+      if (!node) continue
+      ops.push({
+        kind: 'update',
+        entity: 'node',
+        id: move.id,
+        before: { x: node.x, y: node.y, updatedAt: node.updatedAt },
+        after: { x: move.x, y: move.y, updatedAt: now },
       })
-      return changed ? { ...board, nodes } : board
-    })
+    }
+    if (ops.length === 0) return
+    set(updateBoardAtom, get(currentBoardIdAtom), ops)
   },
 )
 
@@ -258,17 +287,19 @@ export const moveNodesAtom = atom(
 export const updateLinkAtom = atom(
   null,
   (get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
+    const board = get(boardAtom)
+    const node = board.nodes.find((n) => n.id === id)
+    if (node?.type !== 'card' || node.kind !== 'link') return
     const now = nowISO()
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const nodes = board.nodes.map((node) => {
-        if (node.id !== id || node.type !== 'card' || node.kind !== 'link')
-          return node
-        changed = true
-        return { ...node, link: { ...node.link, ...patch }, updatedAt: now }
-      })
-      return changed ? { ...board, nodes } : board
-    })
+    set(updateBoardAtom, get(currentBoardIdAtom), [
+      {
+        kind: 'update',
+        entity: 'node',
+        id,
+        before: { link: node.link, updatedAt: node.updatedAt },
+        after: { link: { ...node.link, ...patch }, updatedAt: now },
+      },
+    ])
   },
 )
 
@@ -284,47 +315,42 @@ export const reorderNodesAtom = atom(
   null,
   (get, set, orderedIds: readonly NodeId[]) => {
     const currentBoardId = get(currentBoardIdAtom)
-    set(updateBoardAtom, currentBoardId, (board: Board) => {
-      const ownIds = new Set(
-        board.nodes
-          .filter((node) => node.boardId === currentBoardId)
-          .map((node) => node.id),
-      )
-      if (
-        orderedIds.length !== ownIds.size ||
-        !orderedIds.every((id) => ownIds.has(id))
-      ) {
-        return board
-      }
-      const byId = new Map(board.nodes.map((node) => [node.id, node]))
-      const queue = orderedIds
-        .map((id) => byId.get(id))
-        .filter((node): node is Node => node !== undefined)
-      let cursor = 0
-      const nodes = board.nodes.map((node) => {
-        if (node.boardId !== currentBoardId) return node
-        const next = queue[cursor]
-        cursor += 1
-        return next ?? node
-      })
-      return { ...board, nodes }
-    })
+    const board = get(boardAtom)
+    const liveNodes = getLiveNodes(board, currentBoardId)
+    const ownIds = new Set(liveNodes.map((node) => node.id))
+    if (
+      orderedIds.length !== ownIds.size ||
+      !orderedIds.every((id) => ownIds.has(id))
+    ) {
+      return
+    }
+    const before = liveNodes.map((node) => ({ id: node.id, index: node.index }))
+    const after = orderedIds.map((id, index) => ({ id, index }))
+    const op: Op = { kind: 'reorder', boardId: currentBoardId, before, after }
+    set(updateBoardAtom, currentBoardId, [op])
   },
 )
 
 /**
- * Removes a mixed set of node/edge ids in one step (spec §4.2's
- * Backspace/Delete). Deleting a container does not cascade-delete its
- * descendants — matching the prototype's `removeItems`
- * (ctx/support/260915-prototype-source/src/state/useBoard.js) — and, with
- * no stored ownership field (v0.1, spec §2.3), there's nothing left
- * dangling to clean up on a survivor either. Also drops any edge touching a
- * removed node and prunes orphaned images (spec §2.6). Records the removed
- * ids as the undo step's `restoreSelection` (spec §8/Q11).
+ * Tombstones a mixed set of node/edge ids in one step (spec §4.2's
+ * Backspace/Delete; schema v4 tombstoning, ctx/notes/260921-action-based-
+ * undo-and-tombstoning.md Q2/§2b) — sets `status: 'trashed'` rather than
+ * splicing out of the array, so a node keeps its array position (and so
+ * its z-order) until the reaper (state/reaper.ts) permanently purges it
+ * later. Deleting a container does not cascade-tombstone its
+ * spatially-contained descendants (Q2, matching the prototype's
+ * `removeItems` and today's pre-tombstoning behavior) — a survivor left
+ * behind by a trashed container just stops being spatially "contained" by
+ * it, nothing dangling to clean up. Also cascades the tombstone to any
+ * edge touching a removed node (or an edge directly named in `ids`).
+ * Orphaned images are *not* pruned here (Q3) — that's deferred to the
+ * reaper's sweep now that a "removed" node can still be sitting in the
+ * array as a tombstone. Records the removed ids as the undo step's
+ * `restoreSelection` (spec §8/Q11).
  *
  * Multiboard support (design doc §2/§4): any `kind: 'board'` node among
  * `ids` is a tombstone, not a real removal, for the board it references —
- * its own node still gets removed here like any other (it's just a
+ * its own node still gets tombstoned here like any other (it's just a
  * stand-in on the home board), but the *board* it points to is flipped to
  * `status: 'trashed'` rather than having its content actually deleted.
  * That content, and the reap that eventually frees it, are entirely
@@ -334,41 +360,58 @@ export const removeEntitiesAtom = atom(
   null,
   (get, set, ids: readonly string[]) => {
     const idSet = new Set(ids)
-    set(
-      updateBoardAtom,
-      get(currentBoardIdAtom),
-      (board: Board) => {
-        const now = nowISO()
-        const trashedBoardIds = new Set(
-          board.nodes
-            .filter(
-              (node): node is Node & { kind: 'board'; boardRef: string } =>
-                idSet.has(node.id) &&
-                node.type === 'card' &&
-                node.kind === 'board',
-            )
-            .map((node) => node.boardRef),
+    const board = get(boardAtom)
+    const now = nowISO()
+    const ops: Op[] = []
+
+    for (const node of board.nodes) {
+      if (idSet.has(node.id) && node.status !== 'trashed') {
+        ops.push({
+          kind: 'update',
+          entity: 'node',
+          id: node.id,
+          before: { status: node.status, updatedAt: node.updatedAt },
+          after: { status: 'trashed', updatedAt: now },
+        })
+      }
+    }
+    for (const edge of board.edges) {
+      if (
+        edge.status !== 'trashed' &&
+        (idSet.has(edge.id) ||
+          idSet.has(edge.fromNodeId) ||
+          idSet.has(edge.toNodeId))
+      ) {
+        ops.push({
+          kind: 'update',
+          entity: 'edge',
+          id: edge.id,
+          before: { status: edge.status, updatedAt: edge.updatedAt },
+          after: { status: 'trashed', updatedAt: now },
+        })
+      }
+    }
+    const trashedBoardIds = new Set(
+      board.nodes
+        .filter(
+          (node): node is Node & { kind: 'board'; boardRef: string } =>
+            idSet.has(node.id) && node.type === 'card' && node.kind === 'board',
         )
-        const nodes = board.nodes.filter((node) => !idSet.has(node.id))
-        const edges = board.edges.filter(
-          (edge) =>
-            !idSet.has(edge.id) &&
-            !idSet.has(edge.fromNodeId) &&
-            !idSet.has(edge.toNodeId),
-        )
-        const images = pruneOrphanedImages(nodes, board.images)
-        const boards =
-          trashedBoardIds.size === 0
-            ? board.boards
-            : board.boards.map((meta) =>
-                trashedBoardIds.has(meta.id)
-                  ? { ...meta, status: 'trashed' as const, updatedAt: now }
-                  : meta,
-              )
-        return { ...board, nodes, edges, images, boards }
-      },
-      ids,
+        .map((node) => node.boardRef),
     )
+    for (const meta of board.boards) {
+      if (trashedBoardIds.has(meta.id) && meta.status !== 'trashed') {
+        ops.push({
+          kind: 'update',
+          entity: 'board',
+          id: meta.id,
+          before: { status: meta.status, updatedAt: meta.updatedAt },
+          after: { status: 'trashed', updatedAt: now },
+        })
+      }
+    }
+    if (ops.length === 0) return
+    set(updateBoardAtom, get(currentBoardIdAtom), ops, ids)
   },
 )
 
@@ -382,11 +425,8 @@ export const removeEntitiesAtom = atom(
  */
 function patchSelectedNodes(
   get: (a: typeof currentBoardIdAtom) => string,
-  set: (
-    write: typeof updateBoardAtom,
-    boardId: string,
-    updater: (board: Board) => Board,
-  ) => void,
+  set: (write: typeof updateBoardAtom, boardId: string, ops: Op[]) => void,
+  board: Board,
   ids: readonly NodeId[],
   skip: (node: Node) => boolean,
   patch: (node: Node, now: string) => Node,
@@ -394,15 +434,29 @@ function patchSelectedNodes(
   if (ids.length === 0) return
   const idSet = new Set(ids)
   const now = nowISO()
-  set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-    let changed = false
-    const nodes = board.nodes.map((node) => {
-      if (!idSet.has(node.id) || skip(node)) return node
-      changed = true
-      return patch(node, now)
-    })
-    return changed ? { ...board, nodes } : board
-  })
+  const ops: Op[] = []
+  for (const node of board.nodes) {
+    if (!idSet.has(node.id) || skip(node)) continue
+    const patched = patch(node, now) as unknown as Record<string, unknown>
+    const nodeRecord = node as unknown as Record<string, unknown>
+    // The union of both sides' keys — not just `patched`'s — so a patch
+    // that *removes* a key entirely (e.g. `withoutTask`) is still detected
+    // as a change (see `applyPatch` in ops.ts for how `after[key] ===
+    // undefined` is interpreted as "delete this key").
+    const keys = new Set([...Object.keys(nodeRecord), ...Object.keys(patched)])
+    const before: Record<string, unknown> = {}
+    const after: Record<string, unknown> = {}
+    for (const key of keys) {
+      if (nodeRecord[key] !== patched[key]) {
+        before[key] = nodeRecord[key]
+        after[key] = patched[key]
+      }
+    }
+    if (Object.keys(after).length > 0) {
+      ops.push({ kind: 'update', entity: 'node', id: node.id, before, after })
+    }
+  }
+  if (ops.length > 0) set(updateBoardAtom, get(currentBoardIdAtom), ops)
 }
 
 export const setColorAtom = atom(
@@ -411,6 +465,7 @@ export const setColorAtom = atom(
     patchSelectedNodes(
       get,
       set,
+      get(boardAtom),
       ids,
       (node) => node.color === color,
       (node, now) => ({ ...node, color, updatedAt: now }),
@@ -425,6 +480,7 @@ export const setPatternAtom = atom(
     patchSelectedNodes(
       get,
       set,
+      get(boardAtom),
       ids,
       (node) => node.type !== 'container' || node.pattern === pattern,
       // `skip` already guarantees `type === 'container'` here.
@@ -453,6 +509,7 @@ export const setTextSizeAtom = atom(
     patchSelectedNodes(
       get,
       set,
+      get(boardAtom),
       ids,
       (node) =>
         node.type !== 'card' || node.kind !== 'text' || node.size === size,
@@ -490,6 +547,7 @@ export const setTaskKindAtom = atom(
     patchSelectedNodes(
       get,
       set,
+      get(boardAtom),
       ids,
       (node) =>
         kind === 'task' ? node.task !== undefined : node.task === undefined,
@@ -508,6 +566,7 @@ export const setTaskStatusAtom = atom(
     patchSelectedNodes(
       get,
       set,
+      get(boardAtom),
       ids,
       (node) => !node.task || node.task.status === status,
       (node, now) => ({ ...node, task: { status }, updatedAt: now }),

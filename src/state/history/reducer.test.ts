@@ -56,6 +56,32 @@ describe('pushUpdate', () => {
     expect(history.present.state).toBe(value)
   })
 
+  it('uses `merge` instead of a wholesale replace when coalescing', () => {
+    let history = createHistoryState<number[]>([])
+    history = pushUpdate(history, [1], T0)
+    const merge = (prev: number[], next: number[]) => [...prev, ...next]
+    history = pushUpdate(history, [2], T0 + 100, undefined, false, merge)
+    history = pushUpdate(history, [3], T0 + 200, undefined, false, merge)
+    expect(history.present.state).toEqual([1, 2, 3])
+    expect(history.past.map((e) => e.state)).toEqual([[]])
+  })
+
+  it('does not call `merge` across a coalesce-window boundary — a fresh entry starts instead', () => {
+    let history = createHistoryState<number[]>([])
+    const merge = (prev: number[], next: number[]) => [...prev, ...next]
+    history = pushUpdate(history, [1], T0, undefined, false, merge)
+    history = pushUpdate(
+      history,
+      [2],
+      T0 + COALESCE_MS + 1,
+      undefined,
+      false,
+      merge,
+    )
+    expect(history.present.state).toEqual([2])
+    expect(history.past.map((e) => e.state)).toEqual([[], [1]])
+  })
+
   it('caps history depth at MAX_HISTORY', () => {
     let history = createHistoryState(0)
     let now = T0

@@ -16,6 +16,8 @@ type CommonFields = Pick<
   | 'w'
   | 'h'
   | 'color'
+  | 'status'
+  | 'index'
   | 'task'
   | 'content'
   | 'createdAt'
@@ -31,6 +33,8 @@ function commonFields(card: CardNode): CommonFields {
     w,
     h,
     color,
+    status,
+    index,
     task,
     content,
     createdAt,
@@ -44,6 +48,8 @@ function commonFields(card: CardNode): CommonFields {
     w,
     h,
     color,
+    status,
+    index,
     ...(task !== undefined ? { task } : {}),
     content,
     createdAt,

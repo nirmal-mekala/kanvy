@@ -11,6 +11,8 @@ function containerNode(id: string, x = 0, y = 0, w = 200, h = 200): Node {
     type: 'container',
     pattern: 'none',
     color: 'gray',
+    status: 'active',
+    index: 0,
     x,
     y,
     w,

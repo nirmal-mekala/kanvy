@@ -30,6 +30,8 @@ function textNode(id: string, overrides: Partial<Node> = {}): Node {
     w: 224,
     h: 90,
     color: 'gray',
+    status: 'active',
+    index: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -182,7 +184,7 @@ describe('nodes atoms', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 
-  it('removeEntitiesAtom drops a node, its edges, and orphaned images (but not a spatially-contained survivor, per spec §2.3 v0.1: no cascade, nothing to clean up)', async () => {
+  it('removeEntitiesAtom tombstones a node and its edges (but not a spatially-contained survivor, per spec §2.3 v0.1/Q2: no cascade)', async () => {
     const { store, addNodeAtom, addEdgeAtom, removeEntitiesAtom, boardAtom } =
       await freshState()
 
@@ -196,6 +198,8 @@ describe('nodes atoms', () => {
       w: 128,
       h: 96,
       color: 'gray',
+      status: 'active',
+      index: 0,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     }
@@ -210,6 +214,7 @@ describe('nodes atoms', () => {
       toNodeId: 'child1',
       toSide: 'left',
       direction: 'none',
+      status: 'active',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
@@ -217,10 +222,11 @@ describe('nodes atoms', () => {
     store.set(removeEntitiesAtom, ['container1'])
 
     const board = store.get(boardAtom)
-    const ids = board.nodes.map((n) => n.id)
-    expect(ids).not.toContain('container1')
-    expect(ids).toContain('child1')
-    expect(board.edges).toEqual([])
+    expect(board.nodes.find((n) => n.id === 'container1')?.status).toBe(
+      'trashed',
+    )
+    expect(board.nodes.find((n) => n.id === 'child1')?.status).toBe('active')
+    expect(board.edges.every((e) => e.status === 'trashed')).toBe(true)
   })
 
   it('undo restores the prior board and redo re-applies the change', async () => {
@@ -303,6 +309,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
       toNodeId: 'b',
       toSide: 'left',
       direction: 'none',
+      status: 'active',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
@@ -323,6 +330,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
       toNodeId: 'b',
       toSide: 'left',
       direction: 'none',
+      status: 'active',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
@@ -338,6 +346,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
       toNodeId: 'd',
       toSide: 'left',
       direction: 'none',
+      status: 'active',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     })
@@ -422,7 +431,7 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     } as Node
   }
 
-  it("deleting a board node removes it and flips its referenced board's status to trashed", async () => {
+  it("deleting a board node tombstones it and flips its referenced board's status to trashed", async () => {
     const {
       store,
       addNodeAtom,
@@ -449,7 +458,7 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     store.set(removeEntitiesAtom, ['bn1'])
 
     const board = store.get(boardAtom)
-    expect(board.nodes.find((n) => n.id === 'bn1')).toBeUndefined()
+    expect(board.nodes.find((n) => n.id === 'bn1')?.status).toBe('trashed')
     expect(board.boards.find((b) => b.id === 'child-1')?.status).toBe('trashed')
   })
 

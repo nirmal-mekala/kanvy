@@ -23,6 +23,9 @@ export const EdgeSchema = z.object({
   toNodeId: NodeIdSchema,
   toSide: SideSchema,
   direction: EdgeDirectionSchema,
+  // Tombstone field, schema v4 — same meaning as `Node.status` (see
+  // schema/node.ts). No `index`: edges have no z-order/paint-order concept.
+  status: z.enum(['active', 'trashed']),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

@@ -7,17 +7,16 @@
 // `addNodeAtom` does for nodes.
 
 import { atom } from 'jotai'
-import type { Board } from '../../schema/board'
 import type { Edge } from '../../schema/edge'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
+import { getLiveEdges } from '../liveEntities'
+import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
 
 export const edgeIdsAtom = atom((get) => {
   const currentBoardId = get(currentBoardIdAtom)
-  return get(boardAtom)
-    .edges.filter((edge) => edge.boardId === currentBoardId)
-    .map((edge) => edge.id)
+  return getLiveEdges(get(boardAtom), currentBoardId).map((edge) => edge.id)
 })
 
 export const edgeFamily = atomFamily((id: string) =>
@@ -44,10 +43,9 @@ export function findEdgeBetween(
 export const addEdgeAtom = atom(null, (get, set, edge: Edge) => {
   const boardId = get(currentBoardIdAtom)
   const stamped = { ...edge, boardId }
-  set(updateBoardAtom, boardId, (board: Board) => ({
-    ...board,
-    edges: [...board.edges, stamped],
-  }))
+  set(updateBoardAtom, boardId, [
+    { kind: 'create', entity: 'edge', value: stamped },
+  ])
 })
 
 /**
@@ -61,14 +59,19 @@ export const setEdgeDirectionAtom = atom(
     if (ids.length === 0) return
     const idSet = new Set(ids)
     const now = new Date().toISOString()
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const edges = board.edges.map((edge) => {
-        if (!idSet.has(edge.id) || edge.direction === direction) return edge
-        changed = true
-        return { ...edge, direction, updatedAt: now }
+    const board = get(boardAtom)
+    const ops: Op[] = []
+    for (const edge of board.edges) {
+      if (!idSet.has(edge.id) || edge.direction === direction) continue
+      ops.push({
+        kind: 'update',
+        entity: 'edge',
+        id: edge.id,
+        before: { direction: edge.direction, updatedAt: edge.updatedAt },
+        after: { direction, updatedAt: now },
       })
-      return changed ? { ...board, edges } : board
-    })
+    }
+    if (ops.length === 0) return
+    set(updateBoardAtom, get(currentBoardIdAtom), ops)
   },
 )

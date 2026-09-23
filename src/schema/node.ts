@@ -66,6 +66,30 @@ export type NodeId = z.infer<typeof NodeIdSchema>
 // `boardId` before rendering is what gives each board its own content and
 // preserves that board's own relative z-order (array order among its own
 // entries), regardless of how other boards' entries are interleaved.
+// `status`/`index` added in schema v4 (action-based undo/tombstoning,
+// ctx/notes/260921-action-based-undo-and-tombstoning.md). `status` mirrors
+// `BoardMeta`'s tombstone field (schema/boardMeta.ts) — delete is a
+// `status: 'trashed'` update, not removal from the array, so a node keeps
+// its array position (and so its z-order, still array-order-derived) until
+// the reaper permanently purges it. `index` is an explicit per-board
+// ordinal backfilled from each node's current array position at migration
+// time — array order stays the live render/paint source of truth
+// (unchanged), `index` exists purely so a future non-JSON backend has
+// something explicit to sort by.
+//
+// `index` is deliberately a float (fractional-indexing/"LexoRank" style),
+// not a dense integer, even though today's only writer
+// (state/liveEntities.ts's `nextNodeIndex`) happens to assign consecutive
+// integers and nothing currently re-sorts an existing node (no UI path
+// reaches state/atoms/nodes.ts's `reorderNodesAtom` — see
+// ctx/notes/260921-action-based-undo-and-tombstoning.md's 260923 addendum
+// under Q4). The float is future-proofing for if/when reordering ships:
+// inserting a node between two existing ones (`A`, `B`) should be able to
+// assign it `(A.index + B.index) / 2` — one field write — rather than
+// renumbering every node after it. `z.number()` already accepts this; no
+// runtime change follows from this comment. The one place it matters is a
+// future SQL schema derived from this shape: that `index` column needs to
+// be `DOUBLE PRECISION`/`REAL`, not `INTEGER`/`SERIAL`.
 const NodeBaseSchema = z.object({
   id: NodeIdSchema,
   boardId: BoardIdSchema,
@@ -75,6 +99,8 @@ const NodeBaseSchema = z.object({
   h: z.number(),
   color: ColorKeySchema,
   task: z.object({ status: TaskStatusSchema }).optional(),
+  status: z.enum(['active', 'trashed']),
+  index: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })

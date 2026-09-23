@@ -27,6 +27,7 @@ import {
 import { themeAtom } from '../../state/atoms/theme'
 import { viewModeAtom } from '../../state/atoms/viewMode'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
+import { getLiveEdges, getLiveNodes } from '../../state/liveEntities'
 import { Card } from '../card/Card'
 import { ConfirmModal } from '../confirm-modal/ConfirmModal'
 import { Container } from '../container/Container'
@@ -65,13 +66,13 @@ export function Canvas() {
   // Multiboard support (ctx/notes/260917-multiboard-support-design.md §2):
   // `board.nodes`/`board.edges` are shared flat arrays across every board —
   // every render/query path below operates on these current-board-scoped
-  // views, never the raw `board.nodes`/`board.edges`.
-  const boardNodes = board.nodes.filter(
-    (node) => node.boardId === currentBoardId,
-  )
-  const boardEdges = board.edges.filter(
-    (edge) => edge.boardId === currentBoardId,
-  )
+  // views, never the raw `board.nodes`/`board.edges`. Also the single real
+  // fan-out point for tombstoning (schema v4) — filtering out trashed
+  // entities here transitively keeps every downstream consumer (Card,
+  // Container, EdgeLayer, renderOrder, containment/no-fly-zone/snap,
+  // clipboard) live-only without each needing its own status check.
+  const boardNodes = getLiveNodes(board, currentBoardId)
+  const boardEdges = getLiveEdges(board, currentBoardId)
   const images = useAtomValue(imagesAtom)
   const theme = useAtomValue(themeAtom)
   const viewMode = useAtomValue(viewModeAtom)

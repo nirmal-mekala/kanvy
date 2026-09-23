@@ -43,6 +43,14 @@ export function createHistoryState<T>(initial: T): HistoryState<T> {
  * boardHistoryAtom.ts): two rapid edits to *different* boards must never
  * coalesce into one entry, since that entry's single attribution couldn't
  * represent both.
+ *
+ * `merge`, when given, is used instead of a bare wholesale replace when an
+ * update coalesces into the current entry — schema v4's ops-based history
+ * (state/ops.ts's `mergeOpLists`) needs this to *combine* the current
+ * entry's ops with the new ones rather than discarding the former, since
+ * an ops entry (unlike the old whole-`Board` snapshot) doesn't already
+ * contain everything a later increment in the same gesture touched.
+ * Omitted, this defaults to "the new value wins," i.e. today's behavior.
  */
 export function pushUpdate<T>(
   history: HistoryState<T>,
@@ -50,17 +58,17 @@ export function pushUpdate<T>(
   now: number,
   restoreSelection?: readonly string[],
   forceNewEntry = false,
+  merge?: (prev: T, next: T) => T,
 ): HistoryState<T> {
   if (next === history.present.state) return history
   const coalesce = !forceNewEntry && now - history.lastActionAt < COALESCE_MS
   const past = coalesce
     ? history.past
     : [...history.past, history.present].slice(-MAX_HISTORY)
+  const state = coalesce && merge ? merge(history.present.state, next) : next
   return {
     past,
-    present: restoreSelection
-      ? { state: next, restoreSelection }
-      : { state: next },
+    present: restoreSelection ? { state, restoreSelection } : { state },
     future: [],
     lastActionAt: now,
   }

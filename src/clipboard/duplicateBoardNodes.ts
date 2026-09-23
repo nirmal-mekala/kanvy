@@ -12,6 +12,7 @@ import type { BoardMeta } from '../schema/boardMeta'
 import type { Edge } from '../schema/edge'
 import { generateId } from '../schema/legacy'
 import type { BoardCard, Node } from '../schema/node'
+import { getLiveEdges, getLiveNodes, isLive } from '../state/liveEntities'
 import { nextCopyTitle } from './copyTitle'
 
 export interface BoardDuplicationResult {
@@ -49,9 +50,7 @@ export function duplicateBoardNodes(
   // titles, so multiple board nodes duplicated in one gesture (e.g.
   // duplicating the same board twice via a multi-select) still get
   // distinct, incrementing copy numbers.
-  const takenTitles = board.boards
-    .filter((b) => b.status !== 'trashed')
-    .map((b) => b.title)
+  const takenTitles = board.boards.filter(isLive).map((b) => b.title)
 
   for (const boardNode of boardNodes) {
     const now = new Date().toISOString()
@@ -71,7 +70,9 @@ export function duplicateBoardNodes(
       updatedAt: now,
     })
 
-    const sourceNodes = board.nodes.filter((n) => n.boardId === sourceBoardId)
+    // Live only (Q5/blast-radius): a duplicated board shouldn't deep-copy
+    // its source's tombstones.
+    const sourceNodes = getLiveNodes(board, sourceBoardId)
     const idMap = new Map(sourceNodes.map((n) => [n.id, generateId()]))
     for (const node of sourceNodes) {
       nodes.push({
@@ -83,7 +84,7 @@ export function duplicateBoardNodes(
       })
     }
 
-    const sourceEdges = board.edges.filter((e) => e.boardId === sourceBoardId)
+    const sourceEdges = getLiveEdges(board, sourceBoardId)
     for (const edge of sourceEdges) {
       const fromNodeId = idMap.get(edge.fromNodeId)
       const toNodeId = idMap.get(edge.toNodeId)
