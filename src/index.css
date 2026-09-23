@@ -18,8 +18,13 @@
   --color-outline: rgba(46, 52, 64, 0.45);
   --color-ink-soft: rgba(46, 52, 64, 0.4);
   --color-border-static: #c7cbd2;
-  /* Fixed, not user-configurable (spec §3) — same in both themes. */
-  --color-edge: #4c566a;
+  /* Not user-configurable (spec §3). A flat (opaque) color, not an
+     ink alpha — the line and arrowhead paths overlap, and a translucent
+     stroke would visibly double-darken there. Equivalent to ink at 0.7
+     opacity over --color-paper, flattened to a solid hex so it stays a
+     single tone at every overlap. Theme-dependent (redefined in
+     [data-theme="dark"] below), unlike the fixed hex this replaced. */
+  --color-edge: #656a75;
   --font-mono: "Fira Code", "Courier New", monospace;
 }
 
@@ -46,6 +51,7 @@
   --color-outline: rgba(236, 239, 244, 0.35);
   --color-border-static: #5c6270;
   --color-ink-soft: rgba(236, 239, 244, 0.4);
+  --color-edge: #b3b7be;
 }
 
 * {
