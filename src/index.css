@@ -111,6 +111,23 @@ body {
   padding: 0 4px;
 }
 
+.banner__action {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  color: var(--color-ink);
+  cursor: pointer;
+  padding: 3px 10px;
+}
+
+.banner__action:hover {
+  background: var(--color-surface-hover);
+}
+
 /* ---------- toast stack (transient error notifications, state/atoms/
    toasts.ts) — floating, top-right below the toolbar. Every other corner
    already has fixed UI (`.board__zoom` bottom-right, `.board__help`
@@ -267,6 +284,19 @@ body {
 
 .board--panning {
   cursor: grabbing;
+}
+
+/* Network mode's per-board navigation wait (design doc §6c) — should
+   usually be invisible (the background eager-load, §6b, has normally
+   already reached the board by the time it's clicked into); shown only
+   when that isn't yet true. */
+.board__loading {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
 }
 
 .board__layer {
@@ -1317,4 +1347,95 @@ input:focus-visible,
 
 .confirm-modal__btn--confirm:hover {
   opacity: 0.9;
+}
+
+.confirm-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-backdrop {
+  z-index: 40;
+}
+
+.settings-modal {
+  position: relative;
+  width: min(420px, 90%);
+  padding: 24px 28px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+}
+
+.settings-modal__title {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.settings-modal__toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-modal__toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border-soft);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.settings-modal__toggle-btn--active {
+  border-color: var(--color-outline);
+  background: var(--color-surface-hover);
+}
+
+.settings-modal__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-modal__label {
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+}
+
+.settings-modal__input {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border-soft);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.settings-modal__error {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  color: #bf616a;
+}
+
+.settings-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

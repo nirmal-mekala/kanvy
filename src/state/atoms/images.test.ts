@@ -24,19 +24,25 @@ function imageNode(id: string, imageId: string): Node {
 
 describe('pruneOrphanedImages', () => {
   it('drops images no node references', () => {
-    const images = { img1: 'a', img2: 'b' }
+    const images = [
+      { id: 'img1', dataUri: 'a' },
+      { id: 'img2', dataUri: 'b' },
+    ]
     const result = pruneOrphanedImages([imageNode('n1', 'img1')], images)
-    expect(result).toEqual({ img1: 'a' })
+    expect(result).toEqual([{ id: 'img1', dataUri: 'a' }])
   })
 
   it('returns the same reference when nothing is orphaned', () => {
-    const images = { img1: 'a' }
+    const images = [{ id: 'img1', dataUri: 'a' }]
     const result = pruneOrphanedImages([imageNode('n1', 'img1')], images)
     expect(result).toBe(images)
   })
 
   it('keeps every image when nothing is orphaned even with multiple nodes', () => {
-    const images = { img1: 'a', img2: 'b' }
+    const images = [
+      { id: 'img1', dataUri: 'a' },
+      { id: 'img2', dataUri: 'b' },
+    ]
     const nodes = [imageNode('n1', 'img1'), imageNode('n2', 'img2')]
     expect(pruneOrphanedImages(nodes, images)).toBe(images)
   })

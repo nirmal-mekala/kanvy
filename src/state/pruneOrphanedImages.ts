@@ -6,6 +6,7 @@
 // that would close the cycle back through images.ts's own import of
 // boardHistoryAtom.ts.
 
+import type { ImageEntry } from '../schema/board'
 import type { ImageCard, Node } from '../schema/node'
 
 /**
@@ -17,8 +18,8 @@ import type { ImageCard, Node } from '../schema/node'
  */
 export function pruneOrphanedImages(
   nodes: readonly Node[],
-  images: Record<string, string>,
-): Record<string, string> {
+  images: readonly ImageEntry[],
+): ImageEntry[] {
   const used = new Set(
     nodes
       .filter(
@@ -27,8 +28,6 @@ export function pruneOrphanedImages(
       )
       .map((node) => node.imageId),
   )
-  const kept = Object.fromEntries(
-    Object.entries(images).filter(([id]) => used.has(id)),
-  )
-  return Object.keys(kept).length === Object.keys(images).length ? images : kept
+  const kept = images.filter((entry) => used.has(entry.id))
+  return kept.length === images.length ? (images as ImageEntry[]) : kept
 }

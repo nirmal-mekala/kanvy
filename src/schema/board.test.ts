@@ -79,7 +79,7 @@ describe('BoardSchema', () => {
       nodes: [validTextCard(), validContainer()],
       edges: [],
       boards: [validBoardMeta()],
-      images: {},
+      images: [],
     }
     const result = BoardSchema.safeParse(board)
     expect(result.success).toBe(true)
@@ -94,7 +94,7 @@ describe('BoardSchema', () => {
         validBoardMeta(),
         { ...validBoardMeta(), id: 'child-1', title: 'Untitled board' },
       ],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(true)
   })
@@ -106,7 +106,7 @@ describe('BoardSchema', () => {
       nodes: [invalid],
       edges: [],
       boards: [validBoardMeta()],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(false)
   })
@@ -118,7 +118,7 @@ describe('BoardSchema', () => {
       nodes: [invalid],
       edges: [],
       boards: [validBoardMeta()],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(false)
   })
@@ -138,7 +138,7 @@ describe('BoardSchema', () => {
       version: SCHEMA_VERSION,
       nodes: [invalid],
       edges: [],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(false)
   })
@@ -149,7 +149,7 @@ describe('BoardSchema', () => {
       version: SCHEMA_VERSION,
       nodes: [invalid],
       edges: [],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(false)
   })
@@ -159,7 +159,7 @@ describe('BoardSchema', () => {
       version: SCHEMA_VERSION,
       nodes: [{ ...validTextCard(), type: 'widget' }],
       edges: [],
-      images: {},
+      images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(false)
   })

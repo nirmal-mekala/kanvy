@@ -161,10 +161,18 @@ function applyReorderOp(
 function applyImageOp(board: Board, op: ImageOp, direction: Direction): Board {
   const value = direction === 'after' ? op.after : op.before
   if (value === undefined) {
-    const { [op.id]: _removed, ...images } = board.images
-    return { ...board, images }
+    return {
+      ...board,
+      images: board.images.filter((entry) => entry.id !== op.id),
+    }
   }
-  return { ...board, images: { ...board.images, [op.id]: value } }
+  const exists = board.images.some((entry) => entry.id === op.id)
+  const images = exists
+    ? board.images.map((entry) =>
+        entry.id === op.id ? { ...entry, dataUri: value } : entry,
+      )
+    : [...board.images, { id: op.id, dataUri: value }]
+  return { ...board, images }
 }
 
 function applyOp(board: Board, op: Op, direction: Direction): Board {

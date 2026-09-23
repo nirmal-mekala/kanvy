@@ -16,7 +16,7 @@ const board: Board = {
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
   ],
-  images: {},
+  images: [],
 }
 
 describe('parseImportedBoard', () => {
@@ -30,7 +30,7 @@ describe('parseImportedBoard', () => {
       cards: [{ id: 'c1', x: 0, y: 0, w: 224, color: 'gray', content: 'x' }],
       groups: [],
       edges: [],
-      images: {},
+      images: [],
     })
     const result = parseImportedBoard(legacy)
     expect(result.ok).toBe(true)

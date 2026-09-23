@@ -15,11 +15,14 @@
 // exercise it.
 
 import type { Board } from '../schema/board'
+import type { NetworkConfig } from '../state/atoms/networkSettings'
+import type { Op } from '../state/ops'
 import {
   type LoadResult,
   loadBoard,
   writeBoard,
 } from '../state/persistence/storage'
+import { applyOpsToNetwork } from './networkOps'
 
 function envNumber(value: string | undefined, fallback: number): number {
   if (!value) return fallback
@@ -48,7 +51,7 @@ function sleep(ms: number): Promise<void> {
 export async function simulateNetwork<T>(
   latencyMs: number,
   errorRate: number,
-  run: () => T,
+  run: () => T | Promise<T>,
   random: () => number = Math.random,
 ): Promise<T> {
   if (latencyMs > 0) await sleep(latencyMs)
@@ -57,11 +60,11 @@ export async function simulateNetwork<T>(
       'Simulated network error (VITE_MOCK_ERROR_RATE) — src/api/boardApi.ts',
     )
   }
-  return run()
+  return await run()
 }
 
 /** Dev-only latency + error-rate injection — a no-op in production builds or when both env vars are unset. */
-function withSimulatedNetwork<T>(run: () => T): Promise<T> {
+function withSimulatedNetwork<T>(run: () => T | Promise<T>): Promise<T> {
   return simulateNetwork(LATENCY_MS, ERROR_RATE, run)
 }
 
@@ -78,4 +81,19 @@ export function fetchBoard(): Promise<LoadResult> {
  */
 export function saveBoard(board: Board): Promise<void> {
   return withSimulatedNetwork(() => writeBoard(board))
+}
+
+/**
+ * Network mode's write-side counterpart to `saveBoard` (network mode
+ * design doc §5) — maps `ops` onto real per-entity REST calls
+ * (api/networkOps.ts) instead of a whole-document localStorage write.
+ * Local mode's `saveBoard` above is completely unaffected; this is only
+ * ever called when the app is in network mode (see state/history/
+ * boardHistoryAtom.ts's mode-aware mutation).
+ */
+export function saveBoardOverNetwork(
+  config: NetworkConfig,
+  ops: readonly Op[],
+): Promise<void> {
+  return withSimulatedNetwork(() => applyOpsToNetwork(config, ops))
 }

@@ -41,11 +41,12 @@
 
 import { MutationObserver } from '@tanstack/react-query'
 import { atom, getDefaultStore } from 'jotai'
-import { saveBoard } from '../../api/boardApi'
+import { fetchBoard, saveBoard, saveBoardOverNetwork } from '../../api/boardApi'
 import { queryClient } from '../../api/queryClient'
 import type { Board } from '../../schema/board'
 import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { currentBoardIdAtom } from '../atoms/currentBoard'
+import { accessModeAtom, networkConfigAtom } from '../atoms/networkSettings'
 import { selectionAtom } from '../atoms/selection'
 import { pushToastAtom } from '../atoms/toasts'
 import {
@@ -119,6 +120,21 @@ function mergePendingSave(prev: PendingSave, next: PendingSave): PendingSave {
 
 const initialLoad: LoadResult = loadBoard()
 
+// Local-mode read-path parity (network mode design doc §6d): the actual
+// initial load above stays a synchronous localStorage read — this app has
+// never shown a loading state for it, and there's no reason to introduce
+// one now — but it's *also* pushed through the same TanStack Query cache
+// network mode's reads use (fetchBoard, api/boardApi.ts, already existed
+// as an unused async wrapper around this same `loadBoard`), purely so
+// local mode's read path is visible in the same query-driven shape/
+// Devtools view as network mode's, per the design doc's explicit read/
+// write parity ask. `void` — this is fire-and-forget priming, nothing
+// awaits it.
+void queryClient.prefetchQuery({
+  queryKey: ['board', 'local'] as const,
+  queryFn: fetchBoard,
+})
+
 // Routes the debounced saver's actual write through the TanStack Query
 // mutation layer (src/api/boardApi.ts) instead of localStorage directly —
 // `MutationObserver` is TanStack Query's supported way to dispatch a
@@ -133,7 +149,18 @@ const initialLoad: LoadResult = loadBoard()
 // each one as a real action, not just "a board got saved."
 const saveMutation = new MutationObserver(queryClient, {
   mutationKey: ['board', 'save'],
-  mutationFn: (pending: PendingSave) => saveBoard(pending.board),
+  // Mode-aware (network mode design doc §5): reads the current mode/config
+  // fresh at mutate time (not captured once at module scope), since
+  // settings can change between one save and the next. Network mode maps
+  // `pending.ops` onto real per-entity REST calls instead of a
+  // whole-document write; local mode's own behavior is unchanged.
+  mutationFn: (pending: PendingSave) => {
+    const store = getDefaultStore()
+    if (store.get(accessModeAtom) === 'network') {
+      return saveBoardOverNetwork(store.get(networkConfigAtom), pending.ops)
+    }
+    return saveBoard(pending.board)
+  },
 })
 const saver = createDebouncedSaver<PendingSave>(
   undefined,

@@ -157,6 +157,23 @@ function backfillEdgeStatuses(edges: unknown[]): unknown[] {
   )
 }
 
+/**
+ * Normalizes `images` into schema v5's `{id, dataUri}[]` shape (design doc
+ * §4) regardless of which era it arrived as: a pre-v5 `{ [id]: dataUri }`
+ * record, an already-array v5 document, or anything unrecognizable (passed
+ * through as `[]` and left for `BoardSchema` to reject if it wasn't
+ * actually empty/valid).
+ */
+function normalizeImages(images: unknown): unknown[] {
+  if (Array.isArray(images)) return images
+  if (isRecord(images)) {
+    return Object.entries(images)
+      .filter(([, dataUri]) => typeof dataUri === 'string')
+      .map(([id, dataUri]) => ({ id, dataUri }))
+  }
+  return []
+}
+
 function normalizeTask(
   entity: Record<string, unknown>,
 ): { status: string } | undefined {
@@ -295,7 +312,7 @@ function normalizePreV0Board(
       edges.filter(isRecord).map((edge) => normalizeLegacyEdge(edge, now)),
     ),
     boards: normalizeBoardsCollection(parsed, now),
-    images: isRecord(parsed.images) ? parsed.images : {},
+    images: normalizeImages(parsed.images),
   }
 }
 
@@ -342,7 +359,7 @@ function backfillV0Board(
       ),
     ),
     boards: normalizeBoardsCollection(parsed, now),
-    images: isRecord(parsed.images) ? parsed.images : {},
+    images: normalizeImages(parsed.images),
   }
 }
 

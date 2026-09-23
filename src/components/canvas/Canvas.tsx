@@ -15,7 +15,7 @@ import type { CardNode, ContainerNode } from '../../schema/node'
 import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
 import { setEdgeDirectionAtom } from '../../state/atoms/edges'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
-import { imagesAtom } from '../../state/atoms/images'
+import { findImageDataUri, imagesAtom } from '../../state/atoms/images'
 import {
   setColorAtom,
   setNodeHeightAtom,
@@ -453,45 +453,49 @@ export function Canvas() {
         {boardNodes
           .filter((node) => node.type === 'card')
           // fallow-ignore-next-line complexity
-          .map((node) => (
-            <Card
-              key={node.id}
-              node={node}
-              {...(node.kind === 'image' && images[node.imageId]
-                ? { imageSrc: images[node.imageId] }
-                : {})}
-              theme={theme}
-              viewMode={viewMode}
-              selected={selection.has(node.id)}
-              dragging={draggingIds?.has(node.id) ?? false}
-              connectorsVisible={
-                connectingFromId === node.id || connectingHoverId === node.id
-              }
-              connectorActiveSide={
-                connectingFromId === node.id
-                  ? connectingFromSide
-                  : connectingHoverId === node.id
-                    ? connectingHoverSide
-                    : null
-              }
-              autoFocus={focusNodeId === node.id}
-              onAutoFocusHandled={() => setFocusNodeId(null)}
-              onHeightChange={(h) => setNodeHeight(node.id, h)}
-              onContentChange={handleContentChange}
-              onContentBlur={handleContentBlur}
-              onPointerDown={handleNodePointerDown}
-              onPointerMove={handleNodePointerMove}
-              onPointerUp={handleNodePointerUp}
-              onPointerCancel={handleNodePointerCancel}
-              onResizePointerDown={handleResizePointerDown}
-              onResizePointerMove={handleResizePointerMove}
-              onResizePointerUp={handleResizePointerUp}
-              onResizePointerCancel={handleResizePointerCancel}
-              onConnectorPointerDown={handleConnectorPointerDown}
-              onConnectorPointerMove={handleConnectingPointerMove}
-              onConnectorPointerUp={handlePointerUp}
-            />
-          ))}
+          .map((node) => {
+            const imageSrc =
+              node.kind === 'image'
+                ? findImageDataUri(images, node.imageId)
+                : undefined
+            return (
+              <Card
+                key={node.id}
+                node={node}
+                {...(imageSrc ? { imageSrc } : {})}
+                theme={theme}
+                viewMode={viewMode}
+                selected={selection.has(node.id)}
+                dragging={draggingIds?.has(node.id) ?? false}
+                connectorsVisible={
+                  connectingFromId === node.id || connectingHoverId === node.id
+                }
+                connectorActiveSide={
+                  connectingFromId === node.id
+                    ? connectingFromSide
+                    : connectingHoverId === node.id
+                      ? connectingHoverSide
+                      : null
+                }
+                autoFocus={focusNodeId === node.id}
+                onAutoFocusHandled={() => setFocusNodeId(null)}
+                onHeightChange={(h) => setNodeHeight(node.id, h)}
+                onContentChange={handleContentChange}
+                onContentBlur={handleContentBlur}
+                onPointerDown={handleNodePointerDown}
+                onPointerMove={handleNodePointerMove}
+                onPointerUp={handleNodePointerUp}
+                onPointerCancel={handleNodePointerCancel}
+                onResizePointerDown={handleResizePointerDown}
+                onResizePointerMove={handleResizePointerMove}
+                onResizePointerUp={handleResizePointerUp}
+                onResizePointerCancel={handleResizePointerCancel}
+                onConnectorPointerDown={handleConnectorPointerDown}
+                onConnectorPointerMove={handleConnectingPointerMove}
+                onConnectorPointerUp={handlePointerUp}
+              />
+            )
+          })}
       </div>
 
       {/* Screen-space overlays — rendered outside `.board__layer` (which

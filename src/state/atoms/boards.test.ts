@@ -43,7 +43,7 @@ function boardWithChild(): Board {
         updatedAt: now,
       },
     ],
-    images: {},
+    images: [],
   }
 }
 

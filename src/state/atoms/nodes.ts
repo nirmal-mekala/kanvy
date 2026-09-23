@@ -42,6 +42,7 @@ import { getLiveNodes, nextNodeIndex } from '../liveEntities'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
+import { findImageDataUri } from './images'
 
 /**
  * Fields common to every node kind (position/size, accent color, task
@@ -99,7 +100,7 @@ export const addNodeAtom = atom(
       ops.push({
         kind: 'image',
         id: newImage.id,
-        before: board.images[newImage.id],
+        before: findImageDataUri(board.images, newImage.id),
         after: newImage.dataUri,
       })
     }
@@ -162,7 +163,7 @@ export const replaceNodeAtom = atom(
       ops.push({
         kind: 'image',
         id: newImage.id,
-        before: board.images[newImage.id],
+        before: findImageDataUri(board.images, newImage.id),
         after: newImage.dataUri,
       })
     }

@@ -83,7 +83,7 @@ export function createSeedBoard(): SeedResult {
         updatedAt: now,
       },
     ],
-    images: {},
+    images: [],
   }
   return { board, welcomeBoardId }
 }

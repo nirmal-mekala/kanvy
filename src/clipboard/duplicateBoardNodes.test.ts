@@ -47,7 +47,7 @@ function board(overrides: Partial<Board> = {}): Board {
         updatedAt: NOW,
       },
     ],
-    images: {},
+    images: [],
     ...overrides,
   }
 }

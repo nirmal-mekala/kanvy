@@ -25,12 +25,14 @@ import {
 } from '@tanstack/react-router'
 import { getDefaultStore } from 'jotai'
 import { BoardPage } from './components/canvas/BoardPage'
+import { NetworkErrorBanner } from './components/notifications/NetworkErrorBanner'
 import { RecoveryBanner } from './components/notifications/RecoveryBanner'
 import { ToastStack } from './components/notifications/ToastStack'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
 import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
+import { ensureBoardLoaded } from './state/networkBoardLoader'
 
 function RootLayout() {
   // Rendered above the route Outlet for every route, so `boardId` isn't a
@@ -40,6 +42,7 @@ function RootLayout() {
   return (
     <div className="app">
       <RecoveryBanner />
+      <NetworkErrorBanner />
       <Toolbar boardId={boardId} />
       <ToastStack />
       <Outlet />
@@ -78,11 +81,30 @@ function BoardRouteComponent() {
 export const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/$boardId',
-  beforeLoad: ({ params }) => {
+  // Board navigation (network mode design doc §6c): blocks on fetching a
+  // not-yet-loaded board's own nodes/edges/images before rendering it —
+  // `ensureBoardLoaded` is a no-op in local mode (everything's already
+  // resident) and resolves immediately if the background eager-load
+  // (§6b) already reached this board, so this await is invisible in both
+  // of those cases and only actually blocks the one case it needs to.
+  beforeLoad: async ({ params }) => {
     if (params.boardId === ROOT_BOARD_ID || !boardExists(params.boardId)) {
       throw redirect({ to: '/' })
     }
+    try {
+      await ensureBoardLoaded(params.boardId)
+    } catch {
+      // Non-blocking (design doc §7) — `ensureBoardLoaded` already
+      // surfaced this via `networkLoadErrorAtom`'s retry banner; the
+      // route still renders (with whatever content is resident so far)
+      // rather than hard-failing the navigation.
+    }
   },
+  pendingComponent: () => (
+    <div className="board__loading" role="status">
+      Loading board…
+    </div>
+  ),
   component: BoardRouteComponent,
 })
 

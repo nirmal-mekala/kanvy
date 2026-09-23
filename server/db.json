@@ -1,0 +1,203 @@
+{
+  "boards": [
+    {
+      "id": "root",
+      "title": "Home",
+      "status": "active",
+      "createdAt": "2026-09-23T12:00:00.000Z",
+      "updatedAt": "2026-09-23T12:00:00.000Z"
+    },
+    {
+      "id": "b1",
+      "title": "my board",
+      "status": "active",
+      "createdAt": "2026-09-23T12:00:00.000Z",
+      "updatedAt": "2026-09-23T20:48:55.355Z"
+    },
+    {
+      "id": "KyYzdDiUbwI",
+      "title": "Untitled board",
+      "status": "active",
+      "createdAt": "2026-09-23T20:42:01.598Z",
+      "updatedAt": "2026-09-23T20:42:01.598Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "n0",
+      "boardId": "root",
+      "type": "card",
+      "kind": "board",
+      "boardRef": "b1",
+      "x": 88,
+      "y": 104,
+      "w": 224,
+      "h": 65,
+      "color": "gray",
+      "status": "active",
+      "index": 0,
+      "content": "",
+      "createdAt": "2026-09-23T12:00:00.000Z",
+      "updatedAt": "2026-09-23T12:00:00.000Z"
+    },
+    {
+      "id": "n1",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "text",
+      "size": "regular",
+      "x": 104,
+      "y": 104,
+      "w": 224,
+      "h": 85,
+      "color": "lime",
+      "status": "active",
+      "index": 0,
+      "content": "watch test edit",
+      "createdAt": "2026-09-23T12:05:00.000Z",
+      "updatedAt": "2026-09-23T21:14:59.196Z",
+      "task": {
+        "status": "todo"
+      }
+    },
+    {
+      "id": "n2",
+      "boardId": "b1",
+      "type": "card",
+      "kind": "image",
+      "imageId": "img1",
+      "x": 408,
+      "y": 40,
+      "w": 224,
+      "h": 119,
+      "color": "violet",
+      "status": "trashed",
+      "index": 1,
+      "content": "",
+      "createdAt": "2026-09-23T12:10:00.000Z",
+      "updatedAt": "2026-09-23T20:41:49.053Z",
+      "task": {
+        "status": "blocked"
+      }
+    },
+    {
+      "id": "n3",
+      "boardId": "b1",
+      "type": "container",
+      "pattern": "falling-triangles",
+      "x": 184,
+      "y": 248,
+      "w": 320,
+      "h": 220,
+      "color": "lime",
+      "status": "active",
+      "index": 2,
+      "createdAt": "2026-09-23T12:15:00.000Z",
+      "updatedAt": "2026-09-23T21:14:57.763Z",
+      "task": {
+        "status": "todo"
+      }
+    },
+    {
+      "id": "m3INxD8HerI",
+      "boardId": "b1",
+      "status": "trashed",
+      "index": 3,
+      "type": "card",
+      "kind": "image",
+      "x": 230,
+      "y": 195,
+      "w": 224,
+      "h": 85,
+      "color": "gray",
+      "content": "",
+      "imageId": "z1kks139atdv",
+      "createdAt": "2026-09-23T20:39:01.323Z",
+      "updatedAt": "2026-09-23T20:40:13.367Z"
+    },
+    {
+      "id": "c8XyhppuZC4",
+      "boardId": "root",
+      "status": "trashed",
+      "index": 1,
+      "type": "card",
+      "kind": "board",
+      "boardRef": "9hhogjhp2ft9",
+      "x": 88,
+      "y": 232,
+      "w": 224,
+      "h": 63,
+      "color": "gray",
+      "content": "",
+      "createdAt": "2026-09-23T20:42:01.598Z",
+      "updatedAt": "2026-09-23T20:44:18.727Z"
+    },
+    {
+      "id": "P7AvbMcSyzQ",
+      "boardId": "9hhogjhp2ft9",
+      "status": "active",
+      "index": 0,
+      "type": "card",
+      "kind": "text",
+      "size": "regular",
+      "x": 292,
+      "y": 340.25,
+      "w": 224,
+      "h": 85,
+      "color": "gray",
+      "content": "",
+      "createdAt": "2026-09-23T20:42:53.747Z",
+      "updatedAt": "2026-09-23T20:42:53.747Z"
+    },
+    {
+      "id": "YwebViCtQ6g",
+      "boardId": "b1",
+      "status": "active",
+      "index": 2,
+      "type": "card",
+      "kind": "text",
+      "size": "regular",
+      "x": 216,
+      "y": 296,
+      "w": 224,
+      "h": 85,
+      "color": "violet",
+      "content": "what the f",
+      "createdAt": "2026-09-23T20:44:32.200Z",
+      "updatedAt": "2026-09-23T21:14:57.763Z"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "boardId": "b1",
+      "fromNodeId": "n1",
+      "fromSide": "right",
+      "toNodeId": "n2",
+      "toSide": "left",
+      "direction": "forward",
+      "status": "trashed",
+      "createdAt": "2026-09-23T12:20:00.000Z",
+      "updatedAt": "2026-09-23T20:41:49.053Z"
+    },
+    {
+      "id": "zVeJSXmybTE",
+      "boardId": "b1",
+      "fromNodeId": "n1",
+      "fromSide": "right",
+      "toNodeId": "n3",
+      "toSide": "top",
+      "direction": "none",
+      "status": "active",
+      "createdAt": "2026-09-23T20:40:46.898Z",
+      "updatedAt": "2026-09-23T20:40:46.898Z"
+    }
+  ],
+  "images": [
+    {
+      "id": "img1",
+      "dataUri": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiPjwvc3ZnPg=="
+    }
+  ],
+  "$schema": "./node_modules/json-server/schema.json"
+}
