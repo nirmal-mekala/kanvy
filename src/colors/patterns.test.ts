@@ -11,11 +11,11 @@ describe('patternBackgroundImage', () => {
 
   it('tints the pattern with whatever colorHex it is given', () => {
     const grayImage = patternBackgroundImage(
-      'diagonal',
+      'squares',
       resolveColorHex('gray', 'dark'),
     )
     const coralImage = patternBackgroundImage(
-      'diagonal',
+      'squares',
       resolveColorHex('coral', 'dark'),
     )
     expect(grayImage).toBeDefined()

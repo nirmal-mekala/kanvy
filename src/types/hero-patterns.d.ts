@@ -4,12 +4,12 @@
 declare module 'hero-patterns' {
   export type PatternFactory = (color: string, opacity: number) => string
 
-  export const diagonalLines: PatternFactory
-  export const graphPaper: PatternFactory
+  export const fallingTriangles: PatternFactory
+  export const leaf: PatternFactory
   export const wiggle: PatternFactory
   export const plus: PatternFactory
-  export const jupiter: PatternFactory
+  export const linesInMotion: PatternFactory
   export const topography: PatternFactory
-  export const yyy: PatternFactory
-  export const corkScrew: PatternFactory
+  export const rain: PatternFactory
+  export const squares: PatternFactory
 }

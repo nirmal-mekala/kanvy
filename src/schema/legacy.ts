@@ -38,16 +38,14 @@ const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12)
 // the app (that's a later stage's concern) — legacy-import-time only.
 const LEGACY_CARD_HEIGHT_ESTIMATE = 90
 
+// diagonalLines/graphPaper/jupiter/yyy/corkScrew were retired from the v0
+// palette in favor of new patterns with no legacy equivalent — omitted here
+// so an old document carrying one falls through to 'none' below.
 const LEGACY_PATTERN_MAP: Record<string, PatternKey> = {
   none: 'none',
-  diagonalLines: 'diagonal',
-  graphPaper: 'graph-paper',
   wiggle: 'wiggle',
   plus: 'plus',
-  jupiter: 'jupiter',
   topography: 'topography',
-  yyy: 'yyy',
-  corkScrew: 'corkscrew',
 }
 
 /** `'big'` was v0's only heading size, renamed `'h1'` when h2/h3 were added. */

@@ -33,14 +33,14 @@ export type ColorKey = z.infer<typeof ColorKeySchema>
 // fallow-ignore-next-line unused-export
 export const PatternKeySchema = z.enum([
   'none',
-  'diagonal',
-  'graph-paper',
+  'falling-triangles',
+  'leaf',
   'wiggle',
   'plus',
-  'jupiter',
+  'lines-in-motion',
   'topography',
-  'yyy',
-  'corkscrew',
+  'rain',
+  'squares',
 ])
 export type PatternKey = z.infer<typeof PatternKeySchema>
 

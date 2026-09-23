@@ -205,16 +205,20 @@ meaningful) node/edge data isn't buried under base64 blobs.
   blue (nord10), `done` green (nord14).
 - **Recency-mode colors** reuse 4 of the existing swatches (`lime`, `amber`,
   `orange`, `coral`) across 4 fixed thresholds — see §6.3.
-- **Edges** are never user-colorable; always one fixed neutral tone (same hex
-  as `gray`/nord3).
+- **Edges** are never user-colorable; always one fixed neutral tone — a flat
+  hex equivalent to ink at 0.7 opacity over `--color-paper` (between
+  full-strength text and dimmed text's 0.4), theme-dependent rather than
+  one shared hex, so it stays visible over a colored/patterned container in
+  both themes. Flat, not a real alpha, since the line and arrowhead paths
+  overlap and a translucent stroke would double-darken there.
 - **Font:** Fira Code Mono (Google Fonts), light weight everywhere except the
   `kanvy` wordmark in the top bar, which is bold. Lowercase wordmark.
 - **Container backgrounds:** SVG patterns from the `hero-patterns` package
   (MIT-licensed), tiled at a fixed opacity and tinted with the container's
   own selected accent color (the same flat hex its border uses outside
   task/recency view modes) over the container's neutral base fill.
-  Available patterns: none (plain), diagonal lines, graph paper, wiggle,
-  plus, jupiter, topography, yyy, corkscrew.
+  Available patterns: none (plain), falling triangles, leaf, wiggle, plus,
+  lines in motion, topography, rain, squares.
 - **Grid:** a dot-matrix background at `GRID_SIZE = 16px` pitch. Card/edge
   geometry snaps to the *midpoints* between dots (offset by half a cell), so
   corners land in the gaps rather than on the dots themselves.
@@ -352,8 +356,9 @@ respect.
 - Path is a cubic bezier that always leaves/arrives perpendicular to the
   chosen side(s) before bending, with a small pseudo-random (id-hashed, so
   stable) perpendicular bow for organic variety — not user-controllable.
-- Edges are always the fixed neutral color, rendered with a halo so they
-  stay legible over a patterned container background.
+- Edges are always the fixed neutral color (§3) — its ink-based, between-
+  full-and-dimmed opacity is what keeps it legible over a patterned
+  container background, not a separate halo/outline treatment.
 
 ## 5. Card kinds — details
 

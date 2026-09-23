@@ -4,28 +4,28 @@
 // v0 schema's `PatternKey` names (schema/node.ts).
 
 import {
-  corkScrew,
-  diagonalLines,
-  graphPaper,
-  jupiter,
+  fallingTriangles,
+  leaf,
+  linesInMotion,
   plus,
+  rain,
+  squares,
   topography,
   wiggle,
-  yyy,
 } from 'hero-patterns'
 import type { PatternKey } from '../schema/node'
 
 type PatternFn = (color: string, opacity: number) => string
 
 const PATTERN_FNS: Partial<Record<PatternKey, PatternFn>> = {
-  diagonal: diagonalLines,
-  'graph-paper': graphPaper,
+  'falling-triangles': fallingTriangles,
+  leaf,
   wiggle,
   plus,
-  jupiter,
+  'lines-in-motion': linesInMotion,
   topography,
-  yyy,
-  corkscrew: corkScrew,
+  rain,
+  squares,
 }
 
 /** Opacity the pattern tint renders at over the container's neutral base fill. */
