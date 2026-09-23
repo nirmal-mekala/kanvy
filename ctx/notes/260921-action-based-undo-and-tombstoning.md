@@ -252,6 +252,29 @@ array order as source of truth, but we expect a wide variety of backends to
 support this (JSON + json-server, but also potentially SQLite and PG
 implementations, for which we would want something explicit)
 
+-> 260923 addendum: implementation confirmed this stayed purely additive —
+`reorderNodesAtom` (state/atoms/nodes.ts) and its `ReorderOp` (state/ops.ts)
+exist and are unit-tested, but nothing in the UI calls them. The z-order a
+user actually sees is still driven entirely by array order (cards share one
+flat CSS `z-index: 1`, so overlapping-card stacking falls back to DOM/array
+order — see index.css's `.card`/`.card--dragging` comments), and array order
+has been static since creation for every node since an earlier revision
+removed the only thing that used to change it (`bringToFrontAtom`, reverted
+for a pointer-capture bug — see `useBoardInteraction.ts`). So `index` is
+currently 100% inert metadata: written once at creation, read by nothing at
+render or load time, functionally redundant with array position today.
+
+Also clarified: `index` should be understood as a float (fractional-
+indexing/"LexoRank" style key), not a dense integer, even though today's only
+writer assigns consecutive integers. This makes zero difference to the JS/TS
+side (`z.number()` and JS `number` already are floats) or to a JSON-based
+backend (json-server handles `1.25` exactly like `1`) — it only matters if a
+SQL schema ever gets derived from this shape, where the `index` column needs
+to be `DOUBLE PRECISION`/`REAL`, not `INTEGER`/`SERIAL`, so a future
+single-node reorder can insert between two existing entries
+(`(A.index + B.index) / 2`) as one field write instead of renumbering
+everything after it.
+
 - **Q5 — export/import scope for trashed content.** Presumably trashed
   entities travel with JSON export/import until reaped, same as boards
   today — but this wasn't asked explicitly when boards got tombstoned

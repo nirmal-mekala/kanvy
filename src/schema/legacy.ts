@@ -126,6 +126,39 @@ function normalizeBoardsCollection(
   ]
 }
 
+/**
+ * Backfills `status`/`index` (schema v4) onto a nodes array that already
+ * has `boardId` resolved on every entry. `index` is assigned densely per
+ * `boardId`, in the array's existing order — today's implicit
+ * array-order-as-z-index becomes each node's explicit value, so migration
+ * is behavior-preserving. Non-record entries pass through unchanged and
+ * are left for `NodeSchema` to reject.
+ */
+function assignNodeStatusAndIndex(nodes: unknown[]): unknown[] {
+  const counters = new Map<string, number>()
+  return nodes.map((node) => {
+    if (!isRecord(node)) return node
+    const boardId =
+      typeof node.boardId === 'string' ? node.boardId : ROOT_BOARD_ID
+    const next = counters.get(boardId) ?? 0
+    counters.set(boardId, next + 1)
+    return {
+      ...node,
+      status: node.status === 'trashed' ? 'trashed' : 'active',
+      index: typeof node.index === 'number' ? node.index : next,
+    }
+  })
+}
+
+/** Backfills `status` (schema v4) onto an edges array. See `assignNodeStatusAndIndex`. */
+function backfillEdgeStatuses(edges: unknown[]): unknown[] {
+  return edges.map((edge) =>
+    isRecord(edge)
+      ? { ...edge, status: edge.status === 'trashed' ? 'trashed' : 'active' }
+      : edge,
+  )
+}
+
 function normalizeTask(
   entity: Record<string, unknown>,
 ): { status: string } | undefined {
@@ -254,13 +287,15 @@ function normalizePreV0Board(
     version: SCHEMA_VERSION,
     // Containers first so array-order-as-z-index (phase 2 schema §1) keeps
     // them beneath cards on first render of a migrated board.
-    nodes: [
+    nodes: assignNodeStatusAndIndex([
       ...groups
         .filter(isRecord)
         .map((group) => normalizeLegacyGroup(group, now)),
       ...cards.filter(isRecord).map((card) => normalizeLegacyCard(card, now)),
-    ],
-    edges: edges.filter(isRecord).map((edge) => normalizeLegacyEdge(edge, now)),
+    ]),
+    edges: backfillEdgeStatuses(
+      edges.filter(isRecord).map((edge) => normalizeLegacyEdge(edge, now)),
+    ),
     boards: normalizeBoardsCollection(parsed, now),
     images: isRecord(parsed.images) ? parsed.images : {},
   }
@@ -294,15 +329,19 @@ function backfillV0Board(
     // Always stamp the current version — a v1 document migrating here has
     // just had `parentId` stripped, so it's no longer meaningfully "v1".
     version: SCHEMA_VERSION,
-    nodes: nodes.map((node) =>
-      isRecord(node)
-        ? backfillBoardId(
-            migrateTextSize(stripParentId(backfillTimestamps(node, now))),
-          )
-        : node,
+    nodes: assignNodeStatusAndIndex(
+      nodes.map((node) =>
+        isRecord(node)
+          ? backfillBoardId(
+              migrateTextSize(stripParentId(backfillTimestamps(node, now))),
+            )
+          : node,
+      ),
     ),
-    edges: edges.map((edge) =>
-      isRecord(edge) ? backfillBoardId(backfillTimestamps(edge, now)) : edge,
+    edges: backfillEdgeStatuses(
+      edges.map((edge) =>
+        isRecord(edge) ? backfillBoardId(backfillTimestamps(edge, now)) : edge,
+      ),
     ),
     boards: normalizeBoardsCollection(parsed, now),
     images: isRecord(parsed.images) ? parsed.images : {},

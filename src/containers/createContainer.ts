@@ -5,8 +5,9 @@ import { ROOT_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { ContainerNode } from '../schema/node'
 
-// `boardId` below is a placeholder only — see cards/newCard.ts's matching
-// note: `addNodeAtom` always overwrites it with the actual current board.
+// `boardId`/`index` below are placeholders only — see cards/newCard.ts's
+// matching note: `addNodeAtom` always overwrites both with the real
+// current board and the real next index.
 
 /** A freshly created container at the given world-space rect (default color/pattern, no task). */
 export function createContainer(rect: {
@@ -19,6 +20,8 @@ export function createContainer(rect: {
   return {
     id: generateId(),
     boardId: ROOT_BOARD_ID,
+    status: 'active',
+    index: 0,
     type: 'container',
     pattern: 'none',
     color: 'gray',

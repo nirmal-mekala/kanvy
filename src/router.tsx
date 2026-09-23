@@ -26,6 +26,7 @@ import {
 import { getDefaultStore } from 'jotai'
 import { BoardPage } from './components/canvas/BoardPage'
 import { RecoveryBanner } from './components/notifications/RecoveryBanner'
+import { ToastStack } from './components/notifications/ToastStack'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
@@ -40,6 +41,7 @@ function RootLayout() {
     <div className="app">
       <RecoveryBanner />
       <Toolbar boardId={boardId} />
+      <ToastStack />
       <Outlet />
     </div>
   )

@@ -17,6 +17,34 @@ import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
 import { CardBody } from './CardBody'
 import { cardClassNames } from './cardClassNames'
 
+// Named once and reused by both `CardResizeHandles` and `Card` below —
+// two structurally-identical-but-separately-written inline function types
+// here trip a TS union-comparison limitation (TS2719, "two different
+// types with this name exist") once `CardNode`'s member count grew with
+// schema v4's `status`/`index` fields; a single named alias sidesteps it.
+type ResizePointerDownHandler = (
+  id: string,
+  dir: ResizeDir,
+  kind: ResizeKind,
+  e: React.PointerEvent,
+) => void
+
+/** Builds `CardResizeHandles`' optional-handler props, omitting any that are `undefined` (exactOptionalPropertyTypes) — pulled out of `Card` itself to keep its own cognitive complexity down. */
+// fallow-ignore-next-line complexity
+function resizeHandlerProps(
+  onResizePointerDown: ResizePointerDownHandler | undefined,
+  onResizePointerMove: ((e: React.PointerEvent) => void) | undefined,
+  onResizePointerUp: ((e: React.PointerEvent) => void) | undefined,
+  onResizePointerCancel: ((e: React.PointerEvent) => void) | undefined,
+) {
+  return {
+    ...(onResizePointerDown ? { onResizePointerDown } : {}),
+    ...(onResizePointerMove ? { onResizePointerMove } : {}),
+    ...(onResizePointerUp ? { onResizePointerUp } : {}),
+    ...(onResizePointerCancel ? { onResizePointerCancel } : {}),
+  }
+}
+
 function useAutoGrowHeight(
   contentRef: React.RefObject<HTMLTextAreaElement | null>,
   content: string,
@@ -77,12 +105,7 @@ function CardResizeHandles({
 }: {
   node: CardNode
   isHeading: boolean
-  onResizePointerDown?: (
-    id: string,
-    dir: ResizeDir,
-    kind: ResizeKind,
-    e: React.PointerEvent,
-  ) => void
+  onResizePointerDown?: ResizePointerDownHandler
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
   onResizePointerCancel?: (e: React.PointerEvent) => void
@@ -161,12 +184,7 @@ export function Card({
   onPointerMove?: (e: React.PointerEvent) => void
   onPointerUp?: (e: React.PointerEvent) => void
   onPointerCancel?: (e: React.PointerEvent) => void
-  onResizePointerDown?: (
-    id: string,
-    dir: ResizeDir,
-    kind: ResizeKind,
-    e: React.PointerEvent,
-  ) => void
+  onResizePointerDown?: ResizePointerDownHandler
   onResizePointerMove?: (e: React.PointerEvent) => void
   onResizePointerUp?: (e: React.PointerEvent) => void
   onResizePointerCancel?: (e: React.PointerEvent) => void
@@ -260,10 +278,12 @@ export function Card({
       <CardResizeHandles
         node={node}
         isHeading={isHeading}
-        onResizePointerDown={onResizePointerDown}
-        onResizePointerMove={onResizePointerMove}
-        onResizePointerUp={onResizePointerUp}
-        onResizePointerCancel={onResizePointerCancel}
+        {...resizeHandlerProps(
+          onResizePointerDown,
+          onResizePointerMove,
+          onResizePointerUp,
+          onResizePointerCancel,
+        )}
       />
       {(hovered || selected || connectorsVisible) &&
         onConnectorPointerDown &&

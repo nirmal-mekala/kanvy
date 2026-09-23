@@ -15,6 +15,8 @@ function containerNode(
     type: 'container',
     pattern: 'none',
     color: 'gray',
+    status: 'active',
+    index: 0,
     x,
     y,
     w,

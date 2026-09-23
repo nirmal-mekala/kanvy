@@ -142,6 +142,7 @@ export function useConnectionInteraction({
       toNodeId: current.hoverId,
       toSide: current.hoverSide,
       direction: 'none',
+      status: 'active',
       createdAt: now,
       updatedAt: now,
     }

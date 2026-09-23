@@ -38,6 +38,8 @@ const validBoard: Board = {
       w: 224,
       h: 90,
       color: 'gray',
+      status: 'active',
+      index: 0,
       content: 'hi',
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
@@ -166,5 +168,48 @@ describe('createDebouncedSaver', () => {
     saver2.cancel()
     vi.advanceTimersByTime(400)
     expect(loadBoard()).toEqual({ ok: true, board: validBoard })
+  })
+
+  it('routes the flush through a custom `write` function instead of localStorage directly', () => {
+    const written: Board[] = []
+    const saver = createDebouncedSaver(400, (board) => {
+      written.push(board)
+    })
+    saver.save(validBoard)
+    vi.advanceTimersByTime(400)
+    expect(written).toEqual([validBoard])
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+  })
+
+  it('uses `merge` to accumulate rapid saves instead of replacing the pending value', () => {
+    const written: number[][] = []
+    const saver = createDebouncedSaver<number[]>(
+      400,
+      (value) => {
+        written.push(value)
+      },
+      (prev, next) => [...prev, ...next],
+    )
+    saver.save([1])
+    saver.save([2])
+    saver.save([3])
+    vi.advanceTimersByTime(400)
+    expect(written).toEqual([[1, 2, 3]])
+  })
+
+  it('starts a fresh (unmerged) pending value after a flush', () => {
+    const written: number[][] = []
+    const saver = createDebouncedSaver<number[]>(
+      400,
+      (value) => {
+        written.push(value)
+      },
+      (prev, next) => [...prev, ...next],
+    )
+    saver.save([1])
+    saver.flush()
+    saver.save([2])
+    vi.advanceTimersByTime(400)
+    expect(written).toEqual([[1], [2]])
   })
 })

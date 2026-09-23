@@ -21,6 +21,8 @@ const textNode: CardNode = {
   w: 224,
   h: 90,
   color: 'gray',
+  status: 'active',
+  index: 0,
   content: '',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

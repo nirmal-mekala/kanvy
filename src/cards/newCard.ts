@@ -6,12 +6,12 @@ import { ROOT_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { CardNode } from '../schema/node'
 
-// `boardId` below is a placeholder (`ROOT_BOARD_ID`) only — these
-// factories don't know what the current board is, and don't need to:
-// state/atoms/nodes.ts's `addNodeAtom`/`addNodesAtom` always overwrite it
-// with the actual current board (`currentBoardIdAtom`) before the node is
-// added. Kept here only to satisfy the schema's required field at
-// construction time.
+// `boardId`/`index` below are placeholders only — these factories don't
+// know what the current board is or how many live nodes it already has,
+// and don't need to: state/atoms/nodes.ts's `addNodeAtom`/`addNodesAtom`
+// always overwrite both with the real current board and the real next
+// index before the node is added. Kept here only to satisfy the schema's
+// required fields at construction time.
 
 /** A fresh regular text card, centered on `(x, y)` (spec §5.1) — created via double-click canvas, ⌘/Ctrl+N, or typing/pasting plain text with nothing selected. */
 export function newTextCard(x: number, y: number, content = ''): CardNode {
@@ -19,6 +19,8 @@ export function newTextCard(x: number, y: number, content = ''): CardNode {
   return {
     id: generateId(),
     boardId: ROOT_BOARD_ID,
+    status: 'active',
+    index: 0,
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -45,6 +47,8 @@ export function newImageCard(
   return {
     id: generateId(),
     boardId: ROOT_BOARD_ID,
+    status: 'active',
+    index: 0,
     type: 'card',
     kind: 'image',
     x: x - CARD_WIDTH / 2,
@@ -65,6 +69,8 @@ export function newLinkCard(x: number, y: number, url: string): CardNode {
   return {
     id: generateId(),
     boardId: ROOT_BOARD_ID,
+    status: 'active',
+    index: 0,
     type: 'card',
     kind: 'link',
     x: x - CARD_WIDTH / 2,
@@ -92,6 +98,8 @@ export function newBoardCard(x: number, y: number, boardRef: string): CardNode {
   return {
     id: generateId(),
     boardId: ROOT_BOARD_ID,
+    status: 'active',
+    index: 0,
     type: 'card',
     kind: 'board',
     boardRef,

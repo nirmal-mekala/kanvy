@@ -105,6 +105,56 @@ body {
   padding: 0 4px;
 }
 
+/* ---------- toast stack (transient error notifications, state/atoms/
+   toasts.ts) — floating, top-right below the toolbar. Every other corner
+   already has fixed UI (`.board__zoom` bottom-right, `.board__help`
+   bottom-left, the dev-only TanStack Query Devtools toggle nudged above
+   `.board__zoom`), so this is the one open corner; `top: 70px` clears the
+   toolbar's own height (its tallest realistic case: icon buttons + the
+   corrupt-recovery `.banner` stacked above it) rather than a bare 14px
+   inset like the bottom corners use. */
+.toast-stack {
+  position: fixed;
+  top: 70px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 280px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(
+    in srgb,
+    var(--color-outline) 15%,
+    var(--color-surface)
+  );
+  border: 2px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.toast__message {
+  flex: 1 1 auto;
+}
+
+.toast__dismiss {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: var(--color-ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
 /* ---------- toolbar (minimal — full functionality is Stage 7) ---------- */
 
 .toolbar {
@@ -251,6 +301,23 @@ body {
   width: auto;
   padding: 0 8px;
   font-size: 0.75rem;
+}
+
+/* TanStack Query Devtools' floating toggle button (dev-only, App.tsx) —
+   `.tsqd-open-btn-container` is the library's own stable class name for
+   its fixed-position wrapper; its exact offsets are set inline via
+   CSS-in-JS at mount time (after this stylesheet, in source order), as a
+   same-specificity single-class rule — the doubled selector below bumps
+   specificity just enough to win without `!important` (which Biome's
+   `noImportantStyles` rule forbids; see the reduced-motion block further
+   down for this codebase's usual cascade-order approach, which doesn't
+   apply here since mount order isn't under our control). Its default
+   bottom-right position (12px inset) would sit right on top of
+   `.board__zoom`'s controls below — nudged up to clear them, keeping the
+   same 14px right-inset this app's other corner controls use. */
+.tsqd-open-btn-container.tsqd-open-btn-container {
+  bottom: 64px;
+  right: 14px;
 }
 
 .board__help {

@@ -6,11 +6,12 @@
 import { atom } from 'jotai'
 import { newBoardCard } from '../../cards/newCard'
 import { duplicateBoardNodes } from '../../clipboard/duplicateBoardNodes'
-import type { Board } from '../../schema/board'
 import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { generateId } from '../../schema/legacy'
 import type { BoardCard } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
+import { nextNodeIndex } from '../liveEntities'
+import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
 
@@ -37,16 +38,18 @@ export const renameBoardAtom = atom(
   null,
   (get, set, targetBoardId: string, title: string) => {
     if (targetBoardId === ROOT_BOARD_ID) return
+    const meta = get(boardAtom).boards.find((b) => b.id === targetBoardId)
+    if (!meta || meta.title === title) return
     const now = new Date().toISOString()
-    set(updateBoardAtom, get(currentBoardIdAtom), (board: Board) => {
-      let changed = false
-      const boards = board.boards.map((meta) => {
-        if (meta.id !== targetBoardId || meta.title === title) return meta
-        changed = true
-        return { ...meta, title, updatedAt: now }
-      })
-      return changed ? { ...board, boards } : board
-    })
+    set(updateBoardAtom, get(currentBoardIdAtom), [
+      {
+        kind: 'update',
+        entity: 'board',
+        id: targetBoardId,
+        before: { title: meta.title, updatedAt: meta.updatedAt },
+        after: { title, updatedAt: now },
+      },
+    ])
   },
 )
 
@@ -66,23 +69,30 @@ export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
   if (currentBoardId !== ROOT_BOARD_ID) return
   const newBoardId = generateId()
   const now = new Date().toISOString()
-  set(updateBoardAtom, currentBoardId, (board: Board) => ({
-    ...board,
-    boards: [
-      ...board.boards,
-      {
+  const board = get(boardAtom)
+  const ops: Op[] = [
+    {
+      kind: 'create',
+      entity: 'board',
+      value: {
         id: newBoardId,
         title: 'Untitled board',
         status: 'active',
         createdAt: now,
         updatedAt: now,
       },
-    ],
-    nodes: [
-      ...board.nodes,
-      { ...newBoardCard(x, y, newBoardId), boardId: currentBoardId },
-    ],
-  }))
+    },
+    {
+      kind: 'create',
+      entity: 'node',
+      value: {
+        ...newBoardCard(x, y, newBoardId),
+        boardId: currentBoardId,
+        index: nextNodeIndex(board, currentBoardId),
+      },
+    },
+  ]
+  set(updateBoardAtom, currentBoardId, ops)
 })
 
 /**
@@ -107,12 +117,31 @@ export const duplicateBoardNodesAtom = atom(
     if (boardNodes.length === 0) return []
     const board = get(boardAtom)
     const result = duplicateBoardNodes(boardNodes, board, offset)
-    set(updateBoardAtom, get(currentBoardIdAtom), (b: Board) => ({
-      ...b,
-      boards: [...b.boards, ...result.boards],
-      nodes: [...b.nodes, ...result.nodes],
-      edges: [...b.edges, ...result.edges],
+    const currentBoardId = get(currentBoardIdAtom)
+    // Deep-copied content for each newly-minted child board already
+    // carries correct, dense `index` values (a 1:1 copy of its live
+    // source board, same relative order) — only the new board-node cards
+    // themselves need fresh indices, since they're being appended to the
+    // *current* board's own live node set.
+    let nextIndex = nextNodeIndex(board, currentBoardId)
+    const nodeOps: Op[] = result.nodes.map((value) => ({
+      kind: 'create',
+      entity: 'node',
+      value:
+        value.boardId === currentBoardId
+          ? { ...value, index: nextIndex++ }
+          : value,
     }))
+    const ops: Op[] = [
+      ...result.boards.map(
+        (value): Op => ({ kind: 'create', entity: 'board', value }),
+      ),
+      ...nodeOps,
+      ...result.edges.map(
+        (value): Op => ({ kind: 'create', entity: 'edge', value }),
+      ),
+    ]
+    set(updateBoardAtom, currentBoardId, ops)
     return result.newBoardNodeCards
   },
 )

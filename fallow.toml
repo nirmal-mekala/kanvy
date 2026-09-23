@@ -1,0 +1,8 @@
+# fallow's dependency-graph analysis can't see Vite's build-time dead-code
+# elimination on a statically-known `import.meta.env.DEV` check
+# (src/App.tsx lazy-imports @tanstack/react-query-devtools only in dev) —
+# it flags the devDependency as reachable from production code. Verified
+# via `pnpm build` + `grep` on the output bundle that the package is not
+# actually present in the production build; this is a false positive, not
+# a real risk.
+ignoreDependencies = ["@tanstack/react-query-devtools"]
