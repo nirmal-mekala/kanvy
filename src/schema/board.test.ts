@@ -249,11 +249,11 @@ describe('normalizeLegacyBoard', () => {
     expect(normalizedLegacyFixture().nodes[0]?.type).toBe('container')
   })
 
-  it('maps a legacy camelCase pattern key to its kebab-case v0 equivalent', () => {
+  it('maps a retired legacy pattern key (no longer in the v0 palette) to none', () => {
     const container = normalizedLegacyFixture().nodes[0]
     expect(container).toMatchObject({
       type: 'container',
-      pattern: 'graph-paper',
+      pattern: 'none',
     })
   })
 

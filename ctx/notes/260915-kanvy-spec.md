@@ -213,8 +213,8 @@ meaningful) node/edge data isn't buried under base64 blobs.
   (MIT-licensed), tiled at a fixed opacity and tinted with the container's
   own selected accent color (the same flat hex its border uses outside
   task/recency view modes) over the container's neutral base fill.
-  Available patterns: none (plain), diagonal lines, graph paper, wiggle,
-  plus, jupiter, topography, yyy, corkscrew.
+  Available patterns: none (plain), falling triangles, leaf, wiggle, plus,
+  lines in motion, topography, rain, squares.
 - **Grid:** a dot-matrix background at `GRID_SIZE = 16px` pitch. Card/edge
   geometry snaps to the *midpoints* between dots (offset by half a cell), so
   corners land in the gaps rather than on the dots themselves.
