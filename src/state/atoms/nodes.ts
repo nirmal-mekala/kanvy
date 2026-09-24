@@ -95,7 +95,13 @@ export const addNodeAtom = atom(
     const boardId = get(currentBoardIdAtom)
     const board = get(boardAtom)
     const stamped = { ...node, boardId, index: nextNodeIndex(board, boardId) }
-    const ops: Op[] = [{ kind: 'create', entity: 'node', value: stamped }]
+    // The image op goes *before* the node's own create op — network mode's
+    // write path (api/networkOps.ts) resolves cross-entity id references
+    // (a node's `imageId`) against whatever's already been created earlier
+    // in this same ops array, since REST backends assign their own ids on
+    // create (network mode design doc; see api/networkIdRemap.ts). The
+    // image must exist server-side first for that resolution to find it.
+    const ops: Op[] = []
     if (newImage) {
       ops.push({
         kind: 'image',
@@ -104,6 +110,7 @@ export const addNodeAtom = atom(
         after: newImage.dataUri,
       })
     }
+    ops.push({ kind: 'create', entity: 'node', value: stamped })
     set(updateBoardAtom, boardId, ops)
   },
 )
@@ -151,10 +158,11 @@ export const replaceNodeAtom = atom(
     // Wholesale replace: `before`/`after` are the entire old/new node —
     // `applyOps`'s `update` interpreter merges shallowly, but since `next`
     // already carries every field (kind conversion, phase2 schema §2),
-    // that merge *is* the full replacement.
-    const ops: Op[] = [
-      { kind: 'update', entity: 'node', id, before: existing, after: next },
-    ]
+    // that merge *is* the full replacement. The image op goes first, same
+    // reasoning as `addNodeAtom` — network mode resolves `next.imageId`
+    // against an id this array already created, so the image's own create
+    // must come first.
+    const ops: Op[] = []
     if (newImage) {
       // No eager prune here (schema v4 Q3, ctx/notes/260921-action-based-
       // undo-and-tombstoning.md) — an orphaned image blob (e.g. from
@@ -167,6 +175,13 @@ export const replaceNodeAtom = atom(
         after: newImage.dataUri,
       })
     }
+    ops.push({
+      kind: 'update',
+      entity: 'node',
+      id,
+      before: existing,
+      after: next,
+    })
     set(updateBoardAtom, get(currentBoardIdAtom), ops)
   },
 )

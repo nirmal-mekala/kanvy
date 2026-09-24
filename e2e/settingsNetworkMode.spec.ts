@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { seedBoard } from './fixtures/board'
+import { dispatchPaste } from './fixtures/clipboard'
 import { startJsonServer } from './fixtures/jsonServer'
+import { makeImageDataUri, makeNoisyImageDataUri } from './fixtures/testImage'
 
 // Every network-mode test below binds a real json-server to a fixed,
 // host-forwarded port (so a remote browser, per the playwright-remote-
@@ -40,9 +42,12 @@ const EMPTY_LOCAL_DOCUMENT = {
 // board load/edit round trip against a real json-server instance.
 //
 // json-server must bind a port the *browser* (possibly remote, per the
-// playwright-remote-browser skill) can reach — one of this container's
-// host-forwarded ports, not an arbitrary one. Defaults to 1994
-// (KANVY_E2E_PORT itself typically claims 1993 for the Vite dev server).
+// playwright-remote-browser skill) can reach — this container's actually-
+// forwarded range is 1993-1997 (KANVY_E2E_PORT itself typically claims
+// 1993 for the Vite dev server), not an arbitrary port. Every test below
+// reuses this same single port rather than offsetting per-test — safe only
+// because `test.describe.configure({ mode: 'serial' })` above guarantees
+// no two of this file's `startJsonServer` calls are ever live at once.
 const JSON_SERVER_PORT = Number(process.env.KANVY_E2E_JSON_SERVER_PORT ?? 1996)
 
 const NOW = '2026-01-01T00:00:00.000Z'
@@ -177,7 +182,7 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
     page,
   }) => {
     test.setTimeout(45_000)
-    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT + 1)
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
     try {
       await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
       await page.goto('/')
@@ -228,6 +233,148 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
           { timeout: 10_000 },
         )
         .toBe('Edited over the network')
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test("pasting a large image in network mode downsizes it under json-server's ~100KB body limit before POSTing (regression: this used to fail outright)", async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await page.getByTitle('Settings').click()
+      await page.getByRole('button', { name: 'Network' }).click()
+      await page
+        .getByPlaceholder('http://localhost:1996')
+        .fill(`http://localhost:${server.port}`)
+      await page.getByRole('button', { name: 'Confirm' }).click()
+      await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
+        0,
+        { timeout: 10_000 },
+      )
+      await page.locator('.board-name__activate').click()
+      await expect(page.getByText('From the network')).toBeVisible({
+        timeout: 10_000,
+      })
+
+      // Random noise, not a solid fill — a solid-color PNG compresses to
+      // almost nothing regardless of dimensions and wouldn't exercise the
+      // byte-size cap at all. 900x900 of noise comfortably exceeds 100KB
+      // even after spec §2.6's existing 1200px-long-edge downsize.
+      const dataUri = await makeNoisyImageDataUri(page, 900, 900)
+      await dispatchPaste(page, { imageDataUri: dataUri })
+      await expect(page.locator('.card--image')).toHaveCount(1, {
+        timeout: 10_000,
+      })
+      // No save-failure toast (state/atoms/toasts.ts) — the old, pre-fix
+      // behavior was a failed POST /images surfaced exactly this way.
+      await expect(page.locator('.toast')).toHaveCount(0)
+
+      await expect
+        .poll(
+          async () => {
+            const res = await page.request.get(
+              `http://localhost:${server.port}/images`,
+            )
+            const images = (await res.json()) as {
+              id: string
+              dataUri: string
+            }[]
+            return images.filter((image) => image.id !== 'img1').length
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(1)
+
+      const res = await page.request.get(
+        `http://localhost:${server.port}/images`,
+      )
+      const images = (await res.json()) as { id: string; dataUri: string }[]
+      const pasted = images.find((image) => image.id !== 'img1')
+      const base64 =
+        pasted?.dataUri.slice(pasted.dataUri.indexOf(',') + 1) ?? ''
+      const decodedBytes = Math.floor((base64.length * 3) / 4)
+      expect(decodedBytes).toBeLessThanOrEqual(90_000)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('editing a just-created image card in a later gesture succeeds against the id json-server actually assigned (regression: json-server discards the client-supplied id on POST — was a 404 on every follow-up PATCH)', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await page.getByTitle('Settings').click()
+      await page.getByRole('button', { name: 'Network' }).click()
+      await page
+        .getByPlaceholder('http://localhost:1996')
+        .fill(`http://localhost:${server.port}`)
+      await page.getByRole('button', { name: 'Confirm' }).click()
+      await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
+        0,
+        { timeout: 10_000 },
+      )
+      await page.locator('.board-name__activate').click()
+      await expect(page.getByText('From the network')).toBeVisible({
+        timeout: 10_000,
+      })
+
+      const dataUri = await makeImageDataUri(page, 100, 60)
+      await dispatchPaste(page, { imageDataUri: dataUri })
+      const card = page.locator('.card--image')
+      await expect(card).toHaveCount(1, { timeout: 10_000 })
+
+      async function fetchPastedNode(): Promise<
+        { id: string; x: number } | undefined
+      > {
+        const res = await page.request.get(
+          `http://localhost:${server.port}/nodes`,
+        )
+        const nodes = (await res.json()) as { id: string; x: number }[]
+        return nodes.find((node) => node.id !== 'n0' && node.id !== 'n1')
+      }
+
+      // Wait for the create's debounced save to actually land server-side
+      // (this app's own id for the card never changes — only the
+      // *server's* record of it does, per api/networkIdRemap.ts — so this
+      // polls for the row's existence, not a specific id) and capture its
+      // original server-side x.
+      await expect
+        .poll(async () => (await fetchPastedNode()) !== undefined, {
+          timeout: 10_000,
+        })
+        .toBe(true)
+      const originalX = (await fetchPastedNode())?.x
+
+      // A later, separate gesture (drag) — this is exactly the sequence
+      // the reported bug reproduced from a real .har capture: create an
+      // image card, then move/resize it, and the follow-up PATCH 404'd
+      // because it still targeted this app's own (client-generated) id,
+      // not the random one json-server actually stored the record under.
+      const box = await card.boundingBox()
+      if (!box) throw new Error('card not rendered')
+      await page.mouse.move(box.x + 10, box.y + 10)
+      await page.mouse.down()
+      await page.mouse.move(box.x + 10 + 60, box.y + 10 + 40, { steps: 5 })
+      await page.mouse.up()
+
+      // No save-failure toast (state/atoms/toasts.ts) — the old, pre-fix
+      // behavior surfaced the 404 exactly this way.
+      await expect(page.locator('.toast')).toHaveCount(0)
+
+      // The move actually persisted server-side (a different x than
+      // right after creation), under whichever id json-server assigned.
+      await expect
+        .poll(async () => (await fetchPastedNode())?.x, { timeout: 10_000 })
+        .not.toBe(originalX)
     } finally {
       await server.stop()
     }

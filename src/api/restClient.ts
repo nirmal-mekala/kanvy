@@ -66,12 +66,20 @@ export async function fetchCollection<T>(
   )
 }
 
-export async function createEntity<T>(
+/**
+ * Creates an entity and returns the server's own record of it — callers
+ * must read the returned `id` rather than assume the one they sent was
+ * honored (json-server, and REST backends generally, are free to assign
+ * their own; network mode's write path (api/networkOps.ts) treats
+ * whatever comes back here as that entity's canonical id from then on —
+ * see api/networkIdRemap.ts).
+ */
+export async function createEntity<T, R = T>(
   config: NetworkConfig,
   collection: string,
   value: T,
   fetchImpl: typeof fetch = fetch,
-): Promise<void> {
+): Promise<R> {
   const response = await fetchImpl(
     collectionUrl(config, collection).toString(),
     {
@@ -81,6 +89,7 @@ export async function createEntity<T>(
     },
   )
   await throwIfNotOk(response, `POST /${collection}`)
+  return response.json() as Promise<R>
 }
 
 export async function patchEntity(

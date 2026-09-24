@@ -140,6 +140,22 @@ batching in `boardHistoryAtom.ts` needs to change — only what `saveBoard`
 (or its mode-aware replacement) does with `pending.ops` when in network
 mode.
 
+**260923 addendum — id handling on `CreateOp`/`ImageOp` create.** A real
+`.har` capture surfaced that json-server (confirmed: any REST backend that
+follows the same convention) does not honor a client-supplied `id` on
+`POST` — it always assigns its own, silently discarding this app's
+`nanoid`-generated one. Every later op targeting that entity (a resize's
+`PATCH`, a delete's tombstone `PATCH`) had been sent against the
+now-wrong, client-side id, 404ing. The fix: network mode's write path
+never sends `id` on create, and treats the response's `id` as canonical
+from then on — `api/networkIdRemap.ts` is the resulting client-id →
+server-id translation table, consulted (and extended) by
+`api/networkOps.ts` for every op's own target id and for cross-entity
+references it carries (a node's `imageId`/`boardRef`, an edge's
+`fromNodeId`/`toNodeId`). This is purely a network-write-boundary
+concern — local app state (rendering, selection, undo) still only ever
+knows the entity by its original client id.
+
 ## 6. Read path
 
 ### 6a. Home-board load (blocking)
