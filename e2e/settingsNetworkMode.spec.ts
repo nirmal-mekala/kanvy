@@ -48,6 +48,10 @@ const EMPTY_LOCAL_DOCUMENT = {
 // reuses this same single port rather than offsetting per-test — safe only
 // because `test.describe.configure({ mode: 'serial' })` above guarantees
 // no two of this file's `startJsonServer` calls are ever live at once.
+// Other network-mode spec files (e.g. networkModeCrud.spec.ts) must use a
+// *different* default port and env var — Playwright still runs separate
+// files concurrently across workers even though this one's own tests are
+// serialized.
 const JSON_SERVER_PORT = Number(process.env.KANVY_E2E_JSON_SERVER_PORT ?? 1996)
 
 const NOW = '2026-01-01T00:00:00.000Z'

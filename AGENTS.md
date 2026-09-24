@@ -113,12 +113,20 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
   bound to a host-forwarded port (`KANVY_E2E_JSON_SERVER_PORT`, defaults to
   1996) the same way the Vite dev server itself is.
 - **Dev backend**: `json-server` (devDependency) — `pnpm dev:server` runs
-  it against `server/db.json` (a sample document, mutated in place by every
-  network-mode write — not repo root, so it doesn't sit alongside source)
-  on `KANVY_JSON_SERVER_PORT` (default 1996), for exercising Network mode
+  it against `server/db.json` (mutated in place by every network-mode
+  write — not repo root, so it doesn't sit alongside source) on
+  `KANVY_JSON_SERVER_PORT` (default 1996), for exercising Network mode
   against a real REST backend during development. `vite.config.ts` excludes
   it from the dev server's file watcher, since json-server rewriting it on
   every write would otherwise trigger a full Vite reload mid-session.
+  `server/db.json` is gitignored and generated, never hand-authored or
+  committed — `pnpm db:init` (`server/generate-db.ts`) builds it from this
+  app's own `Node`/`Edge`/`BoardMeta`/`ImageEntry` types and validates the
+  result against `BoardSchema`, so it can't silently drift from a schema
+  change the way a static fixture would; `dev:server` runs it
+  automatically first (only creates the file if missing — never clobbers
+  a live session's data), and `pnpm db:init -- --force` resets it
+  explicitly.
 - **Linting/formatting**: Biome (`recommended` + cognitive-complexity
   opt-in), also owns formatting — no Prettier. 2-space indentation.
 - **Code health**: `fallow` — complexity/duplication/circular-dependency/
