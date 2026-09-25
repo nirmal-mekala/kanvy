@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import * as imageFile from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import type { Op } from '../state/ops'
-import { applyOpsToNetwork, resetIdRemapTable } from './networkOps'
+import { applyOpsToNetwork } from './networkOps'
 
 const config: NetworkConfig = {
   baseUrl: 'http://localhost:1996',
@@ -16,10 +16,6 @@ function jsonResponse(body: unknown): Response {
     json: () => Promise.resolve(body),
   } as Response
 }
-
-beforeEach(() => {
-  resetIdRemapTable()
-})
 
 describe('applyOpsToNetwork', () => {
   it("maps a CreateOp to a POST against the entity's collection, without the client's own id (the server assigns its own — see networkIdRemap.ts)", async () => {
@@ -167,8 +163,8 @@ describe('applyOpsToNetwork', () => {
     )
   })
 
-  describe('id remap (json-server assigns its own id on create — networkIdRemap.ts)', () => {
-    it("resolves a later UpdateOp's target id to the id the server actually assigned on create", async () => {
+  describe('id remap (json-server assigns its own id on create — networkIdRemap.ts, batch-scoped)', () => {
+    it("resolves a later UpdateOp's target id to the id the server actually assigned on create, within the same batch", async () => {
       const fetchImpl = vi
         .fn()
         .mockResolvedValueOnce(jsonResponse({ id: 'server-n1' }))
@@ -188,7 +184,7 @@ describe('applyOpsToNetwork', () => {
       expect(patchUrl).toBe('http://localhost:1996/nodes/server-n1')
     })
 
-    it("resolves an UpdateOp's target id across separate applyOpsToNetwork calls (a later gesture referencing an earlier one's created entity)", async () => {
+    it("does not resolve an UpdateOp's target id across separate applyOpsToNetwork calls — the id-remap table is batch-scoped now (ctx/notes/260925-network-id-reconciliation.md): a later gesture is expected to already read the confirmed id from live app state (reconciled by state/networkReconcile.ts), not from ops built with a stale one", async () => {
       const createFetch = vi
         .fn()
         .mockResolvedValue(jsonResponse({ id: 'server-b1' }))
@@ -219,7 +215,31 @@ describe('applyOpsToNetwork', () => {
         patchFetch,
       )
       const [patchUrl] = patchFetch.mock.calls[0] as [string, RequestInit]
-      expect(patchUrl).toBe('http://localhost:1996/boards/server-b1')
+      expect(patchUrl).toBe('http://localhost:1996/boards/client-b1')
+    })
+
+    it("resolves a node create's `boardId` against a board created earlier in the same batch (the reported bug: a node created right after its board, in the same gesture)", async () => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ id: 'server-board' }))
+        .mockResolvedValueOnce(jsonResponse({ id: 'server-node' }))
+      const ops: Op[] = [
+        {
+          kind: 'create',
+          entity: 'board',
+          value: { id: 'client-board' } as never,
+        },
+        {
+          kind: 'create',
+          entity: 'node',
+          value: { id: 'client-node', boardId: 'client-board' } as never,
+        },
+      ]
+      await applyOpsToNetwork(config, ops, fetchImpl)
+      const [, nodeInit] = fetchImpl.mock.calls[1] as [string, RequestInit]
+      expect(JSON.parse(nodeInit.body as string)).toMatchObject({
+        boardId: 'server-board',
+      })
     })
 
     it("resolves a node create's `imageId` against an image created earlier in the same batch", async () => {

@@ -4,19 +4,22 @@
 // Local mode's own `saveBoard` internals (whole-document `writeBoard`) are
 // completely untouched by this module.
 //
-// Id handling: this app's own client-generated (nanoid) ids are never sent
-// as the id to create with — a REST backend (confirmed against json-server
-// v1: `Service#create` unconditionally does `{ ...data, id: randomId() }`)
-// is free to assign its own, and this module treats whatever comes back as
-// that entity's canonical id from then on, via api/networkIdRemap.ts's
-// translation table. Local app state (currentBoardAtom, selection, undo,
-// …) never learns or cares about the server's id — every op reaching this
-// module resolves its own target id, and any cross-entity references it
-// carries (a node's `imageId`/`boardRef`, an edge's `fromNodeId`/
-// `toNodeId`), through that same table before it goes over the wire.
+// Id handling (ctx/notes/260925-network-id-reconciliation.md): this app's
+// own client-generated (nanoid) ids are never sent as the id to create
+// with — a REST backend (confirmed against json-server v1: `Service#create`
+// unconditionally does `{ ...data, id: randomId() }`) is free to assign
+// its own. Within one `applyOpsToNetwork` call, a batch-scoped table
+// (api/networkIdRemap.ts) resolves references among ops created together
+// in the same gesture (e.g. a new board's board-card node, sent before the
+// board's own create has resolved). The instant any create's real id is
+// known, it's also reconciled immediately into canonical app state
+// (state/networkReconcile.ts) — so a *later*, separate gesture's ops,
+// built from that already-reconciled state, never need any id resolution
+// at all by the time they reach this module.
 
 import { ensureDataUriUnderBytes } from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
+import { reconcileNetworkEntityIdAtom } from '../state/networkReconcile'
 import type { EntityKind, ImageOp, Op } from '../state/ops'
 import {
   createIdRemapTable,
@@ -44,14 +47,6 @@ const COLLECTION_BY_ENTITY: Record<EntityKind, string> = {
  */
 const JSON_SERVER_MAX_IMAGE_BYTES = 90_000
 
-/** One table per network-mode session — see module comment and networkIdRemap.ts. Reset whenever network mode is (re-)entered (state/networkBoardLoader.ts). */
-let idRemapTable: IdRemapTable = createIdRemapTable()
-
-/** Exported for tests and for state/networkBoardLoader.ts's mode-switch reset — never call this mid-session, it would strand any op still resolving an id from before the reset. */
-export function resetIdRemapTable(): void {
-  idRemapTable = createIdRemapTable()
-}
-
 /** `value` without its own `id` field — never sent on create (see module comment); the server assigns one and this module learns it from the response instead. */
 function withoutId(value: Record<string, unknown>): Record<string, unknown> {
   const { id: _id, ...rest } = value
@@ -65,8 +60,21 @@ function withoutId(value: Record<string, unknown>): Record<string, unknown> {
  * and are silently skipped here rather than treated as an error, matching
  * the design doc's explicit call to flag-not-build for both.
  */
+/** `originalId`/`createdId` differing means the server assigned its own id (the common case, see module comment) — recorded in the batch-scoped `idRemapTable` for the rest of this gesture, and reconciled immediately into canonical app state so no *later* gesture ever needs to resolve it. A no-op when they're already equal. */
+function recordAndReconcile(
+  idRemapTable: IdRemapTable,
+  kind: EntityKind | 'image',
+  originalId: string,
+  createdId: unknown,
+): void {
+  if (typeof createdId !== 'string' || createdId === originalId) return
+  recordRemap(idRemapTable, kind, originalId, createdId)
+  reconcileNetworkEntityIdAtom(kind, originalId, createdId)
+}
+
 async function applyOp(
   config: NetworkConfig,
+  idRemapTable: IdRemapTable,
   op: Op,
   fetchImpl: typeof fetch,
 ): Promise<void> {
@@ -83,10 +91,7 @@ async function applyOp(
       fetchImpl,
     )
     const originalId = (op.value as { id: string }).id
-    const createdId = created.id
-    if (typeof createdId === 'string') {
-      recordRemap(idRemapTable, op.entity, originalId, createdId)
-    }
+    recordAndReconcile(idRemapTable, op.entity, originalId, created.id)
     return
   }
   if (op.kind === 'update') {
@@ -102,13 +107,14 @@ async function applyOp(
     return
   }
   if (op.kind === 'image') {
-    await applyImageOp(config, op, fetchImpl)
+    await applyImageOp(config, idRemapTable, op, fetchImpl)
   }
   // 'reorder' / 'replace-board': no mapping — see doc comment above.
 }
 
 async function applyImageOp(
   config: NetworkConfig,
+  idRemapTable: IdRemapTable,
   op: ImageOp,
   fetchImpl: typeof fetch,
 ): Promise<void> {
@@ -131,10 +137,7 @@ async function applyImageOp(
     { dataUri },
     fetchImpl,
   )
-  const createdId = created.id
-  if (typeof createdId === 'string') {
-    recordRemap(idRemapTable, 'image', op.id, createdId)
-  }
+  recordAndReconcile(idRemapTable, 'image', op.id, created.id)
 }
 
 /**
@@ -143,14 +146,17 @@ async function applyImageOp(
  * the same collection, and so each create's id is resolved and recorded
  * before any later-in-this-batch op that might reference it — see the
  * module comment) — one TanStack Query mutation per gesture (design doc
- * §5), even though it's several real HTTP requests underneath.
+ * §5), even though it's several real HTTP requests underneath. The
+ * id-remap table is scoped to this one call (see networkIdRemap.ts) — a
+ * fresh, empty one every time, never shared across gestures.
  */
 export async function applyOpsToNetwork(
   config: NetworkConfig,
   ops: readonly Op[],
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
+  const idRemapTable = createIdRemapTable()
   for (const op of ops) {
-    await applyOp(config, op, fetchImpl)
+    await applyOp(config, idRemapTable, op, fetchImpl)
   }
 }

@@ -466,3 +466,77 @@ test.describe('edge CRUD over the network', () => {
     }
   })
 })
+
+test.describe('id reconciliation regression (ctx/notes/260925-network-id-reconciliation.md)', () => {
+  test('a node created inside a just-created board is persisted under the real, server-assigned boardId — not the locally-minted one', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+
+      // CREATE the board — same gesture as the "board CRUD" describe
+      // above. POST /boards never sends an id; json-server assigns its
+      // own (the reported bug's actual root cause: the client's own
+      // locally-minted id and the server's real id differ from here on).
+      const boardsBefore = await getCollection(page, baseUrl, 'boards')
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 500, y: 400 } })
+      await expect(page.locator('.card--board')).toHaveCount(2, {
+        timeout: 10_000,
+      })
+      await expect
+        .poll(
+          async () => (await getCollection(page, baseUrl, 'boards')).length,
+          { timeout: 10_000 },
+        )
+        .toBe(boardsBefore.length + 1)
+      const newBoardCard = page.locator('.card--board').last()
+
+      // NAVIGATE into the just-created board.
+      await newBoardCard.locator('.board-name__activate').click()
+      await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
+
+      // The real, server-assigned board id — reconciled into the route
+      // (state/networkReconcile.ts) as soon as `POST /boards` resolved.
+      const boardsAfterCreate = await getCollection(page, baseUrl, 'boards')
+      const realBoardId = boardsAfterCreate.find(
+        (b) => !boardsBefore.some((existing) => existing.id === b.id),
+      )?.id as string
+      expect(page.url()).toContain(realBoardId)
+
+      // CREATE a node *inside* the new board — separate gesture, well
+      // after the board's own create has resolved (same as the original
+      // repro: navigate in, then create).
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 300, y: 300 } })
+      await expect(page.locator('[data-testid="card"]')).toHaveCount(1, {
+        timeout: 10_000,
+      })
+
+      // The node must be persisted under the *real* board id — reading it
+      // back the same way a page reload's `GET /nodes?boardId=<real-id>`
+      // would (state/networkBoardLoader.ts's `ensureBoardLoaded`) is
+      // exactly what the reported bug broke: the node used to be stored
+      // under the stale local id, which no `GET` for a real board id
+      // could ever find.
+      await expect
+        .poll(
+          async () => {
+            const nodes = await getCollection(page, baseUrl, 'nodes')
+            return nodes.some((n) => n.boardId === realBoardId)
+          },
+          { timeout: 10_000 },
+        )
+        .toBe(true)
+    } finally {
+      await server.stop()
+    }
+  })
+})

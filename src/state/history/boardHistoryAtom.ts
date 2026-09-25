@@ -49,7 +49,9 @@ import { currentBoardIdAtom } from '../atoms/currentBoard'
 import { accessModeAtom, networkConfigAtom } from '../atoms/networkSettings'
 import { selectionAtom } from '../atoms/selection'
 import { pushToastAtom } from '../atoms/toasts'
+import { registerReconcileTargets } from '../networkReconcile'
 import {
+  type AttributedOps,
   applyOps,
   type Direction,
   mergeOpLists,
@@ -69,12 +71,6 @@ import {
   redo as redoReducer,
   undo as undoReducer,
 } from './reducer'
-
-/** The ops a step applied plus which board's action produced it — the unit `reducer.ts`'s generic history stack is instantiated over here (schema v4). */
-interface AttributedOps {
-  ops: Op[]
-  boardId: string
-}
 
 function mergeAttributedOps(
   prev: AttributedOps,
@@ -221,6 +217,11 @@ export const boardHistoryAtom = atom<HistoryState<AttributedOps>>(
 export const currentBoardAtom = atom<Board>(initialBoard)
 
 export const boardAtom = atom((get) => get(currentBoardAtom))
+
+// Hands these two atoms to state/networkReconcile.ts without this module
+// importing that one back — see its module comment for the circular
+// import this registration (rather than a direct import) avoids.
+registerReconcileTargets(currentBoardAtom, boardHistoryAtom)
 
 function autosaveIfAcknowledged(
   get: (a: typeof recoveryAcknowledgedAtom) => boolean,

@@ -52,6 +52,26 @@ describe('resolveValueReferences', () => {
     })
   })
 
+  it("rewrites a node's boardId when the board was already remapped (the reported bug: a node created inside a not-yet-confirmed board)", () => {
+    const table = createIdRemapTable()
+    recordRemap(table, 'board', 'client-board', 'server-board')
+    const value = { boardId: 'client-board', x: 1 }
+    expect(resolveValueReferences(table, value)).toEqual({
+      boardId: 'server-board',
+      x: 1,
+    })
+  })
+
+  it("rewrites an edge's boardId the same way", () => {
+    const table = createIdRemapTable()
+    recordRemap(table, 'board', 'client-board', 'server-board')
+    const value = { boardId: 'client-board', fromNodeId: 'n1' }
+    expect(resolveValueReferences(table, value)).toEqual({
+      boardId: 'server-board',
+      fromNodeId: 'n1',
+    })
+  })
+
   it("rewrites an edge's fromNodeId/toNodeId when both nodes were already remapped", () => {
     const table = createIdRemapTable()
     recordRemap(table, 'node', 'client-a', 'server-a')

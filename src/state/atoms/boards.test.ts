@@ -182,6 +182,23 @@ describe('createBoardAtom', () => {
     expect(store.get(boardAtom)).toEqual(before)
   })
 
+  it("a locally-created board's id is stable across a save/reload round trip — local mode's write never reassigns the id it minted (ctx/notes/260925-network-id-reconciliation.md: unlike network mode, there's no reconciliation step for local mode because none is ever needed)", async () => {
+    const { store, createBoardAtom, boardAtom } = await freshState()
+
+    store.set(createBoardAtom, 100, 100)
+    const mintedId = store.get(boardAtom).boards.at(-1)?.id
+
+    // Flush the debounced autosave (500ms) so it actually writes to
+    // localStorage, then reload from scratch the same way a real page
+    // load would.
+    vi.advanceTimersByTime(1000)
+    const storageModule = await import('../persistence/storage')
+    const reloaded = storageModule.loadBoard()
+
+    expect(reloaded.ok).toBe(true)
+    expect(reloaded.board.boards.at(-1)?.id).toBe(mintedId)
+  })
+
   it('is a no-op anywhere but the home board', async () => {
     const { store, createBoardAtom, currentBoardIdAtom, boardAtom } =
       await freshState()

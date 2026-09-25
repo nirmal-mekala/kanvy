@@ -11,7 +11,6 @@
 // prefetch, navigate immediately").
 
 import { atom, getDefaultStore } from 'jotai'
-import { resetIdRemapTable } from '../api/networkOps'
 import { queryClient } from '../api/queryClient'
 import { fetchCollection } from '../api/restClient'
 import type { Board, ImageEntry } from '../schema/board'
@@ -176,10 +175,6 @@ export async function initializeNetworkMode(
   const store = getDefaultStore()
   store.set(networkHomeLoadingAtom, true)
   store.set(networkLoadErrorAtom, undefined)
-  // A fresh session against (possibly) a different backend — any id this
-  // app previously learned from a server response no longer applies (see
-  // api/networkOps.ts's module comment).
-  resetIdRemapTable()
   try {
     const boards = await queryClient.fetchQuery({
       queryKey: ['network', 'boards'] as const,
@@ -239,5 +234,4 @@ export function switchToLocalMode(): void {
   )
   store.set(loadedBoardIdsAtom, new Set())
   store.set(networkLoadErrorAtom, undefined)
-  resetIdRemapTable()
 }

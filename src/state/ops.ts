@@ -97,6 +97,21 @@ export type Op = CreateOp | UpdateOp | ImageOp | ReplaceBoardOp | ReorderOp
 export type Direction = 'after' | 'before'
 
 /**
+ * The ops a step applied plus which board's action produced it — the unit
+ * `history/reducer.ts`'s generic history stack is instantiated over in
+ * `history/boardHistoryAtom.ts` (schema v4). Kept here rather than in
+ * boardHistoryAtom.ts itself so state/entityReconcile.ts and
+ * state/networkReconcile.ts can reference the shape without importing
+ * boardHistoryAtom.ts — which itself pulls in api/boardApi.ts's network
+ * save path, and would otherwise close a circular import back through
+ * api/networkOps.ts (see networkReconcile.ts's own module comment).
+ */
+export interface AttributedOps {
+  ops: Op[]
+  boardId: string
+}
+
+/**
  * Merges `patch` onto `entity` — a key whose patch value is `undefined`
  * *deletes* that key rather than setting it to `undefined` (matches this
  * codebase's own exactOptionalPropertyTypes-aware convention for dropping

@@ -34,7 +34,10 @@ design and `src/api/`, `src/state/networkBoardLoader.ts`,
 `src/components/settings/SettingsModal.tsx` for the result. Modes are
 "ships in the night": switching never migrates data either direction, and
 network settings (mode/base URL/auth token) are in-memory only, reset on
-reload.
+reload. A network create's server-assigned id is reconciled directly into
+canonical app state (not a side table) the instant it's known — see
+`ctx/notes/260925-network-id-reconciliation.md` and `src/state/
+entityReconcile.ts`/`src/state/networkReconcile.ts`.
 
 Do not use this file to track test/build pass counts or a changelog of
 fixed bugs — that state goes stale immediately and belongs in test output

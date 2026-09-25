@@ -33,6 +33,7 @@ import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
 import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 import { ensureBoardLoaded } from './state/networkBoardLoader'
+import { registerBoardNavigator } from './state/networkReconcile'
 
 function RootLayout() {
   // Rendered above the route Outlet for every route, so `boardId` isn't a
@@ -111,6 +112,15 @@ export const boardRoute = createRoute({
 const routeTree = rootRoute.addChildren([homeRoute, boardRoute])
 
 export const router = createRouter({ routeTree })
+
+// state/networkReconcile.ts's redirect-the-address-bar step (when a
+// network create's real board id gets reconciled into a board the user
+// is still viewing) is registered here rather than that module importing
+// `router` directly — see its own doc comment for the circular-import
+// this avoids.
+registerBoardNavigator((boardId) => {
+  void router.navigate({ to: '/$boardId', params: { boardId }, replace: true })
+})
 
 declare module '@tanstack/react-router' {
   interface Register {

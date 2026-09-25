@@ -2,6 +2,16 @@
 // boundary in the persistence layer — everything it delegates to
 // (schema/legacy.ts, schema/board.ts, serialize.ts) is pure.
 //
+// Id handling (ctx/notes/260925-network-id-reconciliation.md): a locally
+// created entity's id is minted once, by the caller (state/atoms/
+// boards.ts, nodes.ts, cards/newCard.ts — nanoid via schema/legacy.ts's
+// `generateId`), before `writeBoard` ever runs — and it's never
+// reassigned; whatever gets written here is final. That's the whole
+// reason local mode needs no id-reconciliation step: unlike network
+// mode's REST backend (which always assigns its own id on create, see
+// api/networkOps.ts), nothing downstream of this module ever hands back
+// a different id than the one it was given.
+//
 // Corrupt/unreadable data handling (spec §9 Q12): `loadBoard` never
 // throws and always returns a usable board (falling back to the seed
 // board), but when the persisted data was corrupt it reports that via

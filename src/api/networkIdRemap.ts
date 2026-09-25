@@ -5,15 +5,18 @@
 // json-server v1's `Service#create`: `{ ...data, id: randomId() }`, always
 // overwriting). Rather than fight that by trying to force our id through,
 // network mode defers to the server: the response's `id` becomes that
-// entity's canonical id for every REST call from then on, and this module
-// is the translation table between "the id this app already knows the
-// entity by" (used everywhere in local state, selection, undo, etc. — none
-// of that ever changes) and "the id the backend actually stores it under."
+// entity's canonical id for every REST call from then on.
 //
-// Lives for the duration of one network-mode session — reset whenever
-// network mode is (re-)entered (api/networkOps.ts's `resetIdRemapTable`,
-// called from state/networkBoardLoader.ts), same "ships in the night"
-// lifetime as the rest of network mode's own state.
+// This table is deliberately *batch-scoped*, not session-scoped
+// (ctx/notes/260925-network-id-reconciliation.md) — api/networkOps.ts
+// creates a fresh one per `applyOpsToNetwork` call, used only to resolve
+// references among ops created together in the same gesture (e.g. a new
+// board's board-card node, sent before the board's own create has
+// resolved). Once a create's real id is known, api/networkOps.ts
+// immediately reconciles it into canonical app state (state/
+// networkReconcile.ts) — the live board, undo history, current-board
+// tracking, the route, and selection — so nothing *outside* one in-flight
+// batch ever needs to resolve an id through a table like this one again.
 
 import type { EntityKind } from '../state/ops'
 
@@ -53,13 +56,13 @@ export function resolveId(
 /**
  * Rewrites the cross-entity id references inside a node/edge value object
  * (a `CreateOp.value` or an `UpdateOp.after`/`before`) using whatever's
- * already been resolved in `table` — a node's `imageId`/`boardRef`, or an
- * edge's `fromNodeId`/`toNodeId`. Returns `value` unchanged (same
- * reference) when nothing needed rewriting. Every other field passes
- * through untouched; this never touches the value's own `id`, since a
- * create's `id` field is stripped before sending (see networkOps.ts) and
- * an update's target id is resolved separately, by the caller, against the
- * op's own entity kind.
+ * already been resolved in `table` — a node's `imageId`/`boardRef`/
+ * `boardId`, or an edge's `fromNodeId`/`toNodeId`/`boardId`. Returns
+ * `value` unchanged (same reference) when nothing needed rewriting. Every
+ * other field passes through untouched; this never touches the value's own
+ * `id`, since a create's `id` field is stripped before sending (see
+ * networkOps.ts) and an update's target id is resolved separately, by the
+ * caller, against the op's own entity kind.
  */
 export function resolveValueReferences(
   table: IdRemapTable,
@@ -73,6 +76,10 @@ export function resolveValueReferences(
   if (typeof value.boardRef === 'string') {
     const resolved = resolveId(table, 'board', value.boardRef)
     if (resolved !== value.boardRef) result = { ...result, boardRef: resolved }
+  }
+  if (typeof value.boardId === 'string') {
+    const resolved = resolveId(table, 'board', value.boardId)
+    if (resolved !== value.boardId) result = { ...result, boardId: resolved }
   }
   if (typeof value.fromNodeId === 'string') {
     const resolved = resolveId(table, 'node', value.fromNodeId)
