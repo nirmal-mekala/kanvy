@@ -18,7 +18,10 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
-import { accessModeAtom } from '../../state/atoms/networkSettings'
+import {
+  accessModeAtom,
+  settingsModalOpenAtom,
+} from '../../state/atoms/networkSettings'
 import { clearSelectionAtom } from '../../state/atoms/selection'
 import { themeAtom, toggleThemeAtom } from '../../state/atoms/theme'
 import { setViewModeAtom, viewModeAtom } from '../../state/atoms/viewMode'
@@ -69,10 +72,10 @@ export function Toolbar({ boardId }: { boardId: string }) {
   const setFocusNodeId = useSetAtom(focusNodeIdAtom)
 
   const accessMode = useAtomValue(accessModeAtom)
+  const [settingsOpen, setSettingsOpen] = useAtom(settingsModalOpenAtom)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [importError, setImportError] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -119,7 +122,7 @@ export function Toolbar({ boardId }: { boardId: string }) {
           onDismiss={() => setImportError(false)}
         />
       )}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsModal />}
       <div className="toolbar">
         <input
           ref={importInputRef}

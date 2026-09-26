@@ -42,7 +42,7 @@ export function HelpPanel({
     <>
       <button
         type="button"
-        className="board__zoom-btn board__help"
+        className="board__zoom-btn"
         onClick={() => onOpenChange(!open)}
         onPointerDown={(e) => e.stopPropagation()}
         title="Keyboard shortcuts"

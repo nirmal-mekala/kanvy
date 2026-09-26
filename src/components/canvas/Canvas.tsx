@@ -36,6 +36,7 @@ import { EdgeLayer } from '../edge/EdgeLayer'
 import { HelpPanel } from '../help-panel/HelpPanel'
 import { commonValue } from '../selection-menu/commonValue'
 import { SelectionMenu } from '../selection-menu/SelectionMenu'
+import { ModeToggle } from './ModeToggle'
 import { useBoardInteraction } from './useBoardInteraction'
 import { useCardCreation } from './useCardCreation'
 import { useCardEditing } from './useCardEditing'
@@ -575,8 +576,6 @@ export function Canvas() {
           )
         })()}
 
-      <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
-
       {pendingConfirm && (
         <ConfirmModal
           title={pendingConfirm.title}
@@ -586,31 +585,35 @@ export function Canvas() {
         />
       )}
 
-      <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="board__zoom-btn"
-          onClick={() => zoomByButton(1 / ZOOM_BUTTON_STEP)}
-          title="Zoom out"
-        >
-          <ZoomOut size={16} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="board__zoom-btn board__zoom-btn--reset"
-          onClick={resetZoom}
-          title="Reset zoom"
-        >
-          {Math.round(view.zoom * 100)}%
-        </button>
-        <button
-          type="button"
-          className="board__zoom-btn"
-          onClick={() => zoomByButton(ZOOM_BUTTON_STEP)}
-          title="Zoom in"
-        >
-          <ZoomIn size={16} strokeWidth={2} />
-        </button>
+      <div className="board__bottom-bar">
+        <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+        <ModeToggle />
+        <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="board__zoom-btn"
+            onClick={() => zoomByButton(1 / ZOOM_BUTTON_STEP)}
+            title="Zoom out"
+          >
+            <ZoomOut size={16} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="board__zoom-btn board__zoom-btn--reset"
+            onClick={resetZoom}
+            title="Reset zoom"
+          >
+            {Math.round(view.zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            className="board__zoom-btn"
+            onClick={() => zoomByButton(ZOOM_BUTTON_STEP)}
+            title="Zoom in"
+          >
+            <ZoomIn size={16} strokeWidth={2} />
+          </button>
+        </div>
       </div>
     </div>
   )
