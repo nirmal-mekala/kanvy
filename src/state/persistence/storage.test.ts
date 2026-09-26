@@ -55,7 +55,7 @@ const validBoard: Board = {
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
   ],
-  images: {},
+  images: [],
 }
 
 beforeEach(() => {
@@ -98,7 +98,7 @@ describe('loadBoard', () => {
       version: 1,
       nodes: [{ bogus: true }],
       edges: [],
-      images: {},
+      images: [],
     })
     localStorage.setItem(STORAGE_KEY, raw)
     const result = loadBoard()

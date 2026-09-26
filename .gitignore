@@ -30,3 +30,9 @@ coverage
 playwright-report
 test-results
 blob-report
+
+# Network mode's dev json-server data — mutated in place by every
+# network-mode write, so it drifts from whatever's committed almost
+# immediately; regenerate from the app's own schema with `pnpm db:init`
+# (see server/generate-db.ts) instead of hand-editing or committing it.
+server/db.json

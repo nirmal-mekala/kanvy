@@ -162,7 +162,7 @@ function board(overrides: Partial<Board> = {}): Board {
     nodes: [],
     edges: [],
     boards: [boardMeta('root', 'active', now)],
-    images: {},
+    images: [],
     ...overrides,
   }
 }
@@ -230,7 +230,7 @@ describe('reapBoards', () => {
           updatedAt: now,
         },
       ],
-      images: { img1: 'data:image/png;base64,abc' },
+      images: [{ id: 'img1', dataUri: 'data:image/png;base64,abc' }],
     })
 
     const result = reapBoards(b, ['child-1'])
@@ -238,7 +238,7 @@ describe('reapBoards', () => {
     expect(result.boards.map((meta) => meta.id)).toEqual(['root'])
     expect(result.nodes.map((n) => n.id)).toEqual(['root-card'])
     expect(result.edges).toEqual([])
-    expect(result.images).toEqual({})
+    expect(result.images).toEqual([])
   })
 
   it('leaves other boards entirely untouched', () => {
@@ -313,7 +313,7 @@ describe('reapEntities', () => {
         edge('old-edge', 'root', 'trashed', longAgo),
         edge('new-edge', 'root', 'trashed', recent),
       ],
-      images: { img1: 'data:image/png;base64,abc' },
+      images: [{ id: 'img1', dataUri: 'data:image/png;base64,abc' }],
     })
 
     const result = reapEntities(b, T0)
@@ -322,7 +322,7 @@ describe('reapEntities', () => {
       ['new-trashed', 'active-node'].sort(),
     )
     expect(result.edges.map((e) => e.id)).toEqual(['new-edge'])
-    expect(result.images).toEqual({})
+    expect(result.images).toEqual([])
   })
 
   it('also sweeps trashed boards (and their content) in the same pass', () => {

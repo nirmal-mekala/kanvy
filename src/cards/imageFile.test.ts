@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   dataTransferHasFiles,
+  estimateBase64Bytes,
   getImageFileFromClipboard,
   getImageFilesFromDataTransfer,
 } from './imageFile'
@@ -45,6 +46,30 @@ describe('getImageFilesFromDataTransfer', () => {
 
   it('returns an empty array when there are no files', () => {
     expect(getImageFilesFromDataTransfer(null)).toEqual([])
+  })
+})
+
+describe('estimateBase64Bytes', () => {
+  it('matches the known decoded byte length of a real base64 string', () => {
+    // 'aGVsbG8sIHdvcmxkIQ==' is base64 for 'hello, world!' (13 bytes).
+    expect(
+      estimateBase64Bytes('data:text/plain;base64,aGVsbG8sIHdvcmxkIQ=='),
+    ).toBe(13)
+  })
+
+  it('accounts for single-character padding', () => {
+    // 'aGVsbG8=' is base64 for 'hello' (5 bytes).
+    expect(estimateBase64Bytes('data:text/plain;base64,aGVsbG8=')).toBe(5)
+  })
+
+  it('handles no padding at all', () => {
+    // 'aGVsbG8h' is base64 for 'hello!' (6 bytes, a multiple of 3).
+    expect(estimateBase64Bytes('data:text/plain;base64,aGVsbG8h')).toBe(6)
+  })
+
+  it('scales roughly linearly for a large payload', () => {
+    const base64 = 'A'.repeat(4000) // 4000 base64 chars -> 3000 decoded bytes
+    expect(estimateBase64Bytes(`data:image/png;base64,${base64}`)).toBe(3000)
   })
 })
 

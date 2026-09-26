@@ -7,13 +7,25 @@
 export function Banner({
   message,
   onDismiss,
+  action,
 }: {
   message: string
   onDismiss: () => void
+  /** An optional retry-style action button (network mode design doc §7) — rendered before the dismiss button. */
+  action?: { label: string; onClick: () => void }
 }) {
   return (
     <div className="banner" role="status">
       <span className="banner__message">{message}</span>
+      {action && (
+        <button
+          type="button"
+          className="banner__action"
+          onClick={action.onClick}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         className="banner__dismiss"

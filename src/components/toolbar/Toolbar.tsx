@@ -3,7 +3,7 @@
 // controls stay on the canvas itself (bottom-right overlay), matching the
 // prototype's own Board.jsx placement, not this component.
 
-import { useAtom, useSetAtom } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import {
   Download,
   Eye,
@@ -11,12 +11,17 @@ import {
   ListClock,
   ListTodo,
   Moon,
+  Settings,
   Sun,
   Upload,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
+import {
+  accessModeAtom,
+  settingsModalOpenAtom,
+} from '../../state/atoms/networkSettings'
 import { clearSelectionAtom } from '../../state/atoms/selection'
 import { themeAtom, toggleThemeAtom } from '../../state/atoms/theme'
 import { setViewModeAtom, viewModeAtom } from '../../state/atoms/viewMode'
@@ -27,6 +32,7 @@ import {
 import { exportBoard, parseImportedBoard } from '../../state/persistence/import'
 import { Breadcrumb } from '../breadcrumb/Breadcrumb'
 import { Banner } from '../notifications/Banner'
+import { SettingsModal } from '../settings/SettingsModal'
 
 const VIEW_MODES: readonly {
   key: ViewMode
@@ -64,6 +70,9 @@ export function Toolbar({ boardId }: { boardId: string }) {
   const loadImportedBoard = useSetAtom(loadImportedBoardAtom)
   const clearSelection = useSetAtom(clearSelectionAtom)
   const setFocusNodeId = useSetAtom(focusNodeIdAtom)
+
+  const accessMode = useAtomValue(accessModeAtom)
+  const [settingsOpen, setSettingsOpen] = useAtom(settingsModalOpenAtom)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [importError, setImportError] = useState(false)
@@ -113,6 +122,7 @@ export function Toolbar({ boardId }: { boardId: string }) {
           onDismiss={() => setImportError(false)}
         />
       )}
+      {settingsOpen && <SettingsModal />}
       <div className="toolbar">
         <input
           ref={importInputRef}
@@ -169,14 +179,16 @@ export function Toolbar({ boardId }: { boardId: string }) {
           )}
         </button>
 
-        <button
-          type="button"
-          className="toolbar__btn toolbar__btn--icon"
-          onClick={handleImportClick}
-          title="Import a board from a JSON file"
-        >
-          <Upload size={16} strokeWidth={2} />
-        </button>
+        {accessMode !== 'network' && (
+          <button
+            type="button"
+            className="toolbar__btn toolbar__btn--icon"
+            onClick={handleImportClick}
+            title="Import a board from a JSON file"
+          >
+            <Upload size={16} strokeWidth={2} />
+          </button>
+        )}
 
         <button
           type="button"
@@ -185,6 +197,15 @@ export function Toolbar({ boardId }: { boardId: string }) {
           title="Download the board as a JSON file"
         >
           <Download size={16} strokeWidth={2} />
+        </button>
+
+        <button
+          type="button"
+          className="toolbar__btn toolbar__btn--icon"
+          onClick={() => setSettingsOpen(true)}
+          title="Settings"
+        >
+          <Settings size={16} strokeWidth={2} />
         </button>
       </div>
     </>

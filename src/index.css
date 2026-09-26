@@ -111,11 +111,28 @@ body {
   padding: 0 4px;
 }
 
+.banner__action {
+  flex: 0 0 auto;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  color: var(--color-ink);
+  cursor: pointer;
+  padding: 3px 10px;
+}
+
+.banner__action:hover {
+  background: var(--color-surface-hover);
+}
+
 /* ---------- toast stack (transient error notifications, state/atoms/
-   toasts.ts) — floating, top-right below the toolbar. Every other corner
-   already has fixed UI (`.board__zoom` bottom-right, `.board__help`
-   bottom-left, the dev-only TanStack Query Devtools toggle nudged above
-   `.board__zoom`), so this is the one open corner; `top: 70px` clears the
+   toasts.ts) — floating, top-right below the toolbar. The bottom edge
+   already has fixed UI (`.board__bottom-bar` — help/mode-toggle/zoom, plus
+   the dev-only TanStack Query Devtools toggle nudged above it), so this is
+   the one open corner; `top: 70px` clears the
    toolbar's own height (its tallest realistic case: icon buttons + the
    corrupt-recovery `.banner` stacked above it) rather than a bare 14px
    inset like the bottom corners use. */
@@ -269,16 +286,44 @@ body {
   cursor: grabbing;
 }
 
+/* Network mode's per-board navigation wait (design doc §6c) — should
+   usually be invisible (the background eager-load, §6b, has normally
+   already reached the board by the time it's clicked into); shown only
+   when that isn't yet true. */
+.board__loading {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+}
+
 .board__layer {
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
 }
 
-.board__zoom {
+.board__bottom-bar {
   position: absolute;
+  left: 14px;
   right: 14px;
   bottom: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.board__bottom-bar > :first-child {
+  justify-self: start;
+}
+
+.board__bottom-bar > :last-child {
+  justify-self: end;
+}
+
+.board__zoom {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -326,10 +371,56 @@ body {
   right: 14px;
 }
 
-.board__help {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
+/* A true slider, not a segmented button pair — one thumb, its position
+   (and icon) is the only indicator of the current mode. The thumb is
+   sized and colored identically to a standard icon button (.board__zoom-
+   btn's own 28px/2px-border/--color-surface/--color-ink), so it reads as
+   "one of the icon buttons" that happens to slide; the track is a
+   deliberately jumbo, similarly-colored housing around it (same
+   background, same border tone/width) — a border is what distinguishes
+   the thumb from the track, not a color difference, matching this app's
+   segmented-control precedent (.edge-direction-control's own active/
+   inactive states) rather than a high-contrast badge. `--board-mode-
+   toggle-travel` must equal the track's content-box width (its own
+   `width`, border-box, minus 2×(border + padding) on each side) minus the
+   thumb's width, so the thumb ends up flush against the padding on both
+   sides at rest — recompute it if track width, border, padding, or thumb
+   size change (currently 68 − 2×(2+2) − 28 = 32px). */
+.board__mode-toggle {
+  --board-mode-toggle-travel: 32px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 68px;
+  height: 36px;
+  padding: 2px;
+  border: 2px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.board__mode-toggle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.board__mode-toggle__thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.board__mode-toggle[aria-checked="true"] .board__mode-toggle__thumb {
+  transform: translateX(var(--board-mode-toggle-travel));
 }
 
 /* Shared by every full-screen dialog backdrop (help panel, confirm modal)
@@ -1032,7 +1123,7 @@ input:focus-visible,
   outline-offset: -2px;
 }
 
-/* Only 3 cosmetic (non-essential) transitions exist in this stylesheet —
+/* Only 4 cosmetic (non-essential) transitions exist in this stylesheet —
    overridden here by matching selector + specificity (not `!important`,
    which Biome's `noImportantStyles` rule forbids), relying on cascade
    order since this block comes last. */
@@ -1046,6 +1137,10 @@ input:focus-visible,
   }
 
   .card {
+    transition: none;
+  }
+
+  .board__mode-toggle__thumb {
     transition: none;
   }
 }
@@ -1317,4 +1412,84 @@ input:focus-visible,
 
 .confirm-modal__btn--confirm:hover {
   opacity: 0.9;
+}
+
+.confirm-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-backdrop {
+  z-index: 40;
+}
+
+.settings-modal {
+  position: relative;
+  width: min(420px, 90%);
+  padding: 24px 28px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+}
+
+.settings-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.settings-modal__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.settings-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-modal__label {
+  font-size: 0.8rem;
+  color: var(--color-ink-soft);
+}
+
+.settings-modal__input {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border-soft);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.settings-modal__checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.settings-modal__warning {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #bf616a;
+}
+
+.settings-modal__error {
+  margin: 0 0 16px;
+  font-size: 0.85rem;
+  color: #bf616a;
+}
+
+.settings-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

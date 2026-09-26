@@ -15,7 +15,7 @@ const board: Board = {
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
   ],
-  images: { img1: 'data:image/png;base64,abc' },
+  images: [{ id: 'img1', dataUri: 'data:image/png;base64,abc' }],
 }
 
 describe('serializeBoard', () => {

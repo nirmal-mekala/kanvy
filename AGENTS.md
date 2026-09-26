@@ -22,11 +22,22 @@ shared `nodes`/`edges`, a `board` card kind) and TanStack Router-based
 home-board navigation are in place — see
 `ctx/notes/260917-multiboard-support-design.md` for the design rationale.
 
-The undo stack is still whole-`Board`-snapshot, and node/edge delete is
-still hard removal (only boards are tombstoned) — moving both to an
-action-based ops model with tombstoning for all entity kinds, plus
-introducing TanStack Query as the mutation layer, is designed but not yet
-implemented: see `ctx/notes/260921-action-based-undo-and-tombstoning.md`.
+The action-based (ops) undo stack, tombstoning for nodes/edges/boards, and
+TanStack Query as the mutation layer are implemented — see
+`ctx/notes/260921-action-based-undo-and-tombstoning.md` for the design and
+`src/state/ops.ts`/`src/state/history/boardHistoryAtom.ts` for the result.
+
+Network mode / backend integration (a REST backend, json-server for now,
+alongside the existing localStorage-backed Local mode) is implemented —
+see `ctx/notes/260923-network-mode-backend-integration-design.md` for the
+design and `src/api/`, `src/state/networkBoardLoader.ts`,
+`src/components/settings/SettingsModal.tsx` for the result. Modes are
+"ships in the night": switching never migrates data either direction, and
+network settings (mode/base URL/auth token) are in-memory only, reset on
+reload. A network create's server-assigned id is reconciled directly into
+canonical app state (not a side table) the instant it's known — see
+`ctx/notes/260925-network-id-reconciliation.md` and `src/state/
+entityReconcile.ts`/`src/state/networkReconcile.ts`.
 
 Do not use this file to track test/build pass counts or a changelog of
 fixed bugs — that state goes stale immediately and belongs in test output
@@ -100,7 +111,25 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
   `ctx/notes/260917-remove-visual-regression-tier.md`) — the migration is
   complete and cross-app pixel comparison no longer serves a purpose.
   `tsc --noEmit` and a coverage floor on pure-function modules both gate,
-  same as lint/tests.
+  same as lint/tests. Network-mode e2e specs spin up a real `json-server`
+  instance via `e2e/fixtures/jsonServer.ts` against a throwaway `db.json`,
+  bound to a host-forwarded port (`KANVY_E2E_JSON_SERVER_PORT`, defaults to
+  1996) the same way the Vite dev server itself is.
+- **Dev backend**: `json-server` (devDependency) — `pnpm dev:server` runs
+  it against `server/db.json` (mutated in place by every network-mode
+  write — not repo root, so it doesn't sit alongside source) on
+  `KANVY_JSON_SERVER_PORT` (default 1996), for exercising Network mode
+  against a real REST backend during development. `vite.config.ts` excludes
+  it from the dev server's file watcher, since json-server rewriting it on
+  every write would otherwise trigger a full Vite reload mid-session.
+  `server/db.json` is gitignored and generated, never hand-authored or
+  committed — `pnpm db:init` (`server/generate-db.ts`) builds it from this
+  app's own `Node`/`Edge`/`BoardMeta`/`ImageEntry` types and validates the
+  result against `BoardSchema`, so it can't silently drift from a schema
+  change the way a static fixture would; `dev:server` runs it
+  automatically first (only creates the file if missing — never clobbers
+  a live session's data), and `pnpm db:init -- --force` resets it
+  explicitly.
 - **Linting/formatting**: Biome (`recommended` + cognitive-complexity
   opt-in), also owns formatting — no Prettier. 2-space indentation.
 - **Code health**: `fallow` — complexity/duplication/circular-dependency/

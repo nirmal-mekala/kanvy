@@ -180,3 +180,51 @@ describe('normalizeLegacyBoard — big → h1 text-size rename', () => {
     }
   })
 })
+
+describe('normalizeLegacyBoard — images array-ification (schema v5)', () => {
+  it('converts a pre-v5 { [id]: dataUri } images record into an array of {id, dataUri} entries', () => {
+    const legacyDoc = {
+      version: 4,
+      nodes: [],
+      edges: [],
+      images: {
+        img1: 'data:image/png;base64,aaa',
+        img2: 'data:image/png;base64,bbb',
+      },
+    }
+    const result = normalizeLegacyBoard(legacyDoc) as {
+      images: { id: string; dataUri: string }[]
+    }
+    expect(result.images).toEqual(
+      expect.arrayContaining([
+        { id: 'img1', dataUri: 'data:image/png;base64,aaa' },
+        { id: 'img2', dataUri: 'data:image/png;base64,bbb' },
+      ]),
+    )
+    expect(result.images).toHaveLength(2)
+  })
+
+  it('leaves an already-array v5 images collection untouched', () => {
+    const v5Doc = {
+      version: SCHEMA_VERSION,
+      nodes: [],
+      edges: [],
+      images: [{ id: 'img1', dataUri: 'data:x' }],
+    }
+    const result = normalizeLegacyBoard(v5Doc) as {
+      images: { id: string; dataUri: string }[]
+    }
+    expect(result.images).toEqual([{ id: 'img1', dataUri: 'data:x' }])
+  })
+
+  it('falls back to an empty array for an unrecognizable images shape', () => {
+    const doc = {
+      version: SCHEMA_VERSION,
+      nodes: [],
+      edges: [],
+      images: 'nope',
+    }
+    const result = normalizeLegacyBoard(doc) as { images: unknown[] }
+    expect(result.images).toEqual([])
+  })
+})

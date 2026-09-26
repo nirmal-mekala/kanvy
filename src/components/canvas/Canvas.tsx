@@ -15,7 +15,7 @@ import type { CardNode, ContainerNode } from '../../schema/node'
 import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
 import { setEdgeDirectionAtom } from '../../state/atoms/edges'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
-import { imagesAtom } from '../../state/atoms/images'
+import { findImageDataUri, imagesAtom } from '../../state/atoms/images'
 import {
   setColorAtom,
   setNodeHeightAtom,
@@ -36,6 +36,7 @@ import { EdgeLayer } from '../edge/EdgeLayer'
 import { HelpPanel } from '../help-panel/HelpPanel'
 import { commonValue } from '../selection-menu/commonValue'
 import { SelectionMenu } from '../selection-menu/SelectionMenu'
+import { ModeToggle } from './ModeToggle'
 import { useBoardInteraction } from './useBoardInteraction'
 import { useCardCreation } from './useCardCreation'
 import { useCardEditing } from './useCardEditing'
@@ -453,45 +454,49 @@ export function Canvas() {
         {boardNodes
           .filter((node) => node.type === 'card')
           // fallow-ignore-next-line complexity
-          .map((node) => (
-            <Card
-              key={node.id}
-              node={node}
-              {...(node.kind === 'image' && images[node.imageId]
-                ? { imageSrc: images[node.imageId] }
-                : {})}
-              theme={theme}
-              viewMode={viewMode}
-              selected={selection.has(node.id)}
-              dragging={draggingIds?.has(node.id) ?? false}
-              connectorsVisible={
-                connectingFromId === node.id || connectingHoverId === node.id
-              }
-              connectorActiveSide={
-                connectingFromId === node.id
-                  ? connectingFromSide
-                  : connectingHoverId === node.id
-                    ? connectingHoverSide
-                    : null
-              }
-              autoFocus={focusNodeId === node.id}
-              onAutoFocusHandled={() => setFocusNodeId(null)}
-              onHeightChange={(h) => setNodeHeight(node.id, h)}
-              onContentChange={handleContentChange}
-              onContentBlur={handleContentBlur}
-              onPointerDown={handleNodePointerDown}
-              onPointerMove={handleNodePointerMove}
-              onPointerUp={handleNodePointerUp}
-              onPointerCancel={handleNodePointerCancel}
-              onResizePointerDown={handleResizePointerDown}
-              onResizePointerMove={handleResizePointerMove}
-              onResizePointerUp={handleResizePointerUp}
-              onResizePointerCancel={handleResizePointerCancel}
-              onConnectorPointerDown={handleConnectorPointerDown}
-              onConnectorPointerMove={handleConnectingPointerMove}
-              onConnectorPointerUp={handlePointerUp}
-            />
-          ))}
+          .map((node) => {
+            const imageSrc =
+              node.kind === 'image'
+                ? findImageDataUri(images, node.imageId)
+                : undefined
+            return (
+              <Card
+                key={node.id}
+                node={node}
+                {...(imageSrc ? { imageSrc } : {})}
+                theme={theme}
+                viewMode={viewMode}
+                selected={selection.has(node.id)}
+                dragging={draggingIds?.has(node.id) ?? false}
+                connectorsVisible={
+                  connectingFromId === node.id || connectingHoverId === node.id
+                }
+                connectorActiveSide={
+                  connectingFromId === node.id
+                    ? connectingFromSide
+                    : connectingHoverId === node.id
+                      ? connectingHoverSide
+                      : null
+                }
+                autoFocus={focusNodeId === node.id}
+                onAutoFocusHandled={() => setFocusNodeId(null)}
+                onHeightChange={(h) => setNodeHeight(node.id, h)}
+                onContentChange={handleContentChange}
+                onContentBlur={handleContentBlur}
+                onPointerDown={handleNodePointerDown}
+                onPointerMove={handleNodePointerMove}
+                onPointerUp={handleNodePointerUp}
+                onPointerCancel={handleNodePointerCancel}
+                onResizePointerDown={handleResizePointerDown}
+                onResizePointerMove={handleResizePointerMove}
+                onResizePointerUp={handleResizePointerUp}
+                onResizePointerCancel={handleResizePointerCancel}
+                onConnectorPointerDown={handleConnectorPointerDown}
+                onConnectorPointerMove={handleConnectingPointerMove}
+                onConnectorPointerUp={handlePointerUp}
+              />
+            )
+          })}
       </div>
 
       {/* Screen-space overlays — rendered outside `.board__layer` (which
@@ -571,8 +576,6 @@ export function Canvas() {
           )
         })()}
 
-      <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
-
       {pendingConfirm && (
         <ConfirmModal
           title={pendingConfirm.title}
@@ -582,31 +585,35 @@ export function Canvas() {
         />
       )}
 
-      <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="board__zoom-btn"
-          onClick={() => zoomByButton(1 / ZOOM_BUTTON_STEP)}
-          title="Zoom out"
-        >
-          <ZoomOut size={16} strokeWidth={2} />
-        </button>
-        <button
-          type="button"
-          className="board__zoom-btn board__zoom-btn--reset"
-          onClick={resetZoom}
-          title="Reset zoom"
-        >
-          {Math.round(view.zoom * 100)}%
-        </button>
-        <button
-          type="button"
-          className="board__zoom-btn"
-          onClick={() => zoomByButton(ZOOM_BUTTON_STEP)}
-          title="Zoom in"
-        >
-          <ZoomIn size={16} strokeWidth={2} />
-        </button>
+      <div className="board__bottom-bar">
+        <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
+        <ModeToggle />
+        <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="board__zoom-btn"
+            onClick={() => zoomByButton(1 / ZOOM_BUTTON_STEP)}
+            title="Zoom out"
+          >
+            <ZoomOut size={16} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="board__zoom-btn board__zoom-btn--reset"
+            onClick={resetZoom}
+            title="Reset zoom"
+          >
+            {Math.round(view.zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            className="board__zoom-btn"
+            onClick={() => zoomByButton(ZOOM_BUTTON_STEP)}
+            title="Zoom in"
+          >
+            <ZoomIn size={16} strokeWidth={2} />
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -31,7 +31,7 @@ function emptyBoard(overrides: Partial<Board> = {}): Board {
     nodes: [],
     edges: [],
     boards: [],
-    images: {},
+    images: [],
     ...overrides,
   }
 }
@@ -70,9 +70,9 @@ describe('applyOps', () => {
       after: 'data:x',
     }
     const after = applyOps(board, [op], 'after')
-    expect(after.images).toEqual({ img1: 'data:x' })
+    expect(after.images).toEqual([{ id: 'img1', dataUri: 'data:x' }])
     const before = applyOps(after, [op], 'before')
-    expect(before.images).toEqual({})
+    expect(before.images).toEqual([])
   })
 
   it('applies a batch of ops in order for `after`, and in reverse order for `before`', () => {

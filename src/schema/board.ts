@@ -23,13 +23,23 @@ import { NodeSchema } from './node'
  * (ctx/notes/260921-action-based-undo-and-tombstoning.md): `status` on
  * both, `index` on nodes only — see schema/node.ts and schema/edge.ts.
  */
-export const SCHEMA_VERSION = 4
+// v5 (ctx/notes/260923-network-mode-backend-integration-design.md §4)
+// array-ifies `images` from a `{ [id]: dataUri }` record into an
+// `{id, dataUri}[]` array -- a REST collection (json-server or otherwise)
+// needs an array of entries with an `id` field, not a bare record.
+export const SCHEMA_VERSION = 5
+
+// fallow-ignore-next-line unused-export
+export const ImageEntrySchema = z
+  .object({ id: z.string(), dataUri: z.string() })
+  .strict()
+export type ImageEntry = z.infer<typeof ImageEntrySchema>
 
 export const BoardSchema = z.object({
   version: z.number(),
   nodes: z.array(NodeSchema),
   edges: z.array(EdgeSchema),
   boards: z.array(BoardMetaSchema),
-  images: z.record(z.string(), z.string()),
+  images: z.array(ImageEntrySchema),
 })
 export type Board = z.infer<typeof BoardSchema>

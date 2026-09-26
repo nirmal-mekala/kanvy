@@ -209,6 +209,24 @@ the ops model, plus the dev-tooling that should ship with it. TanStack
   (`nanoid`, `schema/legacy.ts`'s `generateId`) — retrying a `POST` with
   the same id doesn't produce a duplicate against any backend that treats
   id as the primary key.
+
+  **260923 addendum — this held for retry-idempotency, but not for id
+  *preservation*:** once a real per-entity backend landed (json-server),
+  confirmed directly against its v1 `Service#create` that it unconditionally
+  discards whatever `id` the client sends and assigns its own
+  (`{ ...data, id: randomId() }`, always overwriting) — this is standard
+  behavior for REST backends generally, not a json-server-specific quirk to
+  route around. Network mode's write path (`api/networkOps.ts`) now defers
+  to the server for id on every create: it never sends the client id, and
+  treats the response's `id` as that entity's canonical id from then on,
+  via a translation table (`api/networkIdRemap.ts`) that resolves every
+  later op's target id and any cross-entity references (a node's
+  `imageId`/`boardRef`, an edge's `fromNodeId`/`toNodeId`) through it before
+  they go over the wire. Local app state (ids used for rendering,
+  selection, undo, …) never changes — this translation is private to the
+  network write boundary. See `260923-network-mode-backend-integration-
+  design.md` for the incident this was found from (a real `.har` capture:
+  create an image card, then a later PATCH against it 404'd).
 - **Dev tooling:** once mutations are wired through TanStack Query, add
   dev-only env vars for a simulated network delay (ms) and error rate
   (%), applied uniformly to every query *and* mutation — not mutations
