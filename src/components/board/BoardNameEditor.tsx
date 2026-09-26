@@ -4,19 +4,15 @@
 // (Breadcrumb.tsx) use this, so the two look and behave identically
 // rather than each hand-rolling their own edit affordance.
 //
-// Interaction model (explicit commit, not blur-to-save): the name is
-// read-only text/a nav button by default. Hovering (or focusing, for
-// keyboard users) reveals a pencil button; clicking it enters edit mode,
-// swapping the pencil for a checkmark in the same slot — an explicit
-// "you are now editing / here's how you leave" pair, rather than a mode
-// change with no visible affordance. Only Enter or clicking the checkmark
-// commits; blurring the field (clicking away, navigating, tabbing off) or
-// Escape both discard the draft — the checkmark would be pointless as a
-// "confirm" affordance if blur saved anyway. The checkmark's
-// `onMouseDown` preventDefault keeps focus in the input through the click
-// so the click handler actually fires (a plain click would otherwise
-// blur-and-discard first, then miss the now-different element under the
-// cursor).
+// Interaction model (commit-on-blur): the name is read-only text/a nav
+// button by default. Hovering (or focusing, for keyboard users) reveals a
+// pencil button; clicking it enters edit mode, swapping the pencil for a
+// checkmark in the same slot. Enter, clicking the checkmark, or blurring
+// the field (clicking away, navigating, tabbing off) all commit the
+// draft; Escape discards it instead. The checkmark's `onMouseDown`
+// preventDefault keeps focus in the input through the click so the click
+// handler actually fires (a plain click would otherwise blur-and-commit
+// first, then miss the now-different element under the cursor).
 
 import { Check, Pencil } from 'lucide-react'
 import type { MouseEvent } from 'react'
@@ -74,7 +70,7 @@ export function BoardNameEditor({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            onBlur={discard}
+            onBlur={commit}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commit()
               if (e.key === 'Escape') discard()
