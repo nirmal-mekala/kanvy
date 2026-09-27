@@ -383,4 +383,55 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       await server.stop()
     }
   })
+
+  test('a currently-viewed board orphaned by the boot-time auto-reconnect (App.tsx) redirects home instead of rendering with a blank title (regression: this used to leave a blank-title, empty-canvas board UI at the stale URL)', async ({
+    page,
+  }) => {
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
+    try {
+      // A local-only board — never present in the json-server backend
+      // (`sampleDb()` only has `root`/`b1`) — that the app is already
+      // showing when a *persisted* network base URL (as if Settings had
+      // been confirmed in a prior session) triggers App.tsx's boot-time
+      // auto-reconnect and wholesale-replaces `boardsAtom` out from under
+      // it.
+      const LOCAL_DOCUMENT_WITH_ORPHANED_BOARD = {
+        version: 5,
+        nodes: [],
+        edges: [],
+        boards: [
+          { id: 'root', title: 'Home', status: 'active', createdAt: NOW, updatedAt: NOW },
+          {
+            id: 'local-only',
+            title: 'Local-only board',
+            status: 'active',
+            createdAt: NOW,
+            updatedAt: NOW,
+          },
+        ],
+        images: [],
+      }
+      await seedBoard(page, LOCAL_DOCUMENT_WITH_ORPHANED_BOARD, 'kanvy.board')
+      await page.addInitScript((port) => {
+        window.localStorage.setItem(
+          'kanvy-network-base-url',
+          `http://localhost:${port}`,
+        )
+      }, server.port)
+
+      // `boardRoute.beforeLoad` lets this through at navigation time
+      // (mode is still local there, and the board exists in the seeded
+      // local document), but the boot-time auto-reconnect (App.tsx) can
+      // finish swapping in the network backend's own `boards`/nodes/edges
+      // — which don't include this board — before or shortly after that
+      // render lands. Either way, the reactive board-existence watcher
+      // (router.tsx's `useBoardExistenceGuard`) should catch the orphaned
+      // board and send the user home, rather than leaving them on a
+      // blank-title, empty-canvas board UI at the stale URL.
+      await page.goto('/local-only')
+      await expect(page).toHaveURL('/', { timeout: 10_000 })
+    } finally {
+      await server.stop()
+    }
+  })
 })

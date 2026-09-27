@@ -23,7 +23,8 @@ import {
   redirect,
   useParams,
 } from '@tanstack/react-router'
-import { getDefaultStore } from 'jotai'
+import { getDefaultStore, useAtomValue } from 'jotai'
+import { useEffect } from 'react'
 import { BoardPage } from './components/canvas/BoardPage'
 import { NetworkErrorBanner } from './components/notifications/NetworkErrorBanner'
 import { RecoveryBanner } from './components/notifications/RecoveryBanner'
@@ -35,11 +36,37 @@ import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 import { ensureBoardLoaded } from './state/networkBoardLoader'
 import { registerBoardNavigator } from './state/networkReconcile'
 
+/**
+ * Reactive counterpart to `boardRoute.beforeLoad`'s `boardExists` guard:
+ * that guard only runs at navigation time, so a board that disappears out
+ * from under an already-rendered route — e.g. `initializeNetworkMode`'s
+ * boot-time auto-reconnect (App.tsx) or `switchToLocalMode` wholesale-
+ * replacing `boardsAtom` after the route already resolved, or an undo that
+ * removes the viewed board's own `create` op — leaves the URL pointed at a
+ * now-nonexistent board with nothing to catch it. This re-checks on every
+ * `boardsAtom` change and sends the user home the same way, covering both
+ * that case and a stale/invalid bookmarked link that only turns out to be
+ * unavailable after boot-time state (e.g. a network reconnect) settles.
+ */
+function useBoardExistenceGuard(boardId: string) {
+  const boards = useAtomValue(boardsAtom)
+  useEffect(() => {
+    if (boardId === ROOT_BOARD_ID) return
+    const exists = boards.some(
+      (board) => board.id === boardId && board.status !== 'trashed',
+    )
+    if (!exists) {
+      void router.navigate({ to: '/', replace: true })
+    }
+  }, [boardId, boards])
+}
+
 function RootLayout() {
   // Rendered above the route Outlet for every route, so `boardId` isn't a
   // route param here directly — `strict: false` reads it from whichever
   // matched route has it, falling back to the root board on `/`.
   const { boardId = ROOT_BOARD_ID } = useParams({ strict: false })
+  useBoardExistenceGuard(boardId)
   return (
     <div className="app">
       <RecoveryBanner />
