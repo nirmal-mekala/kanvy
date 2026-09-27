@@ -1114,11 +1114,13 @@ input:focus-visible,
 .breadcrumb__home {
   display: inline-flex;
   align-items: center;
-  color: var(--color-ink-soft);
+  padding: 4px;
+  border-radius: var(--radius);
+  color: var(--color-ink);
 }
 
 .breadcrumb__home:hover {
-  color: var(--color-ink);
+  background: var(--color-surface-hover);
 }
 
 .breadcrumb__chevron {
