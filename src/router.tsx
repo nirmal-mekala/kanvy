@@ -151,7 +151,15 @@ export const boardRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([homeRoute, boardRoute])
 
-export const router = createRouter({ routeTree })
+// `basepath` tracks Vite's own `base` (default `/`, overridden via the
+// `--base` CLI flag) instead of a hardcoded value — the GH Pages deploy
+// workflow builds with `--base=/kanvy/` (project pages are served from a
+// subpath), and `import.meta.env.BASE_URL` is Vite's single source of
+// truth for that, so this needs no separate config to stay in sync.
+export const router = createRouter({
+  routeTree,
+  basepath: import.meta.env.BASE_URL,
+})
 
 // state/networkReconcile.ts's redirect-the-address-bar step (when a
 // network create's real board id gets reconciled into a board the user
