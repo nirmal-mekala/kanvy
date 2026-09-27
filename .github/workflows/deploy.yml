@@ -1,0 +1,67 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          # Explicit, not relying solely on package.json's `packageManager`
+          # field — pnpm/action-setup#225/#227 report v6 sometimes ignoring
+          # that field.
+          version: 12.4.2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/configure-pages@v6
+        id: pages
+
+      # Project pages are served from a subpath (https://<user>.github.io/
+      # kanvy/), not the domain root, so the build needs Vite's `base` set
+      # to that subpath. `--base` (rather than hardcoding `base` in
+      # vite.config.ts) keeps every other build (local dev, `pnpm build`)
+      # unaffected; `configure-pages` derives the exact subpath so this
+      # never drifts from the repo name. router.tsx reads the same value
+      # back via `import.meta.env.BASE_URL`, so the two stay in sync from
+      # this one flag. Calling `vite build` directly, not through the
+      # `pnpm build` script (`tsc -b && vite build`) — pnpm's `--`
+      # argument-forwarding passes a literal `--` through to Vite's own
+      # CLI along with it, which makes Vite swallow `--base` instead of
+      # parsing it.
+      - run: pnpm exec tsc -b
+      - run: pnpm exec vite build --base=${{ steps.pages.outputs.base_path }}/
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deployment
