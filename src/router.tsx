@@ -25,8 +25,8 @@ import {
 } from '@tanstack/react-router'
 import { getDefaultStore } from 'jotai'
 import { BoardPage } from './components/canvas/BoardPage'
-import { NetworkErrorBanner } from './components/notifications/NetworkErrorBanner'
-import { RecoveryBanner } from './components/notifications/RecoveryBanner'
+import { NetworkErrorNotice } from './components/notifications/NetworkErrorNotice'
+import { RecoveryNotice } from './components/notifications/RecoveryNotice'
 import { ToastStack } from './components/notifications/ToastStack'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
@@ -43,8 +43,8 @@ function RootLayout() {
   const { boardId = ROOT_BOARD_ID } = useParams({ strict: false })
   return (
     <div className="app">
-      <RecoveryBanner />
-      <NetworkErrorBanner />
+      <RecoveryNotice />
+      <NetworkErrorNotice />
       <Toolbar boardId={boardId} />
       <ToastStack />
       <Outlet />
@@ -109,7 +109,7 @@ export const boardRoute = createRoute({
       await ensureBoardLoaded(params.boardId)
     } catch {
       // Non-blocking (design doc §7) — `ensureBoardLoaded` already
-      // surfaced this via `networkLoadErrorAtom`'s retry banner; the
+      // surfaced this via `networkLoadErrorAtom`'s error toast; the
       // route still renders (with whatever content is resident so far)
       // rather than hard-failing the navigation.
     }

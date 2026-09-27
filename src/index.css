@@ -79,63 +79,13 @@ body {
   flex-direction: column;
 }
 
-/* ---------- notifications (spec §9: import failure, corrupt-save recovery) ---------- */
-
-.banner {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  background: color-mix(
-    in srgb,
-    var(--color-outline) 15%,
-    var(--color-surface)
-  );
-  border-bottom: 2px solid var(--color-border-soft);
-  font-size: 0.8rem;
-}
-
-.banner__message {
-  flex: 1 1 auto;
-}
-
-.banner__dismiss {
-  flex: 0 0 auto;
-  background: transparent;
-  border: none;
-  color: var(--color-ink);
-  font-size: 1.1rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.banner__action {
-  flex: 0 0 auto;
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  background: transparent;
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius);
-  color: var(--color-ink);
-  cursor: pointer;
-  padding: 3px 10px;
-}
-
-.banner__action:hover {
-  background: var(--color-surface-hover);
-}
-
-/* ---------- toast stack (transient error notifications, state/atoms/
+/* ---------- toast stack (transient notifications, state/atoms/
    toasts.ts) — floating, top-right below the toolbar. The bottom edge
    already has fixed UI (`.board__bottom-bar` — help/mode-toggle/zoom, plus
    the dev-only TanStack Query Devtools toggle nudged above it), so this is
-   the one open corner; `top: 70px` clears the
-   toolbar's own height (its tallest realistic case: icon buttons + the
-   corrupt-recovery `.banner` stacked above it) rather than a bare 14px
-   inset like the bottom corners use. */
+   the one open corner; `top: 70px` clears the toolbar's own height (its
+   tallest realistic case: icon buttons) rather than a bare 14px inset like
+   the bottom corners use. */
 .toast-stack {
   position: fixed;
   top: 70px;
