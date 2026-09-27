@@ -116,9 +116,8 @@ function textCard(id: string, x: number, content: string) {
 
 async function connectNetwork(page: Page, baseUrl: string): Promise<void> {
   await page.getByTitle('Settings').click()
-  await page.getByRole('button', { name: 'Network' }).click()
   await page.getByPlaceholder('http://localhost:1996').fill(baseUrl)
-  await page.getByRole('button', { name: 'Confirm' }).click()
+  await page.getByRole('button', { name: 'Save & Connect' }).click()
   await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(0, {
     timeout: 10_000,
   })

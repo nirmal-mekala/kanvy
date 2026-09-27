@@ -4,8 +4,24 @@
 // this app's other corner-anchored floating UI — `.board__zoom` (bottom-
 // right), `.board__help` (bottom-left), and the dev-only TanStack Query
 // Devtools toggle (nudged above `.board__zoom`, also bottom-right).
+//
+// Reads `toastsAtom` via `useAtomValueRawSync` (a `useSyncExternalStore`-
+// based subscription), not the library's default `useAtomValue` (which
+// subscribes in its own `useEffect`, plain `useReducer`-backed): several
+// of this component's sibling notices (RecoveryNotice, NetworkErrorNotice)
+// push a toast from *their own* mount-time `useEffect`, and React fires
+// passive effects across sibling components in mount/JSX order within one
+// commit. Since those notices render before this component in
+// `RootLayout`, their push could — and did (see the regression test) —
+// fire before this component's own subscribe-effect had been set up,
+// silently dropping that first push forever (a later push would still
+// show correctly, just not the missed one). `useSyncExternalStore`
+// subscribes and re-checks synchronously around the commit rather than in
+// a same-priority passive effect, so it can't lose an update to this kind
+// of ordering race regardless of where this component sits in the tree.
 
-import { useAtomValue, useSetAtom } from 'jotai'
+import { useSetAtom } from 'jotai'
+import { useAtomValueRawSync } from 'jotai/react'
 import { useEffect } from 'react'
 import {
   dismissToastAtom,
@@ -39,7 +55,7 @@ function ToastRow({ id, message }: Toast) {
 }
 
 export function ToastStack() {
-  const toasts = useAtomValue(toastsAtom)
+  const toasts = useAtomValueRawSync(toastsAtom)
   if (toasts.length === 0) return null
   return (
     <div className="toast-stack">

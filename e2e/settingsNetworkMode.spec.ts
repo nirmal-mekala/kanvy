@@ -37,9 +37,11 @@ const EMPTY_LOCAL_DOCUMENT = {
 
 // Network mode / backend integration (ctx/notes/260923-network-mode-
 // backend-integration-design.md, ctx/prompt/260923-network-mode-backend-
-// integration.md §8): settings modal flow (toggle, connection-test
-// failure, connection-test success + apply) and a basic network-mode
-// board load/edit round trip against a real json-server instance.
+// integration.md §8): settings modal flow (connection-test failure,
+// connection-test success + apply — mode switching itself lives in the
+// canvas's mode toggle, components/canvas/ModeToggle.tsx, not the modal)
+// and a basic network-mode board load/edit round trip against a real
+// json-server instance.
 //
 // json-server must bind a port the *browser* (possibly remote, per the
 // playwright-remote-browser skill) can reach — this container's actually-
@@ -116,19 +118,22 @@ function sampleDb() {
 }
 
 test.describe('settings modal (network mode design doc §2)', () => {
-  test('toggling to Network reveals base URL/token fields; toggling back to Local hides them', async ({
+  test('opening Settings shows the base URL/token fields regardless of mode; Cancel closes without switching mode', async ({
     page,
   }) => {
     await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
     await page.goto('/')
-    await page.getByTitle('Settings').click()
-    await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(0)
+    const modeToggle = page.getByRole('switch', {
+      name: 'Switch to Network mode',
+    })
+    await expect(modeToggle).toHaveAttribute('aria-checked', 'false')
 
-    await page.getByRole('button', { name: 'Network' }).click()
+    await page.getByTitle('Settings').click()
     await expect(page.getByPlaceholder('http://localhost:1996')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Local' }).click()
+    await page.getByRole('button', { name: 'Cancel' }).click()
     await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(0)
+    await expect(modeToggle).toHaveAttribute('aria-checked', 'false')
   })
 
   test('Confirm with an unreachable base URL keeps the modal open with an inline error', async ({
@@ -137,11 +142,10 @@ test.describe('settings modal (network mode design doc §2)', () => {
     await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
     await page.goto('/')
     await page.getByTitle('Settings').click()
-    await page.getByRole('button', { name: 'Network' }).click()
     await page
       .getByPlaceholder('http://localhost:1996')
       .fill('http://localhost:1')
-    await page.getByRole('button', { name: 'Confirm' }).click()
+    await page.getByRole('button', { name: 'Save & Connect' }).click()
 
     await expect(page.getByText(/Could not connect/)).toBeVisible()
     // Still open — the toggle/fields are still there.
@@ -160,11 +164,10 @@ test.describe('settings modal (network mode design doc §2)', () => {
       ).toBeVisible()
 
       await page.getByTitle('Settings').click()
-      await page.getByRole('button', { name: 'Network' }).click()
       await page
         .getByPlaceholder('http://localhost:1996')
         .fill(`http://localhost:${server.port}`)
-      await page.getByRole('button', { name: 'Confirm' }).click()
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
 
       // Modal closes once the connection test + home-board load succeed.
       await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
@@ -191,11 +194,10 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
       await page.goto('/')
       await page.getByTitle('Settings').click()
-      await page.getByRole('button', { name: 'Network' }).click()
       await page
         .getByPlaceholder('http://localhost:1996')
         .fill(`http://localhost:${server.port}`)
-      await page.getByRole('button', { name: 'Confirm' }).click()
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
       await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
         0,
         { timeout: 10_000 },
@@ -251,11 +253,10 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
       await page.goto('/')
       await page.getByTitle('Settings').click()
-      await page.getByRole('button', { name: 'Network' }).click()
       await page
         .getByPlaceholder('http://localhost:1996')
         .fill(`http://localhost:${server.port}`)
-      await page.getByRole('button', { name: 'Confirm' }).click()
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
       await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
         0,
         { timeout: 10_000 },
@@ -317,11 +318,10 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
       await page.goto('/')
       await page.getByTitle('Settings').click()
-      await page.getByRole('button', { name: 'Network' }).click()
       await page
         .getByPlaceholder('http://localhost:1996')
         .fill(`http://localhost:${server.port}`)
-      await page.getByRole('button', { name: 'Confirm' }).click()
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
       await expect(page.getByPlaceholder('http://localhost:1996')).toHaveCount(
         0,
         { timeout: 10_000 },

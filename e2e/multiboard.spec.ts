@@ -59,13 +59,44 @@ const TWO_BOARD_DOCUMENT = {
   images: {},
 }
 
+// Every test below that navigates to `/` (or to a path that redirects
+// there) seeds an already-non-fresh local board first — on a genuinely
+// fresh profile, the `/` route takes the brand-new-user onboarding
+// redirect (`freshBoardIdAtom`, state/history/boardHistoryAtom.ts; the
+// `/` route's `beforeLoad` in router.tsx) to a freshly-minted non-home
+// board instead of staying on root. That's intentional product behavior,
+// not something these root-path/breadcrumb invariants are testing, so it
+// has to be sidestepped the same way every other e2e spec that visits `/`
+// already does (see e.g. settingsNetworkMode.spec.ts's own seed-first
+// comment).
+
+test('a brand-new profile (nothing in localStorage) is redirected from / to a freshly-minted welcome board, not left on root', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await expect(page).not.toHaveURL(/\/$/)
+  await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
+  await expect(page.getByText('Welcome to Kanvy')).toBeVisible()
+
+  // NOT re-asserted here: `freshBoardIdAtom`'s doc comment claims this is
+  // "consumed once, so a later deliberate visit to `/` isn't redirected" —
+  // but that's only true of an in-session client-side re-visit. A second
+  // `page.goto('/')` (a real navigation, reloading the app fresh) redirects
+  // *again*, to a *different* new welcome board each time — the seed board
+  // is never actually persisted to localStorage until the user edits it,
+  // so every full reload of an untouched fresh profile re-triggers
+  // onboarding from scratch. See the finding reported alongside this test.
+})
+
 test('the root path is the home board', async ({ page }) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
   await page.goto('/')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
 })
 
 test('navigating to an unknown board id redirects to /', async ({ page }) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
   await page.goto('/does-not-exist')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
@@ -74,6 +105,7 @@ test('navigating to an unknown board id redirects to /', async ({ page }) => {
 test('navigating to /root (the reserved root board id as a path segment) redirects to /', async ({
   page,
 }) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
   await page.goto('/root')
   await expect(page).toHaveURL(/\/$/)
   await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
@@ -82,6 +114,7 @@ test('navigating to /root (the reserved root board id as a path segment) redirec
 test('the breadcrumb shows only the home icon on root, with no editable title', async ({
   page,
 }) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
   await page.goto('/')
   await expect(page.locator('.breadcrumb__home')).toBeVisible()
   await expect(page.locator('.breadcrumb__title')).toHaveCount(0)
@@ -155,9 +188,7 @@ test('breadcrumb rename commits via Enter too, not just the checkmark', async ({
   )
 })
 
-test('breadcrumb rename discards the draft on Escape or on blur — a checkmark-confirm UI would be pointless if either committed anyway', async ({
-  page,
-}) => {
+test('breadcrumb rename discards the draft on Escape', async ({ page }) => {
   await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
   await page.goto('/child-1')
 
@@ -168,14 +199,25 @@ test('breadcrumb rename discards the draft on Escape or on blur — a checkmark-
   await title.locator('.board-name__input').fill('Should not stick (Escape)')
   await page.keyboard.press('Escape')
   await expect(title.locator('.board-name__text')).toHaveText('Untitled board')
+})
 
-  // Blurring (clicking away) without hitting Enter/checkmark also discards
-  // — only an explicit commit (Enter or the checkmark) should save.
+// Commit-on-blur (ctx/notes/260918-board-node-redesign.md §"Editing":
+// "blur (click away), Enter, or clicking the checkmark all commit").
+test('breadcrumb rename also commits on blur, not just Enter/checkmark', async ({
+  page,
+}) => {
+  await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
+  await page.goto('/child-1')
+
+  const title = page.locator('.breadcrumb__title')
+
   await title.hover()
   await title.locator('.board-name__edit-btn').click()
-  await title.locator('.board-name__input').fill('Should not stick (blur)')
+  await title.locator('.board-name__input').fill('Committed via blur')
   await page.locator('.breadcrumb__home').focus()
-  await expect(title.locator('.board-name__text')).toHaveText('Untitled board')
+  await expect(title.locator('.board-name__text')).toHaveText(
+    'Committed via blur',
+  )
 })
 
 // The default fresh-install seed board (schema/seed.ts) already has a

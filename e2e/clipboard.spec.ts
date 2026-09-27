@@ -704,7 +704,7 @@ test.describe('help panel (spec §4.2)', () => {
   test('opens via the ? button and closes on Escape', async ({ page }) => {
     await seed(page, { version: 1, nodes: [], edges: [], images: {} })
     await page.goto('/')
-    await page.locator('.board__help').click()
+    await page.getByTitle('Keyboard shortcuts').click()
     await expect(page.locator('.help-panel')).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.locator('.help-panel')).toBeHidden()
@@ -713,7 +713,7 @@ test.describe('help panel (spec §4.2)', () => {
   test('does not list a bare-key zoom-reset shortcut', async ({ page }) => {
     await seed(page, { version: 1, nodes: [], edges: [], images: {} })
     await page.goto('/')
-    await page.locator('.board__help').click()
+    await page.getByTitle('Keyboard shortcuts').click()
     await expect(page.locator('.help-panel')).not.toContainText(/^z$/i)
   })
 })
