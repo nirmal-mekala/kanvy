@@ -20,7 +20,10 @@ export const pushToastAtom = atom(
   null,
   (get, set, message: string, onDismiss?: () => void) => {
     const id = crypto.randomUUID()
-    set(toastsAtom, [...get(toastsAtom), { id, message, onDismiss }])
+    set(toastsAtom, [
+      ...get(toastsAtom),
+      { id, message, ...(onDismiss ? { onDismiss } : {}) },
+    ])
     return id
   },
 )
