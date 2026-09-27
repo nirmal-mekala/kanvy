@@ -18,6 +18,26 @@ class MemoryStorage {
   }
 }
 
+function linkNode(id: string, overrides: Partial<Node> = {}): Node {
+  return {
+    id,
+    boardId: 'root',
+    type: 'card',
+    kind: 'link',
+    x: 0,
+    y: 0,
+    w: 224,
+    h: 90,
+    color: 'gray',
+    status: 'active',
+    index: 0,
+    link: { url: 'https://example.com', status: 'loading' },
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  } as Node
+}
+
 function textNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
@@ -52,6 +72,7 @@ async function freshState() {
   const selectionModule = await import('./selection')
   const currentBoardModule = await import('./currentBoard')
   const boardsModule = await import('./boards')
+  const networkReconcileModule = await import('../networkReconcile')
   const store = createStore()
   return {
     store,
@@ -61,6 +82,7 @@ async function freshState() {
     ...selectionModule,
     ...currentBoardModule,
     ...boardsModule,
+    ...networkReconcileModule,
   }
 }
 
@@ -512,5 +534,45 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     expect(restored.boards.find((b) => b.id === 'child-1')?.status).toBe(
       'active',
     )
+  })
+
+  it('updateLinkAtom patches the link card matching the given id', async () => {
+    const { store, addNodeAtom, updateLinkAtom, boardAtom } = await freshState()
+    store.set(addNodeAtom, linkNode('link-1'))
+    store.set(updateLinkAtom, 'link-1', { status: 'ready', title: 'Example' })
+    const node = store.get(boardAtom).nodes.find((n) => n.id === 'link-1')
+    expect(node?.type === 'card' && node.kind === 'link' && node.link).toEqual({
+      url: 'https://example.com',
+      status: 'ready',
+      title: 'Example',
+    })
+  })
+
+  // Regression test: a link card's metadata fetch (src/cards/
+  // applyLinkMetadata.ts) captures the node's id in a closure before the
+  // fetch settles. In Network mode, that local id can be reconciled to a
+  // server-assigned one in the meantime (ctx/notes/
+  // 260925-network-id-reconciliation.md) — updateLinkAtom used to look the
+  // node up by the stale id and silently no-op, leaving the card stuck on
+  // `status: 'loading'` forever.
+  it('updateLinkAtom resolves a since-reconciled node id', async () => {
+    const {
+      store,
+      addNodeAtom,
+      updateLinkAtom,
+      boardAtom,
+      reconcileNetworkEntityIdAtom,
+    } = await freshState()
+    store.set(addNodeAtom, linkNode('server-1'))
+    reconcileNetworkEntityIdAtom('node', 'local-1', 'server-1')
+
+    store.set(updateLinkAtom, 'local-1', { status: 'ready', title: 'Example' })
+
+    const node = store.get(boardAtom).nodes.find((n) => n.id === 'server-1')
+    expect(node?.type === 'card' && node.kind === 'link' && node.link).toEqual({
+      url: 'https://example.com',
+      status: 'ready',
+      title: 'Example',
+    })
   })
 })

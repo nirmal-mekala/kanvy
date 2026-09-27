@@ -23,6 +23,27 @@ import {
 import type { HistoryState } from './history/reducer'
 import type { AttributedOps } from './ops'
 
+// Tracks node id reconciliations (local id -> server-assigned id) for
+// callers holding an id in a closure across an async gap that can outlive
+// the reconciliation — e.g. a link card's in-flight metadata fetch
+// (src/cards/applyLinkMetadata.ts), captured before the node's own create
+// resolved. Everything already *live in state* gets rewritten in place by
+// `reconcileEntityId`/`reconcileHistoryIds` below; this map exists only for
+// what isn't state, so `resolveReconciledNodeId` can translate such an id
+// right before it's used to look a node up.
+const nodeIdAliases = new Map<string, string>()
+
+/** Follows `nodeIdAliases` until it reaches an id with no further alias. */
+export function resolveReconciledNodeId(id: string): string {
+  let current = id
+  const seen = new Set<string>()
+  while (nodeIdAliases.has(current) && !seen.has(current)) {
+    seen.add(current)
+    current = nodeIdAliases.get(current) as string
+  }
+  return current
+}
+
 let navigateToBoardId: ((boardId: string) => void) | undefined
 
 /** Called once by router.tsx, at its own module scope — see module comment for why this is a registration instead of a direct import. */
@@ -65,7 +86,9 @@ export const reconcileNetworkEntityIdAtom = (
   oldId: string,
   newId: string,
 ): void => {
-  if (oldId === newId || !reconcileTargets) return
+  if (oldId === newId) return
+  if (kind === 'node') nodeIdAliases.set(oldId, newId)
+  if (!reconcileTargets) return
   const store = getDefaultStore()
   const { currentBoardAtom, boardHistoryAtom } = reconcileTargets
 
