@@ -1,7 +1,6 @@
-// Floating, auto-dismissing error notifications — see state/atoms/
-// toasts.ts for why these are separate from Banner.tsx's persistent,
-// manual-dismiss notifications. Rendered once in router.tsx's
-// `RootLayout`, top-right (below the toolbar) so it doesn't collide with
+// Floating, auto-dismissing notifications — see state/atoms/toasts.ts.
+// Rendered once in router.tsx's `RootLayout`, top-right (below the
+// toolbar) so it doesn't collide with
 // this app's other corner-anchored floating UI — `.board__zoom` (bottom-
 // right), `.board__help` (bottom-left), and the dev-only TanStack Query
 // Devtools toggle (nudged above `.board__zoom`, also bottom-right).

@@ -9,7 +9,7 @@ import { seedBoard } from './fixtures/board'
 // playwright.config.ts's `use` block, which wasn't set anywhere before.
 
 test.describe('import-failure UI (spec §9/Q14)', () => {
-  test('shows a dismissible banner, not window.alert, on a bad import file', async ({
+  test('shows a dismissible toast, not window.alert, on a bad import file', async ({
     page,
   }) => {
     await page.goto('/')
@@ -23,17 +23,17 @@ test.describe('import-failure UI (spec §9/Q14)', () => {
       buffer: Buffer.from('{ this is not valid json'),
     })
 
-    const banner = page.locator('.banner')
-    await expect(banner).toBeVisible()
-    await expect(banner).toContainText('Could not import')
+    const toast = page.locator('.toast')
+    await expect(toast).toBeVisible()
+    await expect(toast).toContainText('Could not import')
 
-    await banner.locator('.banner__dismiss').click()
-    await expect(banner).toBeHidden()
+    await toast.locator('.toast__dismiss').click()
+    await expect(toast).toBeHidden()
   })
 })
 
 test.describe('corrupt-save recovery UI (spec §9/Q12)', () => {
-  test('shows a recovery banner and suppresses autosave until dismissed', async ({
+  test('shows a recovery toast and suppresses autosave until dismissed', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -41,19 +41,19 @@ test.describe('corrupt-save recovery UI (spec §9/Q12)', () => {
     })
     await page.goto('/')
 
-    const banner = page.locator('.banner')
-    await expect(banner).toBeVisible()
-    await expect(banner).toContainText("couldn't be read")
+    const toast = page.locator('.toast')
+    await expect(toast).toBeVisible()
+    await expect(toast).toContainText("couldn't be read")
 
     // The corrupt bytes must still be sitting in storage, untouched, until
-    // the user acknowledges the banner.
+    // the user acknowledges the toast.
     const stored = await page.evaluate(() =>
       window.localStorage.getItem('kanvy.board'),
     )
     expect(stored).toBe('{ not json at all')
 
-    await banner.locator('.banner__dismiss').click()
-    await expect(banner).toBeHidden()
+    await toast.locator('.toast__dismiss').click()
+    await expect(toast).toBeHidden()
   })
 })
 

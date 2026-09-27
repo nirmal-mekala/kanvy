@@ -24,6 +24,7 @@ import {
 } from '../../state/atoms/networkSettings'
 import { clearSelectionAtom } from '../../state/atoms/selection'
 import { themeAtom, toggleThemeAtom } from '../../state/atoms/theme'
+import { pushToastAtom } from '../../state/atoms/toasts'
 import { setViewModeAtom, viewModeAtom } from '../../state/atoms/viewMode'
 import {
   boardAtom,
@@ -31,7 +32,6 @@ import {
 } from '../../state/history/boardHistoryAtom'
 import { exportBoard, parseImportedBoard } from '../../state/persistence/import'
 import { Breadcrumb } from '../breadcrumb/Breadcrumb'
-import { Banner } from '../notifications/Banner'
 import { SettingsModal } from '../settings/SettingsModal'
 
 const VIEW_MODES: readonly {
@@ -70,12 +70,12 @@ export function Toolbar({ boardId }: { boardId: string }) {
   const loadImportedBoard = useSetAtom(loadImportedBoardAtom)
   const clearSelection = useSetAtom(clearSelectionAtom)
   const setFocusNodeId = useSetAtom(focusNodeIdAtom)
+  const pushToast = useSetAtom(pushToastAtom)
 
   const accessMode = useAtomValue(accessModeAtom)
   const [settingsOpen, setSettingsOpen] = useAtom(settingsModalOpenAtom)
 
   const [menuOpen, setMenuOpen] = useState(false)
-  const [importError, setImportError] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -106,7 +106,7 @@ export function Toolbar({ boardId }: { boardId: string }) {
     if (!file) return
     const result = parseImportedBoard(await file.text())
     if (!result.ok) {
-      setImportError(true)
+      pushToast('Could not import that file — is it a Kanvy JSON export?')
       return
     }
     loadImportedBoard(result.board)
@@ -116,12 +116,6 @@ export function Toolbar({ boardId }: { boardId: string }) {
 
   return (
     <>
-      {importError && (
-        <Banner
-          message="Could not import that file — is it a Kanvy JSON export?"
-          onDismiss={() => setImportError(false)}
-        />
-      )}
       {settingsOpen && <SettingsModal />}
       <div className="toolbar">
         <input
