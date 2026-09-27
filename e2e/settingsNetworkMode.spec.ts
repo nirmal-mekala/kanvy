@@ -400,7 +400,13 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
         nodes: [],
         edges: [],
         boards: [
-          { id: 'root', title: 'Home', status: 'active', createdAt: NOW, updatedAt: NOW },
+          {
+            id: 'root',
+            title: 'Home',
+            status: 'active',
+            createdAt: NOW,
+            updatedAt: NOW,
+          },
           {
             id: 'local-only',
             title: 'Local-only board',
