@@ -1,2 +1,2 @@
 # kanvy
-canvas gui using json canvas spec
+local first infinite canvas app
