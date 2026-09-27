@@ -5,7 +5,13 @@
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { ZoomIn, ZoomOut } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { sortContainersForRender } from '../../containers/renderOrder'
 import { anchorPoint } from '../../geometry/anchor'
 import { boundingBox } from '../../geometry/containment'
@@ -258,8 +264,13 @@ export function Canvas() {
   // keyed on `currentBoardId` alone — this should run once per board
   // switch, not every time `boardNodes`/`zoomToFitAll` change as a result
   // of editing the board's own content.
+  //
+  // useLayoutEffect (not useEffect): BoardPage's currentBoardIdAtom update
+  // is itself a useLayoutEffect (see BoardPage.tsx), so this must also run
+  // pre-paint to land in the same commit — otherwise the new board's nodes
+  // render one frame through the previous board's stale pan/zoom transform.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see comment above
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (boardNodes.length === 0) {
       setView({ x: 0, y: 0, zoom: 1 })
       return

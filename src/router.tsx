@@ -31,6 +31,7 @@ import { ToastStack } from './components/notifications/ToastStack'
 import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
+import { currentBoardIdAtom } from './state/atoms/currentBoard'
 import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 import { ensureBoardLoaded } from './state/networkBoardLoader'
 import { registerBoardNavigator } from './state/networkReconcile'
@@ -64,6 +65,14 @@ const homeRoute = createRoute({
       store.set(freshBoardIdAtom, undefined)
       throw redirect({ to: '/$boardId', params: { boardId: freshBoardId } })
     }
+    // Set here, not in a `BoardPage` effect: home and board routes render
+    // different component types at the same `Outlet` slot, so navigating
+    // between them unmounts/remounts `BoardPage` rather than updating its
+    // props — an effect-based sync would leave `currentBoardIdAtom` (and
+    // everything Canvas derives from it) stale for a whole extra render.
+    // `beforeLoad` runs before the new route's component ever mounts, so
+    // setting it here keeps it correct from that component's first render.
+    store.set(currentBoardIdAtom, ROOT_BOARD_ID)
   },
   component: () => <BoardPage boardId={ROOT_BOARD_ID} />,
 })
@@ -92,6 +101,10 @@ export const boardRoute = createRoute({
     if (params.boardId === ROOT_BOARD_ID || !boardExists(params.boardId)) {
       throw redirect({ to: '/' })
     }
+    // See homeRoute's `beforeLoad` comment: set pre-mount, not via a
+    // `BoardPage` effect, so it's never stale across the unmount/remount
+    // this route's component boundary causes.
+    getDefaultStore().set(currentBoardIdAtom, params.boardId)
     try {
       await ensureBoardLoaded(params.boardId)
     } catch {
