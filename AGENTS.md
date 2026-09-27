@@ -39,6 +39,14 @@ canonical app state (not a side table) the instant it's known — see
 `ctx/notes/260925-network-id-reconciliation.md` and `src/state/
 entityReconcile.ts`/`src/state/networkReconcile.ts`.
 
+Link-card metadata fetching no longer proxies through microlink.io (its
+free tier's ~25 req/day cap made it unsustainable). A same-origin raw
+`fetch()` of the pasted/typed URL was tried and dropped (CORS broke it
+for most real sites) in favor of proxying through metadata.party
+(`POST https://api.metadata.party/extract`), a CORS-enabled extraction
+API — see `ctx/notes/260927-metadata-party-proxy.md` and `src/cards/
+linkMetadata.ts`.
+
 Do not use this file to track test/build pass counts or a changelog of
 fixed bugs — that state goes stale immediately and belongs in test output
 and git history, not here.

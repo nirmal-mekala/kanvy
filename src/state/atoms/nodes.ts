@@ -39,6 +39,7 @@ import type {
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { getLiveNodes, nextNodeIndex } from '../liveEntities'
+import { resolveReconciledNodeId } from '../networkReconcile'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom } from './currentBoard'
@@ -298,20 +299,26 @@ export const moveNodesAtom = atom(
 /**
  * Patches a link card's fetched-metadata fields once a `fetchLinkMetadata`
  * call (spec §5.4) resolves or fails — a no-op if the card was converted
- * away from `kind: 'link'` (or deleted) before the fetch settled.
+ * away from `kind: 'link'` (or deleted) before the fetch settled. `id` is
+ * resolved through `resolveReconciledNodeId` first since the caller
+ * (`applyLinkMetadata`) captured it before the fetch started, and in
+ * Network mode the node's local id can have been reconciled to a
+ * server-assigned one in the meantime (ctx/notes/
+ * 260925-network-id-reconciliation.md).
  */
 export const updateLinkAtom = atom(
   null,
   (get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
+    const resolvedId = resolveReconciledNodeId(id)
     const board = get(boardAtom)
-    const node = board.nodes.find((n) => n.id === id)
+    const node = board.nodes.find((n) => n.id === resolvedId)
     if (node?.type !== 'card' || node.kind !== 'link') return
     const now = nowISO()
     set(updateBoardAtom, get(currentBoardIdAtom), [
       {
         kind: 'update',
         entity: 'node',
-        id,
+        id: resolvedId,
         before: { link: node.link, updatedAt: node.updatedAt },
         after: { link: { ...node.link, ...patch }, updatedAt: now },
       },

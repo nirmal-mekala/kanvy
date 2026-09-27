@@ -1,11 +1,13 @@
-// microlink.io title/preview-image fetch (spec §5.4) — ported from the
-// prototype's utils/linkMetadata.js, with a timeout + basic retry added
-// per spec §5.4/Q18 (today's prototype failure is permanent). Retry
-// count/backoff are implementation details, not user-facing. `fetchImpl`
-// is injectable so tests never hit the real network (spec §13) — production
-// callers omit it and get the real `fetch`.
+// Link-card title/preview-image fetch (spec §5.4). Previously proxied
+// through microlink.io's free API (25 req/day cap made it unsustainable),
+// then briefly did a raw same-origin-only `fetch` of the pasted URL itself
+// (broke via CORS for most real sites). Now proxies through metadata.party
+// (`POST https://api.metadata.party/extract`), a CORS-enabled extraction
+// API — see https://metadata.party/. Timeout + retry (spec §5.4/Q18) are
+// kept. `fetchImpl` is injectable so tests never hit the real network (spec
+// §13) — production callers omit it and get the real `fetch`.
 
-const API_BASE = 'https://api.microlink.io/'
+const METADATA_PARTY_ENDPOINT = 'https://api.metadata.party/extract'
 const REQUEST_TIMEOUT_MS = 6000
 const MAX_ATTEMPTS = 3
 const RETRY_BACKOFF_MS = 400
@@ -15,12 +17,16 @@ export interface LinkMetadata {
   imageUrl: string | null
 }
 
-interface MicrolinkResponse {
-  status?: string
-  data?: {
-    title?: string | null
-    image?: { url?: string } | null
-    logo?: { url?: string } | null
+interface MetadataPartyResponse {
+  title?: string
+  images?: string[]
+  error?: string
+}
+
+function toLinkMetadata(data: MetadataPartyResponse): LinkMetadata {
+  return {
+    title: data.title || null,
+    imageUrl: data.images?.[0] || null,
   }
 }
 
@@ -31,18 +37,19 @@ async function fetchOnce(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const res = await fetchImpl(`${API_BASE}?url=${encodeURIComponent(url)}`, {
+    const res = await fetchImpl(METADATA_PARTY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
       signal: controller.signal,
     })
-    if (!res.ok) throw new Error(`Link metadata request failed (${res.status})`)
-    const json = (await res.json()) as MicrolinkResponse
-    if (json.status !== 'success')
-      throw new Error('Link metadata request failed')
-    const { title, image, logo } = json.data ?? {}
-    return {
-      title: title || null,
-      imageUrl: image?.url || logo?.url || null,
+    const data = (await res.json()) as MetadataPartyResponse
+    if (!res.ok || data.error) {
+      throw new Error(
+        data.error ?? `Link metadata request failed (${res.status})`,
+      )
     }
+    return toLinkMetadata(data)
   } finally {
     clearTimeout(timeout)
   }
@@ -53,10 +60,10 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Fetches title/preview-image metadata for `url`, retrying up to
- * `MAX_ATTEMPTS` times (short fixed backoff) on failure or timeout before
- * giving up (spec §5.4/Q18's v0 improvement over the prototype's
- * permanent-failure behavior).
+ * Fetches title/preview-image metadata for `url` via the metadata.party
+ * extraction proxy, retrying up to `MAX_ATTEMPTS` times (short fixed
+ * backoff) on failure or timeout before giving up (spec §5.4/Q18's v0
+ * improvement over the prototype's permanent-failure behavior).
  */
 export async function fetchLinkMetadata(
   url: string,
