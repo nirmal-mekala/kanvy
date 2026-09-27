@@ -22,6 +22,7 @@ import {
 } from '../../cards/imageFile'
 import { newImageCard, newLinkCard, newTextCard } from '../../cards/newCard'
 import { isPlainUrl } from '../../cards/urlSlurp'
+import { isEditableTarget } from '../../clipboard/dom'
 import { hasNodeClipboardContentAtom } from '../../clipboard/nodeClipboard'
 import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { generateId } from '../../schema/legacy'
@@ -35,6 +36,19 @@ import {
 } from '../../state/atoms/nodes'
 import type { View } from './viewportCoords'
 import { worldPoint } from './viewportCoords'
+
+// Paste into a modal/form field (e.g. Settings' Base URL input) must fall
+// through to the browser's native paste, not get hijacked into creating/
+// converting a canvas card. A focused card caption is also an editable
+// target (it's a <textarea>), so `focusedCard` — the same DOM-focus check
+// `onPaste`'s priority logic already relies on — exempts it, preserving
+// paste-a-URL-into-a-focused-caption-converts-the-card (spec §5.3/§5.4).
+function isForeignEditableTarget(
+  target: EventTarget | null,
+  focusedCard: unknown,
+): boolean {
+  return isEditableTarget(target) && !focusedCard
+}
 
 export function useCardCreation({
   nodesById,
@@ -183,6 +197,7 @@ export function useCardCreation({
     function onPaste(e: ClipboardEvent) {
       const clipboardData = e.clipboardData
       if (!clipboardData) return
+      const focusedCard = focusedTargetCard()
       // A populated in-app node clipboard (a deliberate, just-performed
       // ⌘/Ctrl+C) takes priority over incidental OS-clipboard image/URL
       // content, unless a card's caption is *actively focused* — the only
@@ -196,7 +211,11 @@ export function useCardCreation({
       // silently hijack every paste instead of restoring what was just
       // copied in-app (spec §7; see useClipboardShortcuts.ts's
       // `handlePaste` for the other half of this priority order).
-      if (hasNodeClipboardContent && !focusedTargetCard()) return
+      if (
+        isForeignEditableTarget(e.target, focusedCard) ||
+        (hasNodeClipboardContent && !focusedCard)
+      )
+        return
       const imageFile = getImageFileFromClipboard(clipboardData)
       if (imageFile) {
         e.preventDefault()
