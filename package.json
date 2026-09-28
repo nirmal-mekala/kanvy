@@ -22,6 +22,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.103.2",
     "@tanstack/react-router": "^1.170.36",
+    "emojibase-data": "^17.0.0",
     "hero-patterns": "^2.1.0",
     "jotai": "^3.0.0",
     "lucide-react": "^1.46.0",

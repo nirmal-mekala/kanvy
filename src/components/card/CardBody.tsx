@@ -19,9 +19,11 @@ import { LayoutDashboard } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
+import { useEmojiTrigger } from '../../emoji/useEmojiTrigger'
 import type { CardNode } from '../../schema/node'
 import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
 import { BoardNameEditor } from '../board/BoardNameEditor'
+import { EmojiSuggestionMenu } from '../emoji/EmojiSuggestionMenu'
 import { CardLinkMeta } from './CardLinkMeta'
 import { CardMedia } from './CardMedia'
 import { RecencyIndicator } from './RecencyIndicator'
@@ -58,6 +60,10 @@ export function CardBody({
   // keeps the hook call unconditional without needing a real lookup.
   const referencedBoard = useAtomValue(
     boardFamily(node.kind === 'board' ? node.boardRef : ''),
+  )
+
+  const [emojiView, emojiHandlers] = useEmojiTrigger(contentRef, (newValue) =>
+    onContentChange?.(newValue),
   )
 
   return (
@@ -146,16 +152,48 @@ export function CardBody({
       )}
 
       {showCaption && node.kind !== 'board' && (
-        <textarea
-          ref={contentRef}
-          className="card__content no-drag"
-          aria-label="Card caption"
-          value={node.content}
-          placeholder="Write something..."
-          rows={1}
-          onChange={onContentChange && ((e) => onContentChange(e.target.value))}
-          onBlur={onContentBlur}
-        />
+        <>
+          <textarea
+            ref={contentRef}
+            className="card__content no-drag"
+            aria-label="Card caption"
+            value={node.content}
+            placeholder="Write something..."
+            rows={1}
+            onChange={
+              onContentChange &&
+              ((e) => {
+                onContentChange(e.target.value)
+                emojiHandlers.handleChange()
+              })
+            }
+            onKeyDown={(e) => {
+              if (emojiHandlers.handleKeyDown(e)) e.preventDefault()
+            }}
+            onBlur={() => {
+              emojiHandlers.handleBlur()
+              onContentBlur?.()
+            }}
+          />
+          {emojiView.isOpen && emojiView.position && (
+            <EmojiSuggestionMenu
+              mode={emojiView.mode}
+              results={emojiView.results}
+              activeIndex={emojiView.activeIndex}
+              grid={emojiView.grid}
+              row={emojiView.row}
+              col={emojiView.col}
+              position={emojiView.position}
+              fontSize={
+                contentRef.current
+                  ? window.getComputedStyle(contentRef.current).fontSize
+                  : '0.85rem'
+              }
+              onSelectResult={emojiHandlers.selectResult}
+              onSelectVariant={emojiHandlers.selectVariant}
+            />
+          )}
+        </>
       )}
     </div>
   )
