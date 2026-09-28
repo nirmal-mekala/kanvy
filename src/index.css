@@ -1445,3 +1445,99 @@ input:focus-visible,
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* ---------- emoji suggestion menu (src/emoji, src/components/emoji) ----------
+   `position: fixed` (not `.selection-menu`'s canvas-space `absolute`) —
+   this anchors to a text field's on-screen caret via getBoundingClientRect,
+   which already accounts for canvas pan/zoom, so no coordinate transform
+   is needed here. `font-size` is set inline per instance, matching
+   whatever field is being edited (regular card content, an h1/h2/h3
+   heading, or a board-name input). */
+
+.emoji-menu {
+  position: fixed;
+  z-index: 30;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(46, 52, 64, 0.2);
+}
+
+.emoji-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.emoji-menu__item {
+  /* Without this, several browsers render a <button>'s native appearance
+     UNDER our own background/border overrides, which for a color-emoji
+     glyph specifically makes it fall back to a flat, washed-out
+     monochrome rendering instead of full color — reproduced directly:
+     the same glyph in a plain <span>, or in a `<button>` with
+     `appearance: none`, renders in full color; a bare `<button>` (any
+     other style otherwise identical) renders it washed out. */
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.emoji-menu__item--active,
+.emoji-menu__item:hover {
+  background: var(--color-surface-hover);
+}
+
+.emoji-menu__glyph {
+  flex: none;
+  line-height: 1;
+}
+
+.emoji-menu__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Skin tones across (columns), gender forms down (rows) — a row only
+   exists at all for the ~50 emoji families that have gender variants. */
+.emoji-menu__variants {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.emoji-menu__variant {
+  /* See `.emoji-menu__item`'s comment above — same fix, same reason. */
+  appearance: none;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  padding: 4px 6px;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 1.2em;
+}
+
+.emoji-menu__variant--active,
+.emoji-menu__variant:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.emoji-menu__variant:disabled {
+  visibility: hidden;
+  cursor: default;
+}

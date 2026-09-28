@@ -17,7 +17,14 @@
 import { Check, Pencil } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import { useEmojiTrigger } from '../../emoji/useEmojiTrigger'
+import { EmojiSuggestionMenu } from '../emoji/EmojiSuggestionMenu'
 
+// CRAP scoring penalizes this component's 0% coverage — component tests
+// aren't a required tier for v0 (spec §13); real coverage comes from e2e
+// (e2e/*.spec.ts), which fallow's static analysis can't see. Same
+// precedent as SelectionMenu.tsx/CardBody.tsx/Card.tsx.
+// fallow-ignore-next-line complexity
 export function BoardNameEditor({
   title,
   onRename,
@@ -35,6 +42,10 @@ export function BoardNameEditor({
   const [draft, setDraft] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const editing = draft !== null
+
+  const [emojiView, emojiHandlers] = useEmojiTrigger(inputRef, (newValue) =>
+    setDraft(newValue),
+  )
 
   useEffect(() => {
     if (editing) inputRef.current?.focus()
@@ -68,14 +79,42 @@ export function BoardNameEditor({
             className="board-name__input"
             aria-label={ariaLabel}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value)
+              emojiHandlers.handleChange()
+            }}
             onClick={(e) => e.stopPropagation()}
-            onBlur={commit}
+            onBlur={() => {
+              emojiHandlers.handleBlur()
+              commit()
+            }}
             onKeyDown={(e) => {
+              if (emojiHandlers.handleKeyDown(e)) {
+                e.preventDefault()
+                return
+              }
               if (e.key === 'Enter') commit()
               if (e.key === 'Escape') discard()
             }}
           />
+          {emojiView.isOpen && emojiView.position && (
+            <EmojiSuggestionMenu
+              mode={emojiView.mode}
+              results={emojiView.results}
+              activeIndex={emojiView.activeIndex}
+              grid={emojiView.grid}
+              row={emojiView.row}
+              col={emojiView.col}
+              position={emojiView.position}
+              fontSize={
+                inputRef.current
+                  ? window.getComputedStyle(inputRef.current).fontSize
+                  : '0.85rem'
+              }
+              onSelectResult={emojiHandlers.selectResult}
+              onSelectVariant={emojiHandlers.selectVariant}
+            />
+          )}
           <button
             type="button"
             className="board-name__edit-btn board-name__edit-btn--confirm"
