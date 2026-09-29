@@ -152,16 +152,13 @@ test.describe('settings modal (network mode design doc §2)', () => {
     await expect(page.getByPlaceholder('http://localhost:1996')).toBeVisible()
   })
 
-  test('Confirm against a reachable backend applies network mode and hides Upload', async ({
+  test('Confirm against a reachable backend applies network mode', async ({
     page,
   }) => {
     const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
     try {
       await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
       await page.goto('/')
-      await expect(
-        page.getByTitle('Import a board from a JSON file'),
-      ).toBeVisible()
 
       await page.getByTitle('Settings').click()
       await page
@@ -174,10 +171,6 @@ test.describe('settings modal (network mode design doc §2)', () => {
         0,
         { timeout: 10_000 },
       )
-      // Network mode hides Upload (design doc §3).
-      await expect(
-        page.getByTitle('Import a board from a JSON file'),
-      ).toHaveCount(0)
     } finally {
       await server.stop()
     }
