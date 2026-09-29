@@ -27,6 +27,11 @@ export interface ModalProps {
   role?: 'dialog' | 'alertdialog'
   dialogClassName: string
   backdropClassName?: string
+  /** Extra class appended to the title `<h2>`, alongside its shared
+   * `modal-dialog__title` class — e.g. `confirm-modal__title` — so
+   * per-modal e2e/CSS hooks keep working without each modal reimplementing
+   * the heading markup itself. */
+  titleClassName?: string
   /** `standard` (default): the app's one fixed full-dialog size (help
    * panel, settings modal). `compact`: a smaller, content-sized footprint
    * for quick yes/no confirmations (confirm modal) — the app has exactly
@@ -45,6 +50,7 @@ export function Modal({
   role = 'dialog',
   dialogClassName,
   backdropClassName,
+  titleClassName,
   size = 'standard',
   children,
 }: ModalProps) {
@@ -82,10 +88,18 @@ export function Modal({
         className={`modal-dialog modal-dialog--${size} ${dialogClassName}`}
         role={role}
         aria-modal="true"
+        aria-label={title}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <h2 id={titleId} className="modal-dialog__title">
+        <h2
+          id={titleId}
+          className={
+            titleClassName
+              ? `modal-dialog__title ${titleClassName}`
+              : 'modal-dialog__title'
+          }
+        >
           {title}
         </h2>
         {children}

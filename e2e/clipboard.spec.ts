@@ -410,6 +410,7 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
   test('⌘/Ctrl+N creates a new empty text card, focused', async ({ page }) => {
     await seed(page, childBoardDocument([]))
     await page.goto(`/${CHILD_BOARD_ID}`)
+    await expect(page.locator('.board__layer')).toBeVisible()
     await page.keyboard.press('ControlOrMeta+n')
     await expect(
       page.locator('[data-node-id]:not(.node-connector)'),

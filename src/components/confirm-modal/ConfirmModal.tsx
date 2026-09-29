@@ -31,6 +31,7 @@ export function ConfirmModal({
     <Modal
       title={title}
       titleId="confirm-modal__title"
+      titleClassName="confirm-modal__title"
       {...(body ? { descriptionId: 'confirm-modal__body' } : {})}
       onDismiss={onCancel}
       onConfirm={onConfirm}
