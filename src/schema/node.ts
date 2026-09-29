@@ -80,14 +80,15 @@ export type NodeId = z.infer<typeof NodeIdSchema>
 // `index` is deliberately a float (fractional-indexing/"LexoRank" style),
 // not a dense integer, even though today's only writer
 // (state/liveEntities.ts's `nextNodeIndex`) happens to assign consecutive
-// integers and nothing currently re-sorts an existing node (no UI path
-// reaches state/atoms/nodes.ts's `reorderNodesAtom` — see
+// integers and nothing currently re-sorts an existing node (see
 // ctx/notes/260921-action-based-undo-and-tombstoning.md's 260923 addendum
-// under Q4). The float is future-proofing for if/when reordering ships:
-// inserting a node between two existing ones (`A`, `B`) should be able to
-// assign it `(A.index + B.index) / 2` — one field write — rather than
-// renumbering every node after it. `z.number()` already accepts this; no
-// runtime change follows from this comment. The one place it matters is a
+// under Q4 — the reorder atom/op that once existed for this was removed as
+// unreachable from the UI). The float is future-proofing for if/when
+// reordering ships: inserting a node between two existing ones (`A`, `B`)
+// should be able to assign it `(A.index + B.index) / 2` — one field write —
+// rather than renumbering every node after it. `z.number()` already
+// accepts this; no runtime change follows from this comment. The one
+// place it matters is a
 // future SQL schema derived from this shape: that `index` column needs to
 // be `DOUBLE PRECISION`/`REAL`, not `INTEGER`/`SERIAL`.
 const NodeBaseSchema = z.object({

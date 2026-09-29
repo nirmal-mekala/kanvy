@@ -129,8 +129,11 @@ preference — real per-entity calls, not a whole-document write):
 | `CreateOp` | `POST /<collection>` (collection per `entity`: `boards`/`nodes`/`edges`) |
 | `UpdateOp` | `PATCH /<collection>/:id` with `after`'s changed fields (covers tombstoning — `{status: 'trashed'}` — and index changes, same as today) |
 | `ImageOp` | `POST /images` (create) or `PATCH /images/:id` (update) or `DELETE /images/:id` (when `after` is `undefined`) |
-| `ReorderOp` | Currently unreachable from the UI (see 260921 doc's addendum) — no REST mapping needed yet; flag as a gap if it ever becomes reachable. |
 | `ReplaceBoardOp` | Only produced by JSON import, which is already hidden in network mode (§3) — no REST mapping needed. |
+
+(`ReorderOp` — flagged here as unreachable from the UI, no REST mapping
+needed yet — was removed 260929 along with `reorderNodesAtom`; see the
+260921 doc's 260929 addendum.)
 
 Local mode's `saveBoard` internals stay exactly as they are today
 (`writeBoard`, whole-document localStorage write) — only network mode's

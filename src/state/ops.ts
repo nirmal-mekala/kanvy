@@ -68,31 +68,7 @@ export interface ReplaceBoardOp {
   after: Board
 }
 
-/**
- * A node reorder (schema v4 Q4) — the one structural case a plain
- * create/update op can't express, since array position isn't a stored
- * field (`Node.index` is metadata *about* order, for a future backend to
- * sort by; the live app still treats array order itself as the render/
- * paint source of truth, unchanged — see `reorderNodesAtom`,
- * state/atoms/nodes.ts). `before`/`after` are `boardId`'s own live node
- * ids in their prior/new array-relative order, each paired with the
- * `index` value that order implies. `index` is a float, not a dense
- * integer (see schema/node.ts) — this whole-array-permute op is today's
- * only *type* that would touch it, and it's currently unreachable from
- * the UI (see ctx/notes/260921-action-based-undo-and-tombstoning.md's
- * 260923 addendum under Q4), but a future single-node reorder would be an
- * ordinary `UpdateOp` patching just that node's `index` to a value
- * computed between its new neighbors — no need for a batch op like this
- * one at all in that case.
- */
-export interface ReorderOp {
-  kind: 'reorder'
-  boardId: string
-  before: { id: string; index: number }[]
-  after: { id: string; index: number }[]
-}
-
-export type Op = CreateOp | UpdateOp | ImageOp | ReplaceBoardOp | ReorderOp
+export type Op = CreateOp | UpdateOp | ImageOp | ReplaceBoardOp
 
 export type Direction = 'after' | 'before'
 
@@ -149,30 +125,6 @@ function applyEntityOp<E extends EntityById>(
   )
 }
 
-function applyReorderOp(
-  board: Board,
-  op: ReorderOp,
-  direction: Direction,
-): Board {
-  const order = direction === 'after' ? op.after : op.before
-  const indexById = new Map(order.map((entry) => [entry.id, entry.index]))
-  const ownIds = new Set(order.map((entry) => entry.id))
-  const byId = new Map(board.nodes.map((entity) => [entity.id, entity]))
-  const queue = order
-    .map((entry) => byId.get(entry.id))
-    .filter((entity): entity is Node => entity !== undefined)
-  let cursor = 0
-  const nodes = board.nodes.map((entity) => {
-    if (entity.boardId !== op.boardId || !ownIds.has(entity.id)) return entity
-    const next = queue[cursor]
-    cursor += 1
-    if (!next) return entity
-    const index = indexById.get(next.id)
-    return index === undefined ? next : { ...next, index }
-  })
-  return { ...board, nodes }
-}
-
 function applyImageOp(board: Board, op: ImageOp, direction: Direction): Board {
   const value = direction === 'after' ? op.after : op.before
   if (value === undefined) {
@@ -195,7 +147,6 @@ function applyOp(board: Board, op: Op, direction: Direction): Board {
   if (op.kind === 'replace-board') {
     return direction === 'after' ? op.after : op.before
   }
-  if (op.kind === 'reorder') return applyReorderOp(board, op, direction)
   switch (op.entity) {
     case 'node':
       return { ...board, nodes: applyEntityOp(board.nodes, op, direction) }
@@ -228,7 +179,6 @@ export function applyOps(
 function opTargetKey(op: Op): string {
   if (op.kind === 'image') return `image:${op.id}`
   if (op.kind === 'replace-board') return 'replace-board'
-  if (op.kind === 'reorder') return `reorder:${op.boardId}`
   if (op.kind === 'create') return `${op.entity}:${op.value.id}`
   return `${op.entity}:${op.id}`
 }
@@ -252,9 +202,6 @@ function mergeOp(existing: Op, incoming: Op): Op {
     }
   }
   if (existing.kind === 'image' && incoming.kind === 'image') {
-    return { ...incoming, before: existing.before }
-  }
-  if (existing.kind === 'reorder' && incoming.kind === 'reorder') {
     return { ...incoming, before: existing.before }
   }
   if (existing.kind === 'update' && incoming.kind === 'update') {

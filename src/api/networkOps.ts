@@ -54,11 +54,10 @@ function withoutId(value: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * Applies one op to the REST backend. `ReorderOp`/`ReplaceBoardOp` have no
- * REST mapping (design doc §5/§10 — the former is unreachable from the UI
- * today, the latter's only source, JSON import, is hidden in network mode)
- * and are silently skipped here rather than treated as an error, matching
- * the design doc's explicit call to flag-not-build for both.
+ * Applies one op to the REST backend. `ReplaceBoardOp` has no REST mapping
+ * (design doc §10 — its only source, JSON import, is hidden in network
+ * mode) and is silently skipped here rather than treated as an error,
+ * matching the design doc's explicit call to flag-not-build for it.
  */
 /** `originalId`/`createdId` differing means the server assigned its own id (the common case, see module comment) — recorded in the batch-scoped `idRemapTable` for the rest of this gesture, and reconciled immediately into canonical app state so no *later* gesture ever needs to resolve it. A no-op when they're already equal. */
 function recordAndReconcile(
@@ -109,7 +108,7 @@ async function applyOp(
   if (op.kind === 'image') {
     await applyImageOp(config, idRemapTable, op, fetchImpl)
   }
-  // 'reorder' / 'replace-board': no mapping — see doc comment above.
+  // 'replace-board': no mapping — see doc comment above.
 }
 
 async function applyImageOp(
