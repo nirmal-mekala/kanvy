@@ -464,6 +464,7 @@ test.describe('heading cards (spec §5.2)', () => {
         return {
           overflowY: style.overflowY,
           overflows: el.scrollHeight > el.clientHeight,
+          clientHeight: el.clientHeight,
         }
       })
       expect(overflowsButHidden.overflows).toBe(true)
@@ -491,8 +492,124 @@ test.describe('heading cards (spec §5.2)', () => {
       expect(box.h % 16).toBe(0)
       expect(box.w).toBeGreaterThan(320)
       expect(box.h).toBeGreaterThan(240)
+
+      // The textarea's own rendered box — not just the outer `.card`
+      // div's inline style — must grow along with it, and the overflow
+      // that was clipped before growing is now visible (or at least
+      // less clipped): proves the stored height increase actually
+      // reaches the content box, not just the outer div.
+      const afterGrow = await textarea.evaluate((el) => el.clientHeight)
+      expect(afterGrow).toBeGreaterThan(overflowsButHidden.clientHeight)
     })
   }
+
+  test('the n resize handle and its same-side connector both stay independently grabbable', async ({
+    page,
+  }) => {
+    // A heading's cardinal-direction resize handles (`.resize-handle--n`)
+    // and the connector affordance on the same side
+    // (`.node-connector--top`) are both centered on that edge, so their
+    // hit areas fully overlap at the exact point either would naturally
+    // be grabbed — the n handle is notched (`clip-path`, index.css)
+    // around the connector's ~16px-wide hit area so both remain usable.
+    await seed(page, {
+      version: 1,
+      nodes: [
+        { ...textCard('a', 100, 100, 'Header'), size: 'h1', w: 320, h: 240 },
+        textCard('b', 100, 700),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await card.click()
+
+    const handle = card.locator('.resize-handle--n')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    const centerX = handleBox.x + handleBox.width / 2
+    const centerY = handleBox.y + handleBox.height / 2
+
+    // Off-center (outside the notch): grabs the resize handle.
+    await page.mouse.move(centerX + 40, centerY)
+    await page.mouse.down()
+    await page.mouse.move(centerX + 40, centerY - 40, { steps: 5 })
+    await page.mouse.up()
+    const afterResize = await card.evaluate((el) =>
+      Number.parseFloat((el as HTMLElement).style.height),
+    )
+    expect(afterResize).toBeGreaterThan(240)
+
+    // Exactly at the notch (the connector's own spot): still grabs the
+    // connector, not the handle — dragging from there to another node
+    // creates an edge instead of resizing further.
+    const connectorBox = await card
+      .locator('.node-connector--top')
+      .boundingBox()
+    if (!connectorBox) throw new Error('connector not rendered')
+    const targetBox = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
+    if (!targetBox) throw new Error('target not rendered')
+    await page.mouse.move(
+      connectorBox.x + connectorBox.width / 2,
+      connectorBox.y + connectorBox.height / 2,
+    )
+    await page.mouse.down()
+    await page.mouse.move(
+      targetBox.x + targetBox.width / 2,
+      targetBox.y + targetBox.height / 2,
+    )
+    await page.mouse.up()
+    await expect(page.locator('[data-edge-id]')).toHaveCount(1)
+    // The edge-drag didn't also resize the card further.
+    const afterEdgeDrag = await card.evaluate((el) =>
+      Number.parseFloat((el as HTMLElement).style.height),
+    )
+    expect(afterEdgeDrag).toBe(afterResize)
+  })
+
+  test("a resized-down heading card clamps to its own level's minimum height, not a shared one", async ({
+    page,
+  }) => {
+    // h1's minimum (96) is taller than h2/h3's (80) — one line of h1's
+    // larger font needs more room — so shrinking each all the way down
+    // must land on its own level's floor, not a value shared across
+    // levels (HEADING_MIN_H, geometry/constants.ts).
+    const minHeightBySize = { h1: 96, h2: 80, h3: 80 } as const
+    for (const size of ['h1', 'h2', 'h3'] as const) {
+      await seed(page, {
+        version: 1,
+        nodes: [
+          { ...textCard('a', 100, 100, 'One line'), size, w: 320, h: 240 },
+        ],
+        edges: [],
+        images: {},
+      })
+      await page.goto('/')
+      const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+      const handle = page.locator(
+        '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
+      )
+      const handleBox = await handle.boundingBox()
+      if (!handleBox) throw new Error('handle not rendered')
+
+      // Drag the se handle far up-and-left — well past every level's
+      // minimum — so the result is purely the clamp, not the drag delta.
+      await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+      await page.mouse.down()
+      await page.mouse.move(handleBox.x + 5 - 400, handleBox.y + 5 - 400, {
+        steps: 5,
+      })
+      await page.mouse.up()
+
+      const h = await card.evaluate((el) =>
+        Number.parseFloat((el as HTMLElement).style.height),
+      )
+      expect(h).toBe(minHeightBySize[size])
+    }
+  })
 
   test('the selection menu toggles between regular and each heading level, preserving size across heading-to-heading switches', async ({
     page,

@@ -24,6 +24,7 @@ import {
   CARD_WIDTH,
   HEADING_DEFAULT_H,
   HEADING_DEFAULT_W,
+  type HeadingSize,
 } from '../../geometry/constants'
 import type { Board } from '../../schema/board'
 import type {
@@ -546,7 +547,7 @@ export const setTextSizeAtom = atom(
             ...card,
             size,
             w: HEADING_DEFAULT_W,
-            h: HEADING_DEFAULT_H,
+            h: HEADING_DEFAULT_H[size as HeadingSize],
             updatedAt: now,
           }
         }
