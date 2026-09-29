@@ -466,10 +466,10 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
       addNodeAtom,
       removeEntitiesAtom,
       boardAtom,
-      loadImportedBoardAtom,
+      currentBoardAtom,
     } = await freshState()
     const before = store.get(boardAtom)
-    store.set(loadImportedBoardAtom, {
+    store.set(currentBoardAtom, {
       ...before,
       boards: [
         ...before.boards,
@@ -509,10 +509,10 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
       removeEntitiesAtom,
       undoBoardAtom,
       boardAtom,
-      loadImportedBoardAtom,
+      currentBoardAtom,
     } = await freshState()
     const before = store.get(boardAtom)
-    store.set(loadImportedBoardAtom, {
+    store.set(currentBoardAtom, {
       ...before,
       boards: [
         ...before.boards,

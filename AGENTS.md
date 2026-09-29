@@ -110,7 +110,7 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
 - **State**: Jotai, granular `atomFamily`-per-entity (not one atom per
   board slice) — avoids whole-canvas re-renders on a single drag.
 - **Validation**: Zod is the source of truth for the data model; TS types
-  are derived via `z.infer<>`. Validates at board load and JSON import.
+  are derived via `z.infer<>`. Validates at board load.
 - **Testing**: Vitest for pure-function unit tests (spec §13); Playwright
   for e2e (interaction-test layer), run via the `playwright-remote-
   browser` skill, using `KANVY_E2E_PORT`/`KANVY_E2E_HOST` for this

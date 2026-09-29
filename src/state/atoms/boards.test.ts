@@ -69,8 +69,8 @@ beforeEach(() => {
 
 describe('boardsAtom / boardFamily', () => {
   it('boardsAtom reflects the loaded boards collection', async () => {
-    const { store, boardsAtom, loadImportedBoardAtom } = await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    const { store, boardsAtom, currentBoardAtom } = await freshState()
+    store.set(currentBoardAtom, boardWithChild())
     expect(store.get(boardsAtom).map((b) => b.id)).toEqual([
       ROOT_BOARD_ID,
       'child-1',
@@ -78,8 +78,8 @@ describe('boardsAtom / boardFamily', () => {
   })
 
   it('boardFamily(id) looks up a single board by id', async () => {
-    const { store, boardFamily, loadImportedBoardAtom } = await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    const { store, boardFamily, currentBoardAtom } = await freshState()
+    store.set(currentBoardAtom, boardWithChild())
     expect(store.get(boardFamily('child-1'))?.title).toBe('Untitled board')
     expect(store.get(boardFamily('nonexistent'))).toBeUndefined()
   })
@@ -87,9 +87,9 @@ describe('boardsAtom / boardFamily', () => {
 
 describe('renameBoardAtom', () => {
   it('renames the target board, independent of which board is currently being viewed', async () => {
-    const { store, boardFamily, renameBoardAtom, loadImportedBoardAtom } =
+    const { store, boardFamily, renameBoardAtom, currentBoardAtom } =
       await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    store.set(currentBoardAtom, boardWithChild())
 
     store.set(renameBoardAtom, 'child-1', 'My board')
 
@@ -97,14 +97,9 @@ describe('renameBoardAtom', () => {
   })
 
   it('is a no-op for the reserved root board (its title is fixed)', async () => {
-    const {
-      store,
-      boardFamily,
-      renameBoardAtom,
-      loadImportedBoardAtom,
-      boardAtom,
-    } = await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    const { store, boardFamily, renameBoardAtom, currentBoardAtom, boardAtom } =
+      await freshState()
+    store.set(currentBoardAtom, boardWithChild())
     const before = store.get(boardAtom)
 
     store.set(renameBoardAtom, ROOT_BOARD_ID, 'New home title')
@@ -114,9 +109,9 @@ describe('renameBoardAtom', () => {
   })
 
   it('is a no-op given the same title already set (no spurious history step)', async () => {
-    const { store, renameBoardAtom, loadImportedBoardAtom, boardAtom } =
+    const { store, renameBoardAtom, currentBoardAtom, boardAtom } =
       await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    store.set(currentBoardAtom, boardWithChild())
     const before = store.get(boardAtom)
 
     store.set(renameBoardAtom, 'child-1', 'Untitled board')
@@ -128,17 +123,15 @@ describe('renameBoardAtom', () => {
     const {
       store,
       renameBoardAtom,
-      loadImportedBoardAtom,
+      currentBoardAtom,
       boardFamily,
       undoBoardAtom,
       currentBoardIdAtom,
     } = await freshState()
-    store.set(loadImportedBoardAtom, boardWithChild())
+    store.set(currentBoardAtom, boardWithChild())
 
     // Renaming a board-node's target board from root (Sub-phase 4's
     // on-canvas rename) — attribution is root, the board acted *from*.
-    // Advance past the 400ms coalescing window so this doesn't merge with
-    // the import itself into a single undo step.
     vi.advanceTimersByTime(1000)
     store.set(currentBoardIdAtom, ROOT_BOARD_ID)
     store.set(renameBoardAtom, 'child-1', 'Renamed from root')

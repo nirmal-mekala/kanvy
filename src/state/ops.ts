@@ -56,11 +56,10 @@ export interface ImageOp {
 /**
  * A full-document swap — the one exception to "every mutation is a
  * per-entity create/update" (state/history/boardHistoryAtom.ts's
- * `loadImportedBoardAtom`, spec §9/Q14): a JSON import can replace
- * `nodes`/`edges`/`boards`/`images` all at once, wholesale, and diffing
- * that down to per-entity ops would be exactly the auto-diff approach the
- * design doc's developer preference rejected for ordinary mutations. Kept
- * to this one call site rather than a general escape hatch.
+ * `acknowledgeRecoveryAtom`): a corrupt-data recovery has no prior *valid*
+ * board to diff against, so it force-overwrites with `before === after`
+ * rather than per-entity ops. Kept to this one call site rather than a
+ * general escape hatch.
  */
 export interface ReplaceBoardOp {
   kind: 'replace-board'

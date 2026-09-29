@@ -8,30 +8,6 @@ import { seedBoard } from './fixtures/board'
 // The touch-drag spec needed `hasTouch: true` added to
 // playwright.config.ts's `use` block, which wasn't set anywhere before.
 
-test.describe('import-failure UI (spec §9/Q14)', () => {
-  test('shows a dismissible toast, not window.alert, on a bad import file', async ({
-    page,
-  }) => {
-    await page.goto('/')
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.locator('button[title="Import a board from a JSON file"]').click(),
-    ])
-    await fileChooser.setFiles({
-      name: 'not-a-board.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from('{ this is not valid json'),
-    })
-
-    const toast = page.locator('.toast')
-    await expect(toast).toBeVisible()
-    await expect(toast).toContainText('Could not import')
-
-    await toast.locator('.toast__dismiss').click()
-    await expect(toast).toBeHidden()
-  })
-})
-
 test.describe('corrupt-save recovery UI (spec §9/Q12)', () => {
   test('shows a recovery toast and suppresses autosave until dismissed', async ({
     page,

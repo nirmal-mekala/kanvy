@@ -1,9 +1,9 @@
 // Top bar: brand wordmark, view-mode menu (eye icon), theme toggle,
-// import/export — visual parity with the prototype's Toolbar.jsx. Zoom
+// export — visual parity with the prototype's Toolbar.jsx. Zoom
 // controls stay on the canvas itself (bottom-right overlay), matching the
 // prototype's own Board.jsx placement, not this component.
 
-import { useAtom, useAtomValue, useSetAtom } from 'jotai'
+import { useAtom, useSetAtom } from 'jotai'
 import {
   Download,
   Eye,
@@ -13,24 +13,14 @@ import {
   Moon,
   Settings,
   Sun,
-  Upload,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
-import { focusNodeIdAtom } from '../../state/atoms/focus'
-import {
-  accessModeAtom,
-  settingsModalOpenAtom,
-} from '../../state/atoms/networkSettings'
-import { clearSelectionAtom } from '../../state/atoms/selection'
+import { settingsModalOpenAtom } from '../../state/atoms/networkSettings'
 import { themeAtom, toggleThemeAtom } from '../../state/atoms/theme'
-import { pushToastAtom } from '../../state/atoms/toasts'
 import { setViewModeAtom, viewModeAtom } from '../../state/atoms/viewMode'
-import {
-  boardAtom,
-  loadImportedBoardAtom,
-} from '../../state/history/boardHistoryAtom'
-import { exportBoard, parseImportedBoard } from '../../state/persistence/import'
+import { boardAtom } from '../../state/history/boardHistoryAtom'
+import { exportBoard } from '../../state/persistence/export'
 import { Breadcrumb } from '../breadcrumb/Breadcrumb'
 import { SettingsModal } from '../settings/SettingsModal'
 
@@ -67,17 +57,10 @@ export function Toolbar({ boardId }: { boardId: string }) {
   const toggleTheme = useSetAtom(toggleThemeAtom)
   const [viewMode] = useAtom(viewModeAtom)
   const setViewMode = useSetAtom(setViewModeAtom)
-  const loadImportedBoard = useSetAtom(loadImportedBoardAtom)
-  const clearSelection = useSetAtom(clearSelectionAtom)
-  const setFocusNodeId = useSetAtom(focusNodeIdAtom)
-  const pushToast = useSetAtom(pushToastAtom)
-
-  const accessMode = useAtomValue(accessModeAtom)
   const [settingsOpen, setSettingsOpen] = useAtom(settingsModalOpenAtom)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
-  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -92,39 +75,10 @@ export function Toolbar({ boardId }: { boardId: string }) {
     downloadBoardJson(exportBoard(board))
   }
 
-  function handleImportClick() {
-    importInputRef.current?.click()
-  }
-
-  // Replacing the whole board makes the old selection/focus request almost
-  // certainly stale (spec §9/Q14's import path).
-  async function handleImportFileChange(
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const result = parseImportedBoard(await file.text())
-    if (!result.ok) {
-      pushToast('Could not import that file — is it a Kanvy JSON export?')
-      return
-    }
-    loadImportedBoard(result.board)
-    clearSelection()
-    setFocusNodeId(null)
-  }
-
   return (
     <>
       {settingsOpen && <SettingsModal />}
       <div className="toolbar">
-        <input
-          ref={importInputRef}
-          type="file"
-          accept="application/json,.json"
-          onChange={handleImportFileChange}
-          style={{ display: 'none' }}
-        />
         <span className="toolbar__brand">kanvy</span>
         <Breadcrumb boardId={boardId} />
 
@@ -172,17 +126,6 @@ export function Toolbar({ boardId }: { boardId: string }) {
             <Moon size={16} strokeWidth={2} />
           )}
         </button>
-
-        {accessMode !== 'network' && (
-          <button
-            type="button"
-            className="toolbar__btn toolbar__btn--icon"
-            onClick={handleImportClick}
-            title="Import a board from a JSON file"
-          >
-            <Upload size={16} strokeWidth={2} />
-          </button>
-        )}
 
         <button
           type="button"
