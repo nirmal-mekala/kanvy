@@ -625,6 +625,13 @@ test.describe('heading cards (spec §5.2)', () => {
       .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
       .click()
     const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    const textarea = card.locator('.card__content')
+
+    // A regular card's auto-grow effect (Card.tsx's `useAutoGrowHeight`)
+    // sets an *inline* `height` style directly on the textarea — confirm
+    // it's actually there before converting, or the assertion below (that
+    // converting to a heading clears it) would pass vacuously.
+    await expect(textarea).toHaveAttribute('style', /height:/)
 
     // regular -> h1: seeds the heading default box (no prior heading size
     // to preserve from).
@@ -635,6 +642,18 @@ test.describe('heading cards (spec §5.2)', () => {
       h: Number.parseFloat((el as HTMLElement).style.height),
     }))
     expect(afterH1.w).toBeGreaterThan(224) // wider than CARD_WIDTH
+
+    // The textarea's own *inline* height (left over from auto-grow while
+    // it was a regular card) must be cleared, not just left in place —
+    // an inline style always wins over the heading's CSS class rule
+    // (`height: calc(100% - 17px)`, index.css), so a stale one would
+    // permanently freeze the textarea at its pre-conversion size no
+    // matter how the heading box is later resized. Found via a screen
+    // recording showing exactly this: a card typed as regular text, then
+    // converted to h1, stayed stuck at its small pre-conversion height.
+    await expect(textarea).not.toHaveAttribute('style', /height:/)
+    const contentHeight = await textarea.evaluate((el) => el.clientHeight)
+    expect(contentHeight).toBeGreaterThan(afterH1.h - 30) // fills ~the whole box, not a leftover sliver
 
     // Resize it by hand, then switch h1 -> h2: relabels only, keeps the box.
     const handle = page.locator(

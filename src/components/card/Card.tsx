@@ -52,9 +52,21 @@ function useAutoGrowHeight(
 ) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: content isn't read in the body, but the effect must re-run on every keystroke to remeasure scrollHeight against the textarea's new content.
   useLayoutEffect(() => {
-    if (skip) return
     const el = contentRef.current
     if (!el) return
+    if (skip) {
+      // A heading's fixed height comes from CSS (`height: calc(100% -
+      // 17px)`, index.css), which an inline style always beats — so a
+      // stale `el.style.height` left over from a *previous* render where
+      // this same textarea was a regular (auto-growing) card must be
+      // cleared, not just skipped, or the heading is stuck rendering at
+      // whatever height auto-grow last set it to (found via a screen
+      // recording: a card typed as regular text, then converted to a
+      // heading via the selection menu, kept the small pre-conversion
+      // height forever).
+      el.style.height = ''
+      return
+    }
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [skip, contentRef, content])
