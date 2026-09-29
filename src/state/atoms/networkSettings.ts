@@ -81,3 +81,19 @@ export function writeNetworkAuthSettings(
     // ignore — persistence is a nicety, not required for the app to work
   }
 }
+
+/**
+ * Removes any persisted network settings (base URL + auth token) from
+ * localStorage. Silent-failure on a full/unavailable localStorage, same
+ * as `writeNetworkAuthSettings`. Does not touch in-memory state
+ * (`networkConfigAtom`/`persistTokenAtom`) — callers update those atoms
+ * themselves, same division of responsibility as `writeNetworkAuthSettings`.
+ */
+export function clearNetworkAuthSettings(): void {
+  try {
+    localStorage.removeItem(BASE_URL_KEY)
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+  } catch {
+    // ignore — persistence is a nicety, not required for the app to work
+  }
+}
