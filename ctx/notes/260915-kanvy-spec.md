@@ -395,11 +395,16 @@ respect.
     (possibly smaller) minimum is left alone, not shrunk to match.
   - Truncates (does not scroll) when content overflows; wraps (breaking
     mid-word rather than overflowing horizontally) if room allows. A
-    visual cue for clipped content was attempted (a gradient fade, then a
-    flat glyph) and shelved for now — see
-    `ctx/notes/260929-heading-truncation-indicator-tabled.md` — so a
-    truncated heading currently just clips with no on-canvas indication
-    beyond the content itself looking cut off.
+    truncated heading shows a small flat `⋯` glyph in its bottom-right
+    corner rather than cutting off text with no visual indication — a
+    shadow/gradient fade was tried and dropped for feeling out of step
+    with this app's otherwise flat, glyph-based affordances (task-status
+    dots, connector circles). See
+    `ctx/notes/260929-heading-truncation-indicator-tabled.md` for that
+    history and two real bugs found and fixed along the way: a stale
+    inline textarea height surviving a regular-to-heading conversion, and
+    an empty textarea's `scrollHeight` being measured from its wrapped
+    placeholder text rather than its actual (empty) value.
 - Toggle between regular/h1/h2/h3 via the selection menu. Switching
   between two heading levels (e.g. h1 → h2) only relabels the size — a
   user-resized box is preserved, not reset. Switching to `image` or `link`

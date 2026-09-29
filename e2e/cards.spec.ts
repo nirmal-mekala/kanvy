@@ -470,6 +470,11 @@ test.describe('heading cards (spec §5.2)', () => {
       expect(overflowsButHidden.overflows).toBe(true)
       expect(overflowsButHidden.overflowY).toBe('hidden')
 
+      // A flat glyph cues the truncation — not a shadow/gradient fade,
+      // which felt out of step with this app's other flat affordances
+      // (task-status dots, connector circles) once seen in place.
+      await expect(card.locator('.card__content-more')).toBeVisible()
+
       // Resize via the se handle, grid-snapped, past the documented minimum.
       const handle = page.locator(
         '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
@@ -570,6 +575,72 @@ test.describe('heading cards (spec §5.2)', () => {
     expect(afterEdgeDrag).toBe(afterResize)
   })
 
+  test("the truncation glyph is absent when a heading's content fits its box", async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [
+        { ...textCard('a', 100, 100, 'One line'), size: 'h1', w: 320, h: 240 },
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
+  })
+
+  test('the truncation glyph tracks real overflow through a live regular-to-heading conversion, not just a directly-seeded heading', async ({
+    page,
+  }) => {
+    // Every other glyph test seeds a heading-sized node directly into
+    // localStorage — exactly the shape of gap that let two real bugs ship
+    // unnoticed, both of which only manifested via the live
+    // regular-card-typed-then-converted flow, never a directly-seeded
+    // one: the stale-inline-height bug (fixed above) and an empty
+    // textarea's `scrollHeight` being measured from its wrapped
+    // *placeholder* text rather than its (empty) value, which made a
+    // freshly-converted, not-yet-typed-into heading read as clipped.
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/${CHILD_BOARD_ID}`)
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    await page.mouse.dblclick(boardBox.x + 200, boardBox.y + 200)
+    // Double-click autofocuses the new card's textarea, but only once
+    // React commits the focus effect — an explicit click guarantees the
+    // typing below actually lands in the field instead of racing it.
+    await page.locator('[data-testid="card"] .card__content').click()
+    await page.keyboard.type(
+      'a heading long enough to overflow its default one-line box',
+    )
+    await page.mouse.click(boardBox.x + 500, boardBox.y + 500)
+
+    const card = page.locator('[data-testid="card"]')
+    await card.locator('.card__bar').click()
+    await page.locator('.textsize-swatch[title="Heading 1"]').click()
+    await expect(card).toHaveClass(/card--h1/)
+
+    // Long content in the small default box: should read as clipped.
+    await expect(card.locator('.card__content-more')).toBeVisible()
+
+    // Grow the box past what the content needs: the glyph must clear —
+    // proving this isn't just permanently stuck "on" the way the
+    // stale-inline-height bug made it look.
+    const handle = card.locator('.resize-handle--se')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 5 + 200, handleBox.y + 5 + 300, {
+      steps: 8,
+    })
+    await page.mouse.up()
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
+  })
+
   test("a resized-down heading card clamps to its own level's minimum height, not a shared one", async ({
     page,
   }) => {
@@ -654,6 +725,14 @@ test.describe('heading cards (spec §5.2)', () => {
     await expect(textarea).not.toHaveAttribute('style', /height:/)
     const contentHeight = await textarea.evaluate((el) => el.clientHeight)
     expect(contentHeight).toBeGreaterThan(afterH1.h - 30) // fills ~the whole box, not a leftover sliver
+
+    // This card's content is empty, so it can't possibly be clipped —
+    // the truncation glyph must be absent. Before the stale-inline-height
+    // bug above was fixed, this glyph read as "always present" (reported
+    // separately): a frozen, too-small `clientHeight` made
+    // `scrollHeight > clientHeight` look true almost regardless of
+    // content, which this assertion would have caught.
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
 
     // Resize it by hand, then switch h1 -> h2: relabels only, keeps the box.
     const handle = page.locator(

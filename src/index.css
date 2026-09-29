@@ -842,6 +842,22 @@ body {
   font-size: 1.75rem;
 }
 
+/* Truncation cue for a heading whose text is clipped (spec §5.2:
+   truncates rather than scrolling) — rendered only when JS detects
+   actual clipping (Card.tsx's `useOverflowClipped`), so a heading whose
+   content fits shows no cue at all. A small flat glyph in the same
+   muted ink used elsewhere for de-emphasized/decorative marks (task
+   status dots, connector affordances), not a shadow/gradient fade — this
+   app's affordances are consistently flat lines/glyphs, never textured
+   ones. */
+.card__content-more {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  color: var(--color-ink-soft);
+  pointer-events: none;
+}
+
 /* ---------- container ---------- */
 
 /* Never given a z-index — its stacking relies entirely on DOM order (it's

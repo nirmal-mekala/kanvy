@@ -15,7 +15,7 @@
 
 import { useNavigate } from '@tanstack/react-router'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard, MoreHorizontal } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import type { Theme } from '../../colors/colorKey'
@@ -29,6 +29,26 @@ import { CardMedia } from './CardMedia'
 import { RecencyIndicator } from './RecencyIndicator'
 import { TaskStatusIcon } from './TaskStatusIcon'
 
+/**
+ * The truncation cue for a heading whose text overflows its fixed box
+ * (spec §5.2) — a small flat glyph, not a shadow/gradient fade: this
+ * app's affordances (`TaskStatusIcon`, the connector dots, the board
+ * icon) are consistently flat glyphs/lines, never textured/shadowed
+ * ones. Split out of `CardBody` purely to keep its cognitive complexity
+ * under Biome's threshold.
+ */
+function CardContentTruncationIndicator({ clipped }: { clipped: boolean }) {
+  if (!clipped) return null
+  return (
+    <MoreHorizontal
+      className="card__content-more"
+      size={14}
+      strokeWidth={2}
+      aria-hidden="true"
+    />
+  )
+}
+
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage comes from
 // e2e/visual-regression specs.
@@ -40,6 +60,7 @@ export function CardBody({
   viewMode,
   showCaption,
   tinted,
+  clipped,
   contentRef,
   onContentChange,
   onContentBlur,
@@ -50,6 +71,8 @@ export function CardBody({
   viewMode: ViewMode
   showCaption: boolean
   tinted: boolean
+  /** True when a heading card's text is truncated by its fixed box (spec §5.2) — shows a small `.card__content-more` glyph as a visual cue instead of a silent cut-off. Always `false` for non-heading cards. */
+  clipped: boolean
   contentRef: RefObject<HTMLTextAreaElement | null>
   onContentChange?: (content: string) => void
   onContentBlur?: () => void
@@ -175,6 +198,7 @@ export function CardBody({
               onContentBlur?.()
             }}
           />
+          <CardContentTruncationIndicator clipped={clipped} />
           {emojiView.isOpen && emojiView.position && (
             <EmojiSuggestionMenu
               mode={emojiView.mode}
