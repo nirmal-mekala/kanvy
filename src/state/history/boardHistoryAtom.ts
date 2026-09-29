@@ -101,7 +101,7 @@ interface PendingSave {
  * practice: `updateBoardAtom` is the only caller that can accumulate
  * across calls (always `direction: 'after'`, and it flushes first itself
  * — see its own comment — whenever `boardId` would otherwise change
- * mid-batch), and every other caller (undo/redo/import/recovery-ack)
+ * mid-batch), and every other caller (undo/redo/recovery-ack)
  * flushes before its own `save`, so `pending` is always empty by the time
  * they call it and this never actually has to reconcile a mismatch.
  */
@@ -344,48 +344,5 @@ export const redoBoardAtom = atom(null, (get, set) => {
     boardId,
     board: nextBoard,
   })
-  saver.flush()
-})
-
-/**
- * Replaces the whole board with an imported one (spec §9/Q14) — goes
- * through the normal undo path, so an accidental import is just another
- * ⌘/Ctrl+Z away from being undone, same as any other mutation. Import can
- * change every top-level collection at once, wholesale, so this is the one
- * op that isn't a per-entity create/update (`ops.ts`'s `ReplaceBoardOp`) —
- * diffing it down to per-entity ops would be exactly the auto-diff
- * approach the design doc's developer preference rejected for ordinary
- * mutations. Always its own history entry (`forceNewEntry: true`), so it's
- * never merged with anything. Attributed to whichever board was being
- * viewed when the import happened (import/export operate on the whole app
- * document, per ctx/notes/260917-multiboard-implementation-plan.md §1's
- * Q1 — there's no more specific board to attribute it to).
- */
-export const loadImportedBoardAtom = atom(null, (get, set, board: Board) => {
-  const boardId = get(currentBoardIdAtom)
-  const prevBoard = get(currentBoardAtom)
-  if (board === prevBoard) return
-  set(currentBoardAtom, board)
-  const history = get(boardHistoryAtom)
-  const op: ReplaceBoardOp = {
-    kind: 'replace-board',
-    before: prevBoard,
-    after: board,
-  }
-  const ops: Op[] = [op]
-  set(
-    boardHistoryAtom,
-    pushUpdate(
-      history,
-      { ops, boardId },
-      Date.now(),
-      undefined,
-      true,
-      mergeAttributedOps,
-    ),
-  )
-  // Its own complete action, same reasoning as undo/redo above.
-  saver.flush()
-  autosaveIfAcknowledged(get, { ops, direction: 'after', boardId, board })
   saver.flush()
 })
