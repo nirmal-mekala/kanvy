@@ -1,15 +1,14 @@
 // Connection-details settings modal (network mode design doc §2, later
 // narrowed — mode switching itself now lives in the canvas's mode toggle,
-// components/canvas/ModeToggle.tsx). Mirrors ConfirmModal.tsx's
-// backdrop+dialog structure (Escape to dismiss, a real button standing in
-// for the backdrop). Nothing here touches app state until Confirm is
-// pressed: the fields/checkbox are pure local draft state, and Confirm
-// only applies the draft after a successful connection test — same
-// "Save & Connect" behavior the modal always had, just without its own
-// Local/Network buttons.
+// components/canvas/ModeToggle.tsx). Built on the shared Modal primitive
+// (../modal/Modal.tsx), same as ConfirmModal.tsx. Nothing here touches app
+// state until Confirm is pressed: the fields/checkbox are pure local draft
+// state, and Confirm only applies the draft after a successful connection
+// test — same "Save & Connect" behavior the modal always had, just without
+// its own Local/Network buttons.
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { testConnection } from '../../api/restClient'
 import {
   accessModeAtom,
@@ -24,6 +23,7 @@ import {
   networkHomeLoadingAtom,
   switchToLocalMode,
 } from '../../state/networkBoardLoader'
+import { Modal } from '../modal/Modal'
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage comes from
@@ -69,18 +69,6 @@ export function SettingsModal() {
     }
   }
 
-  // Re-registered every render (cheap) so Escape/Enter always close over
-  // the latest onClose/handleConfirm — same as ConfirmModal.tsx's own
-  // keydown effect, which does the same for the same reason.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'Enter') handleConfirm()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  })
-
   function handleClearNetworkSettings() {
     if (accessMode === 'network') {
       switchToLocalMode()
@@ -96,96 +84,84 @@ export function SettingsModal() {
   }
 
   return (
-    <div
-      className="modal-backdrop settings-backdrop"
-      onPointerDown={(e) => e.stopPropagation()}
+    <Modal
+      title="Connection settings"
+      titleId="settings-modal__title"
+      onDismiss={onClose}
+      onConfirm={handleConfirm}
+      dismissLabel="Close settings"
+      dialogClassName="settings-modal"
+      backdropClassName="settings-backdrop"
     >
-      <button
-        type="button"
-        className="modal-backdrop__dismiss"
-        aria-label="Close settings"
-        onClick={onClose}
-      />
-      <div
-        className="settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal__title"
-      >
-        <h2 id="settings-modal__title" className="settings-modal__title">
-          Connection settings
-        </h2>
+      <div className="settings-modal__fields">
+        <label className="settings-modal__field">
+          <span className="settings-modal__label">Base URL</span>
+          <input
+            type="text"
+            className="settings-modal__input"
+            placeholder="http://localhost:1996"
+            value={draftBaseUrl}
+            onChange={(e) => setDraftBaseUrl(e.target.value)}
+          />
+        </label>
+        <label className="settings-modal__field">
+          <span className="settings-modal__label">Auth token (optional)</span>
+          <input
+            type="text"
+            className="settings-modal__input"
+            placeholder="Sent as Authorization: Bearer <token>"
+            value={draftAuthToken}
+            onChange={(e) => setDraftAuthToken(e.target.value)}
+          />
+        </label>
+        <label className="settings-modal__checkbox-field">
+          <input
+            type="checkbox"
+            checked={draftPersistToken}
+            onChange={(e) => setDraftPersistToken(e.target.checked)}
+          />
+          <span>Persist token to this browser's local storage</span>
+        </label>
+        {draftPersistToken && (
+          <p className="settings-modal__warning">
+            The token will be stored in plaintext in this browser's local
+            storage. Anyone with access to this device/browser could read it.
+          </p>
+        )}
+      </div>
 
-        <div className="settings-modal__fields">
-          <label className="settings-modal__field">
-            <span className="settings-modal__label">Base URL</span>
-            <input
-              type="text"
-              className="settings-modal__input"
-              placeholder="http://localhost:1996"
-              value={draftBaseUrl}
-              onChange={(e) => setDraftBaseUrl(e.target.value)}
-            />
-          </label>
-          <label className="settings-modal__field">
-            <span className="settings-modal__label">Auth token (optional)</span>
-            <input
-              type="text"
-              className="settings-modal__input"
-              placeholder="Sent as Authorization: Bearer <token>"
-              value={draftAuthToken}
-              onChange={(e) => setDraftAuthToken(e.target.value)}
-            />
-          </label>
-          <label className="settings-modal__checkbox-field">
-            <input
-              type="checkbox"
-              checked={draftPersistToken}
-              onChange={(e) => setDraftPersistToken(e.target.checked)}
-            />
-            <span>Persist token to this browser's local storage</span>
-          </label>
-          {draftPersistToken && (
-            <p className="settings-modal__warning">
-              The token will be stored in plaintext in this browser's local
-              storage. Anyone with access to this device/browser could read it.
-            </p>
-          )}
-        </div>
+      {error && <p className="settings-modal__error">{error}</p>}
 
-        {error && <p className="settings-modal__error">{error}</p>}
-
-        <div className="settings-modal__actions">
+      <div className="settings-modal__actions">
+        <button
+          type="button"
+          className="confirm-modal__btn confirm-modal__btn--confirm"
+          onClick={handleClearNetworkSettings}
+        >
+          Clear Network Settings
+        </button>
+        <div className="settings-modal__actions-group">
           <button
             type="button"
-            className="confirm-modal__btn settings-modal__clear-btn"
-            onClick={handleClearNetworkSettings}
+            className="confirm-modal__btn confirm-modal__btn--cancel"
+            onClick={onClose}
           >
-            Clear Network Settings
+            Cancel
           </button>
-          <div className="settings-modal__actions-group">
-            <button
-              type="button"
-              className="confirm-modal__btn confirm-modal__btn--cancel"
-              onClick={onClose}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="confirm-modal__btn confirm-modal__btn--positive"
-              onClick={handleConfirm}
-              disabled={testing || !draftBaseUrl}
-            >
-              {homeLoading
-                ? 'Loading board…'
-                : testing
-                  ? 'Testing…'
-                  : 'Save & Connect'}
-            </button>
-          </div>
+          <button
+            type="button"
+            className="confirm-modal__btn confirm-modal__btn--positive"
+            onClick={handleConfirm}
+            disabled={testing || !draftBaseUrl}
+          >
+            {homeLoading
+              ? 'Loading board…'
+              : testing
+                ? 'Testing…'
+                : 'Save & Connect'}
+          </button>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
