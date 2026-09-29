@@ -28,6 +28,20 @@
   --font-mono: "Fira Code", "Courier New", monospace;
 }
 
+/* Modal dialogs (help panel, confirm modal, settings modal) use the system
+   UI stack rather than the app's default monospace (--font-mono) — prose-
+   heavy dialog content reads better in a sans-serif face than the canvas's
+   label/data typography does. Deliberately NOT named `--font-sans` (or any
+   other `--font-*` name): that's a reserved Tailwind v4 `@theme` namespace
+   Tailwind provides its own default for, which silently wins over a
+   same-named override placed in `@theme` here — this needs to be a plain,
+   non-`@theme` custom property to actually take the value below. */
+:root {
+  --modal-font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
 :root {
   color-scheme: light;
   --radius: 5px;
@@ -373,11 +387,17 @@ body {
   transform: translateX(var(--board-mode-toggle-travel));
 }
 
-/* Shared by every full-screen dialog backdrop (help panel, confirm modal)
-   — each pairs this with its own z-index modifier class (`.help-backdrop`/
-   `.confirm-backdrop`) so a later-opened dialog always sits on top. */
+/* Shared by every full-screen dialog (help panel, confirm modal, settings
+   modal) — components/modal/Modal.tsx portals this to `document.body`,
+   and `position: fixed` (not `absolute`) is what makes that portal
+   actually cover the viewport: `absolute` would still size itself against
+   whatever positioned ancestor happens to contain the portal target,
+   which for `document.body` is the initial containing block anyway, but
+   `fixed` doesn't depend on that being true. Each dialog pairs this with
+   its own z-index modifier class (`.help-backdrop`/`.confirm-backdrop`/
+   `.settings-backdrop`) so a later-opened dialog always sits on top. */
 .modal-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
@@ -396,25 +416,52 @@ body {
   cursor: default;
 }
 
-.help-backdrop {
-  z-index: 30;
-}
-
-.help-panel {
+/* Shared dialog chrome — every modal built on components/modal/Modal.tsx
+   gets this for free. Sizing itself is one of exactly two fixed
+   footprints (`.modal-dialog--standard`/`.modal-dialog--compact` below),
+   not per-modal content-sizing, so dialogs of the same size never shift
+   position/dimensions when swapped for one another. Content taller than
+   the dialog scrolls inside it (`overflow: auto`) rather than growing it.
+   Sans-serif (--modal-font-family), not this app's default --font-mono —
+   see @theme's comment on --font-sans for why this isn't `--font-sans`. */
+.modal-dialog {
   position: relative;
-  width: min(640px, 90%);
-  max-height: 80%;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   padding: 24px 28px;
   background: var(--color-surface);
   border: 2px solid var(--color-outline);
   border-radius: var(--radius);
+  font-family: var(--modal-font-family);
+  font-weight: 400;
 }
 
-.help-panel__title {
+/* The app's one "full dialog" size — help panel, settings modal: enough
+   room for a scrollable list/form, not just a line or two of text. */
+.modal-dialog--standard {
+  width: 560px;
+  max-width: 90vw;
+  height: 480px;
+  max-height: 85vh;
+}
+
+/* The app's one "quick confirmation" size — confirm modal: sized to its
+   (short, title+body+two-buttons) content rather than the standard
+   dialog's fixed height, so a yes/no prompt doesn't dwarf its own text. */
+.modal-dialog--compact {
+  width: min(420px, 90vw);
+  max-height: 85vh;
+}
+
+.modal-dialog__title {
   margin: 0 0 16px;
   font-size: 1.05rem;
   font-weight: 700;
+}
+
+.help-backdrop {
+  z-index: 30;
 }
 
 .help-panel__table {
@@ -1308,21 +1355,6 @@ input:focus-visible,
   z-index: 40;
 }
 
-.confirm-modal {
-  position: relative;
-  width: min(420px, 90%);
-  padding: 24px 28px;
-  background: var(--color-surface);
-  border: 2px solid var(--color-outline);
-  border-radius: var(--radius);
-}
-
-.confirm-modal__title {
-  margin: 0 0 12px;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
 .confirm-modal__body {
   margin: 0 0 20px;
   font-size: 0.9rem;
@@ -1388,27 +1420,6 @@ input:focus-visible,
   z-index: 40;
 }
 
-.settings-modal {
-  position: relative;
-  width: min(560px, 92%);
-  height: 460px;
-  display: flex;
-  flex-direction: column;
-  padding: 24px 28px;
-  background: var(--color-surface);
-  border: 2px solid var(--color-outline);
-  border-radius: var(--radius);
-}
-
-.settings-modal__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 16px;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
 .settings-modal__fields {
   display: flex;
   flex-direction: column;
@@ -1463,16 +1474,6 @@ input:focus-visible,
   margin: 0 0 16px;
   font-size: 0.85rem;
   color: #bf616a;
-}
-
-.settings-modal__clear-btn {
-  background: var(--color-surface);
-  color: #bf616a;
-  border: 2px solid #bf616a;
-}
-
-.settings-modal__clear-btn:hover {
-  background: color-mix(in srgb, #bf616a 12%, transparent);
 }
 
 .settings-modal__actions {

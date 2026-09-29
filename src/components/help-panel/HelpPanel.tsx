@@ -5,7 +5,7 @@
 // are left out, ported verbatim from the prototype's own `SHORTCUTS` list.
 
 import { CircleHelp } from 'lucide-react'
-import { useEffect } from 'react'
+import { Modal } from '../modal/Modal'
 
 const SHORTCUTS: readonly [string, string][] = [
   ['⌘/Ctrl + click + drag', 'Create a container'],
@@ -29,15 +29,6 @@ export function HelpPanel({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  useEffect(() => {
-    if (!open) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onOpenChange(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onOpenChange])
-
   return (
     <>
       <button
@@ -51,38 +42,25 @@ export function HelpPanel({
       </button>
 
       {open && (
-        <div
-          className="modal-backdrop help-backdrop"
-          onPointerDown={(e) => e.stopPropagation()}
+        <Modal
+          title="Keyboard shortcuts"
+          titleId="help-panel__title"
+          onDismiss={() => onOpenChange(false)}
+          dismissLabel="Close keyboard shortcuts"
+          dialogClassName="help-panel"
+          backdropClassName="help-backdrop"
         >
-          {/* A real, keyboard-operable button standing in for the backdrop
-              itself — clicking (or Enter/Space-activating) anywhere outside
-              the panel dismisses it, same as Escape or the `?` button. */}
-          <button
-            type="button"
-            className="modal-backdrop__dismiss"
-            aria-label="Close keyboard shortcuts"
-            onClick={() => onOpenChange(false)}
-          />
-          <div
-            className="help-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Keyboard shortcuts"
-          >
-            <h2 className="help-panel__title">Keyboard shortcuts</h2>
-            <table className="help-panel__table">
-              <tbody>
-                {SHORTCUTS.map(([key, desc]) => (
-                  <tr key={key}>
-                    <td className="help-panel__key">{key}</td>
-                    <td>{desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <table className="help-panel__table">
+            <tbody>
+              {SHORTCUTS.map(([key, desc]) => (
+                <tr key={key}>
+                  <td className="help-panel__key">{key}</td>
+                  <td>{desc}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
       )}
     </>
   )
