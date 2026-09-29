@@ -328,34 +328,6 @@ export const updateLinkAtom = atom(
 )
 
 /**
- * Reorders `nodes` to match `orderedIds` exactly (array order doubles as
- * z-index — phase2 schema §1). `orderedIds` is expected to be exactly the
- * current board's own node ids (a no-op otherwise) — only the *content* at
- * each of the current board's own array positions is permuted; the
- * positions themselves, and every other board's interleaved entries, are
- * left untouched.
- */
-export const reorderNodesAtom = atom(
-  null,
-  (get, set, orderedIds: readonly NodeId[]) => {
-    const currentBoardId = get(currentBoardIdAtom)
-    const board = get(boardAtom)
-    const liveNodes = getLiveNodes(board, currentBoardId)
-    const ownIds = new Set(liveNodes.map((node) => node.id))
-    if (
-      orderedIds.length !== ownIds.size ||
-      !orderedIds.every((id) => ownIds.has(id))
-    ) {
-      return
-    }
-    const before = liveNodes.map((node) => ({ id: node.id, index: node.index }))
-    const after = orderedIds.map((id, index) => ({ id, index }))
-    const op: Op = { kind: 'reorder', boardId: currentBoardId, before, after }
-    set(updateBoardAtom, currentBoardId, [op])
-  },
-)
-
-/**
  * Tombstones a mixed set of node/edge ids in one step (spec §4.2's
  * Backspace/Delete; schema v4 tombstoning, ctx/notes/260921-action-based-
  * undo-and-tombstoning.md Q2/§2b) — sets `status: 'trashed'` rather than

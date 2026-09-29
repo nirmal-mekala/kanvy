@@ -293,6 +293,16 @@ single-node reorder can insert between two existing entries
 (`(A.index + B.index) / 2`) as one field write instead of renumbering
 everything after it.
 
+-> 260929 addendum: `reorderNodesAtom` (state/atoms/nodes.ts) and its
+`ReorderOp` (state/ops.ts) — confirmed above as unreachable from the UI —
+have been removed, along with their `applyOps`/`mergeOpLists` handling and
+their network-mode no-mapping skip (api/networkOps.ts). `index` remains on
+the schema (still written at creation, still a float for the reasons
+above) since it's part of the corrected v0 data model, independent of
+whether anything currently reorders by it; a future single-node reorder
+would reintroduce it as an ordinary `UpdateOp` per this addendum's own
+note above, not a dedicated op type.
+
 - **Q5 — export/import scope for trashed content.** Presumably trashed
   entities travel with JSON export/import until reaped, same as boards
   today — but this wasn't asked explicitly when boards got tombstoned

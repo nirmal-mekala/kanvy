@@ -190,8 +190,8 @@ function reconcileOp(
   if (op.kind === 'create') return reconcileCreateOp(op, kind, oldId, newId)
   if (op.kind === 'update') return reconcileUpdateOp(op, kind, oldId, newId)
   // 'image' ops key off their own `id` (the image's id) directly, and
-  // carry no other entity's cross-reference field; 'reorder'/'replace-board'
-  // aren't reachable from network-mode create paths (ops.ts) — left as-is.
+  // carry no other entity's cross-reference field; 'replace-board' isn't
+  // reachable from network-mode create paths (ops.ts) — left as-is.
   if (op.kind === 'image' && kind === 'image' && op.id === oldId) {
     return { ...op, id: newId }
   }

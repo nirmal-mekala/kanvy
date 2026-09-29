@@ -96,10 +96,9 @@ describe('applyOpsToNetwork', () => {
     expect(init.method).toBe('DELETE')
   })
 
-  it('skips ReorderOp/ReplaceBoardOp — no REST mapping (design doc §5/§10)', async () => {
+  it('skips ReplaceBoardOp — no REST mapping (design doc §10)', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
     const ops: Op[] = [
-      { kind: 'reorder', boardId: 'root', before: [], after: [] },
       {
         kind: 'replace-board',
         before: {} as never,
