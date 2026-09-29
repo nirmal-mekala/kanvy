@@ -139,20 +139,27 @@ describe('nodes atoms', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 
-  it('setTextSizeAtom regular → h1 seeds the heading default box', async () => {
-    const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =
-      await freshState()
-    store.set(addNodeAtom, textNode('n1', { size: 'regular', w: 224, h: 90 }))
+  it.each([
+    ['h1', 96], // HEADING_DEFAULT_H.h1 — fits one 3rem line
+    ['h2', 80], // HEADING_DEFAULT_H.h2 — fits one 2.25rem line
+    ['h3', 80], // HEADING_DEFAULT_H.h3 — fits one 1.75rem line (same grid step as h2)
+  ] as const)(
+    "setTextSizeAtom regular → %s seeds that level's default box",
+    async (size, expectedH) => {
+      const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =
+        await freshState()
+      store.set(addNodeAtom, textNode('n1', { size: 'regular', w: 224, h: 90 }))
 
-    store.set(setTextSizeAtom, ['n1'], 'h1')
+      store.set(setTextSizeAtom, ['n1'], size)
 
-    const node = store.get(nodeFamily('n1'))
-    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
-      'h1',
-    )
-    expect(node?.w).toBe(256) // HEADING_DEFAULT_W (GRID_SIZE * 16)
-    expect(node?.h).toBe(128) // HEADING_DEFAULT_H (GRID_SIZE * 8)
-  })
+      const node = store.get(nodeFamily('n1'))
+      expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
+        size,
+      )
+      expect(node?.w).toBe(256) // HEADING_DEFAULT_W (GRID_SIZE * 16) — shared across levels
+      expect(node?.h).toBe(expectedH)
+    },
+  )
 
   it('setTextSizeAtom h1 → h2 relabels size only, preserving the current (user-resized) box', async () => {
     const { store, addNodeAtom, setTextSizeAtom, nodeFamily } =

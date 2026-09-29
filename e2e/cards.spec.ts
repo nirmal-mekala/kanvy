@@ -464,10 +464,16 @@ test.describe('heading cards (spec §5.2)', () => {
         return {
           overflowY: style.overflowY,
           overflows: el.scrollHeight > el.clientHeight,
+          clientHeight: el.clientHeight,
         }
       })
       expect(overflowsButHidden.overflows).toBe(true)
       expect(overflowsButHidden.overflowY).toBe('hidden')
+
+      // A flat glyph cues the truncation — not a shadow/gradient fade,
+      // which felt out of step with this app's other flat affordances
+      // (task-status dots, connector circles) once seen in place.
+      await expect(card.locator('.card__content-more')).toBeVisible()
 
       // Resize via the se handle, grid-snapped, past the documented minimum.
       const handle = page.locator(
@@ -491,8 +497,190 @@ test.describe('heading cards (spec §5.2)', () => {
       expect(box.h % 16).toBe(0)
       expect(box.w).toBeGreaterThan(320)
       expect(box.h).toBeGreaterThan(240)
+
+      // The textarea's own rendered box — not just the outer `.card`
+      // div's inline style — must grow along with it, and the overflow
+      // that was clipped before growing is now visible (or at least
+      // less clipped): proves the stored height increase actually
+      // reaches the content box, not just the outer div.
+      const afterGrow = await textarea.evaluate((el) => el.clientHeight)
+      expect(afterGrow).toBeGreaterThan(overflowsButHidden.clientHeight)
     })
   }
+
+  test('the n resize handle and its same-side connector both stay independently grabbable', async ({
+    page,
+  }) => {
+    // A heading's cardinal-direction resize handles (`.resize-handle--n`)
+    // and the connector affordance on the same side
+    // (`.node-connector--top`) are both centered on that edge, so their
+    // hit areas fully overlap at the exact point either would naturally
+    // be grabbed — the n handle is notched (`clip-path`, index.css)
+    // around the connector's ~16px-wide hit area so both remain usable.
+    await seed(page, {
+      version: 1,
+      nodes: [
+        { ...textCard('a', 100, 100, 'Header'), size: 'h1', w: 320, h: 240 },
+        textCard('b', 100, 700),
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await card.click()
+
+    const handle = card.locator('.resize-handle--n')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    const centerX = handleBox.x + handleBox.width / 2
+    const centerY = handleBox.y + handleBox.height / 2
+
+    // Off-center (outside the notch): grabs the resize handle.
+    await page.mouse.move(centerX + 40, centerY)
+    await page.mouse.down()
+    await page.mouse.move(centerX + 40, centerY - 40, { steps: 5 })
+    await page.mouse.up()
+    const afterResize = await card.evaluate((el) =>
+      Number.parseFloat((el as HTMLElement).style.height),
+    )
+    expect(afterResize).toBeGreaterThan(240)
+
+    // Exactly at the notch (the connector's own spot): still grabs the
+    // connector, not the handle — dragging from there to another node
+    // creates an edge instead of resizing further.
+    const connectorBox = await card
+      .locator('.node-connector--top')
+      .boundingBox()
+    if (!connectorBox) throw new Error('connector not rendered')
+    const targetBox = await page
+      .locator('[data-node-id="b"]:not(.node-connector)')
+      .boundingBox()
+    if (!targetBox) throw new Error('target not rendered')
+    await page.mouse.move(
+      connectorBox.x + connectorBox.width / 2,
+      connectorBox.y + connectorBox.height / 2,
+    )
+    await page.mouse.down()
+    await page.mouse.move(
+      targetBox.x + targetBox.width / 2,
+      targetBox.y + targetBox.height / 2,
+    )
+    await page.mouse.up()
+    await expect(page.locator('[data-edge-id]')).toHaveCount(1)
+    // The edge-drag didn't also resize the card further.
+    const afterEdgeDrag = await card.evaluate((el) =>
+      Number.parseFloat((el as HTMLElement).style.height),
+    )
+    expect(afterEdgeDrag).toBe(afterResize)
+  })
+
+  test("the truncation glyph is absent when a heading's content fits its box", async ({
+    page,
+  }) => {
+    await seed(page, {
+      version: 1,
+      nodes: [
+        { ...textCard('a', 100, 100, 'One line'), size: 'h1', w: 320, h: 240 },
+      ],
+      edges: [],
+      images: {},
+    })
+    await page.goto('/')
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
+  })
+
+  test('the truncation glyph tracks real overflow through a live regular-to-heading conversion, not just a directly-seeded heading', async ({
+    page,
+  }) => {
+    // Every other glyph test seeds a heading-sized node directly into
+    // localStorage — exactly the shape of gap that let two real bugs ship
+    // unnoticed, both of which only manifested via the live
+    // regular-card-typed-then-converted flow, never a directly-seeded
+    // one: the stale-inline-height bug (fixed above) and an empty
+    // textarea's `scrollHeight` being measured from its wrapped
+    // *placeholder* text rather than its (empty) value, which made a
+    // freshly-converted, not-yet-typed-into heading read as clipped.
+    await seed(page, childBoardDocument([]))
+    await page.goto(`/${CHILD_BOARD_ID}`)
+    const board = page.locator('[data-testid="canvas-root"]')
+    const boardBox = await board.boundingBox()
+    if (!boardBox) throw new Error('board not rendered')
+
+    await page.mouse.dblclick(boardBox.x + 200, boardBox.y + 200)
+    // Double-click autofocuses the new card's textarea, but only once
+    // React commits the focus effect — an explicit click guarantees the
+    // typing below actually lands in the field instead of racing it.
+    await page.locator('[data-testid="card"] .card__content').click()
+    await page.keyboard.type(
+      'a heading long enough to overflow its default one-line box',
+    )
+    await page.mouse.click(boardBox.x + 500, boardBox.y + 500)
+
+    const card = page.locator('[data-testid="card"]')
+    await card.locator('.card__bar').click()
+    await page.locator('.textsize-swatch[title="Heading 1"]').click()
+    await expect(card).toHaveClass(/card--h1/)
+
+    // Long content in the small default box: should read as clipped.
+    await expect(card.locator('.card__content-more')).toBeVisible()
+
+    // Grow the box past what the content needs: the glyph must clear —
+    // proving this isn't just permanently stuck "on" the way the
+    // stale-inline-height bug made it look.
+    const handle = card.locator('.resize-handle--se')
+    const handleBox = await handle.boundingBox()
+    if (!handleBox) throw new Error('handle not rendered')
+    await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 5 + 200, handleBox.y + 5 + 300, {
+      steps: 8,
+    })
+    await page.mouse.up()
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
+  })
+
+  test("a resized-down heading card clamps to its own level's minimum height, not a shared one", async ({
+    page,
+  }) => {
+    // h1's minimum (96) is taller than h2/h3's (80) — one line of h1's
+    // larger font needs more room — so shrinking each all the way down
+    // must land on its own level's floor, not a value shared across
+    // levels (HEADING_MIN_H, geometry/constants.ts).
+    const minHeightBySize = { h1: 96, h2: 80, h3: 80 } as const
+    for (const size of ['h1', 'h2', 'h3'] as const) {
+      await seed(page, {
+        version: 1,
+        nodes: [
+          { ...textCard('a', 100, 100, 'One line'), size, w: 320, h: 240 },
+        ],
+        edges: [],
+        images: {},
+      })
+      await page.goto('/')
+      const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+      const handle = page.locator(
+        '[data-node-id="a"]:not(.node-connector) .resize-handle--se',
+      )
+      const handleBox = await handle.boundingBox()
+      if (!handleBox) throw new Error('handle not rendered')
+
+      // Drag the se handle far up-and-left — well past every level's
+      // minimum — so the result is purely the clamp, not the drag delta.
+      await page.mouse.move(handleBox.x + 5, handleBox.y + 5)
+      await page.mouse.down()
+      await page.mouse.move(handleBox.x + 5 - 400, handleBox.y + 5 - 400, {
+        steps: 5,
+      })
+      await page.mouse.up()
+
+      const h = await card.evaluate((el) =>
+        Number.parseFloat((el as HTMLElement).style.height),
+      )
+      expect(h).toBe(minHeightBySize[size])
+    }
+  })
 
   test('the selection menu toggles between regular and each heading level, preserving size across heading-to-heading switches', async ({
     page,
@@ -508,6 +696,13 @@ test.describe('heading cards (spec §5.2)', () => {
       .locator('[data-node-id="a"]:not(.node-connector) .card__bar')
       .click()
     const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    const textarea = card.locator('.card__content')
+
+    // A regular card's auto-grow effect (Card.tsx's `useAutoGrowHeight`)
+    // sets an *inline* `height` style directly on the textarea — confirm
+    // it's actually there before converting, or the assertion below (that
+    // converting to a heading clears it) would pass vacuously.
+    await expect(textarea).toHaveAttribute('style', /height:/)
 
     // regular -> h1: seeds the heading default box (no prior heading size
     // to preserve from).
@@ -518,6 +713,26 @@ test.describe('heading cards (spec §5.2)', () => {
       h: Number.parseFloat((el as HTMLElement).style.height),
     }))
     expect(afterH1.w).toBeGreaterThan(224) // wider than CARD_WIDTH
+
+    // The textarea's own *inline* height (left over from auto-grow while
+    // it was a regular card) must be cleared, not just left in place —
+    // an inline style always wins over the heading's CSS class rule
+    // (`height: calc(100% - 17px)`, index.css), so a stale one would
+    // permanently freeze the textarea at its pre-conversion size no
+    // matter how the heading box is later resized. Found via a screen
+    // recording showing exactly this: a card typed as regular text, then
+    // converted to h1, stayed stuck at its small pre-conversion height.
+    await expect(textarea).not.toHaveAttribute('style', /height:/)
+    const contentHeight = await textarea.evaluate((el) => el.clientHeight)
+    expect(contentHeight).toBeGreaterThan(afterH1.h - 30) // fills ~the whole box, not a leftover sliver
+
+    // This card's content is empty, so it can't possibly be clipped —
+    // the truncation glyph must be absent. Before the stale-inline-height
+    // bug above was fixed, this glyph read as "always present" (reported
+    // separately): a frozen, too-small `clientHeight` made
+    // `scrollHeight > clientHeight` look true almost regardless of
+    // content, which this assertion would have caught.
+    await expect(card.locator('.card__content-more')).toHaveCount(0)
 
     // Resize it by hand, then switch h1 -> h2: relabels only, keeps the box.
     const handle = page.locator(

@@ -329,7 +329,11 @@ respect.
 - Resize: a container is resized by dragging its border/corner handles
   (8-way) at any time, not gated on selection; a heading-sized text card
   (h1/h2/h3) gets the same 8-way handles. Both snap size to the grid with
-  a documented minimum.
+  a documented minimum. The n/s/e/w handles are notched (`clip-path`)
+  around their same-side connector dot's hit area, so both the resize
+  handle and the connector stay independently grabbable despite sharing
+  that edge's midpoint — without the notch, whichever sat on top would
+  silently swallow the other's pointerdown.
 
 ### 4.5 Containers
 
@@ -378,19 +382,36 @@ respect.
   (`h1` largest, `h3` smallest). `h1` is the migrated name for what an
   earlier revision called `'big'` (a single heading size) — legacy boards
   are backfilled (`schema/legacy.ts`).
-- All three levels share identical mechanics, differing only in rendered
-  font size:
+- All three levels share identical mechanics, differing in rendered font
+  size and, in turn, minimum/default box height:
   - User-resizable in any direction (8-way handles), independent of
-    content length; same minimum and default box across all three levels.
-  - Truncates (does not scroll) when content overflows; wraps if room
-    allows.
+    content length; same minimum and default *width* across all three
+    levels, but each level's minimum and default *height* is sized to
+    exactly fit one line of that level's own font size (`HEADING_MIN_H`,
+    `geometry/constants.ts`) — a freshly-created or fully-shrunk heading
+    never has dead vertical space or clips its own single line. Switching
+    between heading levels (e.g. h1 → h2) still preserves a user-resized
+    box as-is (below), so a box resized larger than the new level's
+    (possibly smaller) minimum is left alone, not shrunk to match.
+  - Truncates (does not scroll) when content overflows; wraps (breaking
+    mid-word rather than overflowing horizontally) if room allows. A
+    truncated heading shows a small flat `⋯` glyph centered along its
+    bottom edge rather than cutting off text with no visual indication — a
+    shadow/gradient fade was tried and dropped for feeling out of step
+    with this app's otherwise flat, glyph-based affordances (task-status
+    dots, connector circles). See
+    `ctx/notes/260929-heading-truncation-indicator-tabled.md` for that
+    history and two real bugs found and fixed along the way: a stale
+    inline textarea height surviving a regular-to-heading conversion, and
+    an empty textarea's `scrollHeight` being measured from its wrapped
+    placeholder text rather than its actual (empty) value.
 - Toggle between regular/h1/h2/h3 via the selection menu. Switching
   between two heading levels (e.g. h1 → h2) only relabels the size — a
   user-resized box is preserved, not reset. Switching to `image` or `link`
   always forces `size` back to `regular` (drops the heading sizing
-  entirely); switching *from* regular *to* a heading level seeds a fixed
-  default box (a regular card's dimensions aren't meaningful free-resize
-  ones).
+  entirely); switching *from* regular *to* a heading level seeds that
+  level's default box — the same one-line-tall size as its minimum,
+  above (a regular card's dimensions aren't meaningful free-resize ones).
 - Can connect to other nodes via edges, same as any card.
 
 ### 5.3 Image

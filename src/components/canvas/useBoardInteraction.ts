@@ -21,6 +21,7 @@ import {
   CONTAINER_MIN_W,
   HEADING_MIN_H,
   HEADING_MIN_W,
+  type HeadingSize,
   snapSize,
 } from '../../geometry/constants'
 import { clampOutOfNoFlyZone, isInNoFlyZone } from '../../geometry/noFlyZone'
@@ -84,6 +85,8 @@ interface ResizeState {
   id: NodeId
   dir: ResizeDir
   kind: ResizeKind
+  /** Only set when `kind === 'heading'` — which level's `HEADING_MIN_H` applies (spec §5.2, one min height per level). */
+  headingSize?: HeadingSize
   startX: number
   startY: number
   origin: Rect
@@ -414,10 +417,15 @@ export function useBoardInteraction({
     if (e.button !== 0) return
     const node = nodesById.get(id)
     if (!node) return
+    const headingSize =
+      kind === 'heading' && node.type === 'card' && node.kind === 'text'
+        ? (node.size as HeadingSize)
+        : undefined
     resizeRef.current = {
       id,
       dir,
       kind,
+      ...(headingSize ? { headingSize } : {}),
       startX: e.clientX,
       startY: e.clientY,
       origin: { x: node.x, y: node.y, w: node.w, h: node.h },
@@ -443,7 +451,7 @@ export function useBoardInteraction({
         ? CONTAINER_MIN_H
         : state.kind === 'board'
           ? 0
-          : HEADING_MIN_H
+          : HEADING_MIN_H[state.headingSize ?? 'h1']
 
     const { x, y, w, h } = resizeRect(
       state.dir,

@@ -460,6 +460,49 @@ body {
   touch-action: none;
 }
 
+/* The n/s/e/w resize handles and their same-side `.node-connector` dot
+   are both centered on that edge, so their hit areas fully overlap at
+   the exact point a user would naturally click for either gesture —
+   confirmed by dragging the n handle directly and checking
+   `document.elementFromPoint` there, which resolved to the connector
+   every time, silently swallowing the resize. Rather than resolving the
+   conflict with z-index (which would just swap which affordance becomes
+   unreachable), each cardinal handle's hit area is clipped to a notch
+   around the connector's own ~16px-wide hit area, so both remain
+   independently grabbable: the handle still covers the rest of its
+   strip, the connector still owns its own small spot. */
+.resize-handle--n,
+.resize-handle--s {
+  clip-path: polygon(
+    0 0,
+    calc(50% - 8px) 0,
+    calc(50% - 8px) 100%,
+    0 100%,
+    0 0,
+    100% 0,
+    100% 100%,
+    calc(50% + 8px) 100%,
+    calc(50% + 8px) 0,
+    100% 0
+  );
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(50% - 8px),
+    0 calc(50% - 8px),
+    0 0,
+    0 100%,
+    100% 100%,
+    100% calc(50% + 8px),
+    0 calc(50% + 8px),
+    0 100%
+  );
+}
+
 .resize-handle--n,
 .resize-handle--s {
   left: 10px;
@@ -723,6 +766,9 @@ body {
   border: none;
   resize: none;
   overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
   font-family: inherit;
   font-size: 0.85rem;
   padding: 8px;
@@ -760,8 +806,26 @@ body {
 .card--h2 .card__content,
 .card--h3 .card__content {
   position: absolute;
-  inset: 17px 0 0 0;
-  height: auto;
+  top: 17px;
+  left: 0;
+  right: 0;
+  /* An explicit calculated height, not `height: auto` + `bottom: 0`: a
+     `<textarea>` is a form control with its own intrinsic-size rules
+     (here, `rows={1}`, CardBody.tsx), and relying on the generic
+     abs-positioned "auto height stretches to fill when top+bottom are
+     both set" behavior isn't reliable for form controls across engines
+     — confirmed by a screen recording (ctx/support) showing a
+     Firefox-family browser rendering the textarea shrink-wrapped to its
+     own content height instead of the full box, while Chromium (this
+     repo's e2e/dev-testing browser) stretched it correctly. A `calc()`
+     height has no such ambiguity in any engine.
+  */
+  height: calc(100% - 17px);
+  /* Overrides the base rule's 64px floor: a heading's own minimum comes
+     from HEADING_MIN_H (geometry/constants.ts), sized per level to fit
+     exactly one line — the base floor is a regular-card concern and must
+     not fight the outer box at h2/h3's smaller minimums. */
+  min-height: 0;
   overflow: hidden;
   line-height: 1.2;
 }
@@ -776,6 +840,23 @@ body {
 
 .card--h3 .card__content {
   font-size: 1.75rem;
+}
+
+/* Truncation cue for a heading whose text is clipped (spec §5.2:
+   truncates rather than scrolling) — rendered only when JS detects
+   actual clipping (Card.tsx's `useOverflowClipped`), so a heading whose
+   content fits shows no cue at all. A small flat glyph in the same
+   muted ink used elsewhere for de-emphasized/decorative marks (task
+   status dots, connector affordances), not a shadow/gradient fade — this
+   app's affordances are consistently flat lines/glyphs, never textured
+   ones. */
+.card__content-more {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  color: var(--color-ink-soft);
+  pointer-events: none;
 }
 
 /* ---------- container ---------- */

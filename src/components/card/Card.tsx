@@ -52,12 +52,68 @@ function useAutoGrowHeight(
 ) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: content isn't read in the body, but the effect must re-run on every keystroke to remeasure scrollHeight against the textarea's new content.
   useLayoutEffect(() => {
-    if (skip) return
     const el = contentRef.current
     if (!el) return
+    if (skip) {
+      // A heading's fixed height comes from CSS (`height: calc(100% -
+      // 17px)`, index.css), which an inline style always beats — so a
+      // stale `el.style.height` left over from a *previous* render where
+      // this same textarea was a regular (auto-growing) card must be
+      // cleared, not just skipped, or the heading is stuck rendering at
+      // whatever height auto-grow last set it to (found via a screen
+      // recording: a card typed as regular text, then converted to a
+      // heading via the selection menu, kept the small pre-conversion
+      // height forever).
+      el.style.height = ''
+      return
+    }
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [skip, contentRef, content])
+}
+
+// A 1px tolerance: `scrollHeight`/`clientHeight` are both rounded to
+// whole pixels but from independently-rounded sub-pixel layout values, so
+// content that just barely fits can still read `scrollHeight ===
+// clientHeight + 1` purely from rounding.
+const CLIP_TOLERANCE_PX = 1
+
+/**
+ * Tracks whether a heading card's fixed box is clipping its own text
+ * (spec §5.2: truncates rather than scrolling) — drives the small
+ * `.card__content-more` glyph in `CardBody` so a truncated heading has a
+ * visual cue instead of silently cutting off mid-line. Only meaningful
+ * for headings (`active`); a regular card's box always grows to fit its
+ * content, so it never clips.
+ */
+function useOverflowClipped(
+  contentRef: React.RefObject<HTMLTextAreaElement | null>,
+  active: boolean,
+  content: string,
+  h: number,
+  w: number,
+  setClipped: (clipped: boolean) => void,
+) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: content/h/w aren't read in the body, but the effect must re-run whenever any of them could change whether the box clips its content.
+  useLayoutEffect(() => {
+    // An empty textarea can never be "clipped" — there's no content to
+    // truncate — but `scrollHeight` doesn't know that: Chromium measures
+    // an empty `<textarea>`'s `scrollHeight` from its *placeholder*
+    // text's wrapped height, not the (empty) value, so a heading showing
+    // "Write something..." wrapped across several lines at a large font
+    // size read as clipped despite having nothing in it. This is exactly
+    // what made the glyph look "always present" on this feature's first
+    // attempt (confirmed by an isolated repro: an empty `<textarea
+    // placeholder="…">` reports a multi-line `scrollHeight` purely from
+    // the placeholder, with no other CSS involved).
+    if (!active || content === '') {
+      setClipped(false)
+      return
+    }
+    const el = contentRef.current
+    if (!el) return
+    setClipped(el.scrollHeight > el.clientHeight + CLIP_TOLERANCE_PX)
+  }, [active, content, h, w, contentRef, setClipped])
 }
 
 function useMeasuredHeight(
@@ -214,6 +270,7 @@ export function Card({
   const cardElRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
   const [hovered, setHovered] = useState(false)
+  const [clipped, setClipped] = useState(false)
 
   // Regular notes grow to fit their content; a heading-sized card (h1/h2/
   // h3) has an explicit, user-resized height instead (a later stage's
@@ -224,6 +281,15 @@ export function Card({
   // regular card's total rendered height (bar + content) only lives in the
   // DOM moment-to-moment, so this flows it one-way into the node.
   useMeasuredHeight(cardElRef, isHeading, onHeightChange)
+
+  useOverflowClipped(
+    contentRef,
+    isHeading,
+    node.content,
+    node.h,
+    node.w,
+    setClipped,
+  )
 
   useEffect(() => {
     if (!autoFocus) return
@@ -264,6 +330,7 @@ export function Card({
         viewMode={viewMode}
         showCaption={showCaption}
         tinted={isDone || isDimmedByViewMode}
+        clipped={clipped}
         contentRef={contentRef}
         {...(onContentChange
           ? {
