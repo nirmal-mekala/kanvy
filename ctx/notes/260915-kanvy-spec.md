@@ -395,8 +395,8 @@ respect.
     (possibly smaller) minimum is left alone, not shrunk to match.
   - Truncates (does not scroll) when content overflows; wraps (breaking
     mid-word rather than overflowing horizontally) if room allows. A
-    truncated heading shows a small flat `⋯` glyph in its bottom-right
-    corner rather than cutting off text with no visual indication — a
+    truncated heading shows a small flat `⋯` glyph centered along its
+    bottom edge rather than cutting off text with no visual indication — a
     shadow/gradient fade was tried and dropped for feeling out of step
     with this app's otherwise flat, glyph-based affordances (task-status
     dots, connector circles). See

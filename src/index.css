@@ -852,8 +852,9 @@ body {
    ones. */
 .card__content-more {
   position: absolute;
-  right: 8px;
+  left: 50%;
   bottom: 6px;
+  transform: translateX(-50%);
   color: var(--color-ink-soft);
   pointer-events: none;
 }
