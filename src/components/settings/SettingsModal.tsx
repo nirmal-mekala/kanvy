@@ -9,11 +9,11 @@
 // Local/Network buttons.
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import { Wifi } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { testConnection } from '../../api/restClient'
 import {
   accessModeAtom,
+  clearNetworkAuthSettings,
   networkConfigAtom,
   persistTokenAtom,
   settingsModalOpenAtom,
@@ -22,6 +22,7 @@ import {
 import {
   initializeNetworkMode,
   networkHomeLoadingAtom,
+  switchToLocalMode,
 } from '../../state/networkBoardLoader'
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
@@ -33,7 +34,7 @@ export function SettingsModal() {
   const setSettingsOpen = useSetAtom(settingsModalOpenAtom)
   const onClose = () => setSettingsOpen(false)
 
-  const setAccessMode = useSetAtom(accessModeAtom)
+  const [accessMode, setAccessMode] = useAtom(accessModeAtom)
   const [networkConfig, setNetworkConfig] = useAtom(networkConfigAtom)
   const [persistToken, setPersistToken] = useAtom(persistTokenAtom)
 
@@ -44,16 +45,8 @@ export function SettingsModal() {
   const homeLoading = useAtomValue(networkHomeLoadingAtom)
   const [error, setError] = useState<string | undefined>(undefined)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: onClose is a stable atom setter wrapper, not a changing prop
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
-
   async function handleConfirm() {
+    if (testing || !draftBaseUrl) return
     setTesting(true)
     setError(undefined)
     const config = { baseUrl: draftBaseUrl, authToken: draftAuthToken }
@@ -76,6 +69,32 @@ export function SettingsModal() {
     }
   }
 
+  // Re-registered every render (cheap) so Escape/Enter always close over
+  // the latest onClose/handleConfirm — same as ConfirmModal.tsx's own
+  // keydown effect, which does the same for the same reason.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Enter') handleConfirm()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
+
+  function handleClearNetworkSettings() {
+    if (accessMode === 'network') {
+      switchToLocalMode()
+      setAccessMode('local')
+    }
+    clearNetworkAuthSettings()
+    setNetworkConfig({ baseUrl: '', authToken: '' })
+    setPersistToken(false)
+    setDraftBaseUrl('')
+    setDraftAuthToken('')
+    setDraftPersistToken(false)
+    onClose()
+  }
+
   return (
     <div
       className="modal-backdrop settings-backdrop"
@@ -94,7 +113,7 @@ export function SettingsModal() {
         aria-labelledby="settings-modal__title"
       >
         <h2 id="settings-modal__title" className="settings-modal__title">
-          <Wifi size={16} strokeWidth={2} /> Connection settings
+          Connection settings
         </h2>
 
         <div className="settings-modal__fields">
@@ -139,23 +158,32 @@ export function SettingsModal() {
         <div className="settings-modal__actions">
           <button
             type="button"
-            className="confirm-modal__btn confirm-modal__btn--cancel"
-            onClick={onClose}
+            className="confirm-modal__btn settings-modal__clear-btn"
+            onClick={handleClearNetworkSettings}
           >
-            Cancel
+            Clear Network Settings
           </button>
-          <button
-            type="button"
-            className="confirm-modal__btn confirm-modal__btn--confirm"
-            onClick={handleConfirm}
-            disabled={testing || !draftBaseUrl}
-          >
-            {homeLoading
-              ? 'Loading board…'
-              : testing
-                ? 'Testing…'
-                : 'Save & Connect'}
-          </button>
+          <div className="settings-modal__actions-group">
+            <button
+              type="button"
+              className="confirm-modal__btn confirm-modal__btn--cancel"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="confirm-modal__btn confirm-modal__btn--positive"
+              onClick={handleConfirm}
+              disabled={testing || !draftBaseUrl}
+            >
+              {homeLoading
+                ? 'Loading board…'
+                : testing
+                  ? 'Testing…'
+                  : 'Save & Connect'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

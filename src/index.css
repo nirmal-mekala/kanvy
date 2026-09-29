@@ -1366,6 +1366,19 @@ input:focus-visible,
   opacity: 0.9;
 }
 
+.confirm-modal__btn--positive {
+  /* nord14 — matches colors/colorKey.ts's `lime`, used here as a
+     non-destructive "go ahead" accent so this doesn't read as an error
+     state the way the shared coral confirm color would. */
+  background: #a3be8c;
+  color: #2e3440;
+  border: 2px solid transparent;
+}
+
+.confirm-modal__btn--positive:hover {
+  opacity: 0.9;
+}
+
 .confirm-modal__btn:disabled {
   opacity: 0.5;
   cursor: default;
@@ -1377,7 +1390,10 @@ input:focus-visible,
 
 .settings-modal {
   position: relative;
-  width: min(420px, 90%);
+  width: min(560px, 92%);
+  height: 460px;
+  display: flex;
+  flex-direction: column;
   padding: 24px 28px;
   background: var(--color-surface);
   border: 2px solid var(--color-outline);
@@ -1397,7 +1413,16 @@ input:focus-visible,
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 16px;
+  /* `overflow-y: auto` makes this a scroll container, which clips content
+     — including the focus outline, which paints outside the input's own
+     box — at this element's edges rather than the modal's. The padding
+     gives that outline room; negative margin cancels the resulting inset
+     so the fields still line up with the title/actions above and below. */
+  padding: 4px 6px;
+  margin: -4px -6px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .settings-modal__field {
@@ -1408,7 +1433,7 @@ input:focus-visible,
 
 .settings-modal__label {
   font-size: 0.8rem;
-  color: var(--color-ink-soft);
+  color: var(--color-ink);
 }
 
 .settings-modal__input {
@@ -1440,9 +1465,25 @@ input:focus-visible,
   color: #bf616a;
 }
 
+.settings-modal__clear-btn {
+  background: var(--color-surface);
+  color: #bf616a;
+  border: 2px solid #bf616a;
+}
+
+.settings-modal__clear-btn:hover {
+  background: color-mix(in srgb, #bf616a 12%, transparent);
+}
+
 .settings-modal__actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-modal__actions-group {
+  display: flex;
   gap: 10px;
 }
 
