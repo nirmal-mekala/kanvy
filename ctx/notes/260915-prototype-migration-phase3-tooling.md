@@ -2,16 +2,13 @@
 
 ## Status of this document
 
-Deliverable for prototype-migration phase 3 of
-`ctx/prompt/260915-migration-process.md` ("align on tooling, config, and
-stack"). Resolves
-`ctx/notes/260915-prototype-migration-phase3-questionnaire.md` into concrete
-decisions. Builds on `ctx/notes/260915-kanvy-spec.md` (prototype-migration
-phase 1) and `ctx/notes/260915-prototype-migration-phase2-schema.md`
-(prototype-migration phase 2), and resolves the item phase 2 §6 flagged as
-"a phase 3 style call" (`PatternKey`/`ColorKey` as TS string-literal unions
-— see §4 below). Feeds prototype-migration phase 4 (agent readiness) and
-`AGENTS.md`, which is updated alongside this doc per questionnaire Q2.
+Deliverable for phase 3 ("align on tooling, config, and stack") of the
+original prototype-to-React/TypeScript migration. Builds on
+`ctx/notes/260915-kanvy-spec.md` (phase 1) and
+`ctx/notes/260915-prototype-migration-phase2-schema.md` (phase 2), and
+resolves the item phase 2 §6 flagged as "a phase 3 style call"
+(`PatternKey`/`ColorKey` as TS string-literal unions — see §4 below). Fed
+`AGENTS.md`, which was updated alongside this doc.
 
 Decisions below are final for phase 3 unless marked **(open)**. Numbers in
 parens (e.g. Q1) refer to the corresponding questionnaire item.
@@ -125,14 +122,16 @@ unit tests for pure functions, no dedicated component tier):
   blanket-wide to UI/component code, where e2e is the primary correctness
   signal per phase 1's testing split. Revisit the number once the test
   suite exists (phase 6) and an actual baseline is visible.
-- **Visual regression against the original prototype (Q12):** a dedicated
-  Playwright test tier, separate from the interaction-behavior e2e suite,
-  that diffs the new app's rendering against the **original prototype
-  running live**, not a committed baseline-PNG snapshot:
-  - The original prototype is already vendored, frozen, under
-    `ctx/support/260915-prototype-source/` — run it via its own `vite dev`
-    on a fixed port as the reference server; run the new app on another
-    port. Both are real, running apps for the duration of this test tier.
+- **Visual regression against the original prototype (Q12):** ***(later
+  removed — see `ctx/notes/260917-remove-visual-regression-tier.md`; kept
+  below only as the original design record.)*** a dedicated Playwright
+  test tier, separate from the interaction-behavior e2e suite, that diffs
+  the new app's rendering against the **original prototype running
+  live**, not a committed baseline-PNG snapshot:
+  - The original prototype was vendored, frozen, under `ctx/support/` —
+    run it via its own `vite dev` on a fixed port as the reference server;
+    run the new app on another port. Both are real, running apps for the
+    duration of this test tier.
   - Per scenario (e.g. "default board, standard view," "task view with a
     mix of statuses," "recency view," each card kind, each container
     pattern, light and dark theme): open a Playwright page/context against
@@ -160,11 +159,11 @@ unit tests for pure functions, no dedicated component tier):
   the v0 data model — TS types are derived via `z.infer<>` rather than
   hand-written types kept in sync manually. This supersedes the plain TS
   interfaces sketched in `ctx/notes/260915-prototype-migration-phase2-schema.md`
-  §2 and `ctx/support/260915-kanvy-schema.json` (both remain valid as the
-  *shape* reference; the Zod schema becomes the actual implementation
-  artifact in phase 7). Zod validates at **board load** and **JSON import**
-  — both paths that read a document from outside the running app's own
-  in-memory state. It does not replace the "normalize/backfill legacy
+  §2 (which remains valid as the *shape* reference; the Zod schema became
+  the actual implementation artifact). Zod validates at **board load** —
+  the path that reads a document from outside the running app's own
+  in-memory state. (JSON import, once a second such validation path, has
+  since been removed.) It does not replace the "normalize/backfill legacy
   documents" leniency called for in spec §2.7/§9 — that backfill logic
   runs *before* Zod validation, so a pre-version prototype document is
   normalized into v0 shape first, then validated, rather than rejected

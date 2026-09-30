@@ -1,7 +1,7 @@
 # Link metadata: proxy through metadata.party instead of raw fetch
 
-`ctx/notes/260926-raw-fetch-link-metadata.md` describes dropping
-microlink.io in favor of a raw same-origin `fetch(url)` of the
+A prior revision dropped microlink.io (its free tier's ~25 req/day cap made
+it unsustainable) in favor of a raw same-origin `fetch(url)` of the
 pasted/typed URL, scraped with regex for `og:*`/`twitter:*` tags. That
 approach's accepted-tradeoff CORS failure turned out to break metadata
 fetching for most real-world links (few third-party sites send

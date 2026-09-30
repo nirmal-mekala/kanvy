@@ -1,5 +1,5 @@
 // Staircase-then-push paste placement (spec §7) — ported from the
-// prototype's `pasteClipboard` (ctx/support/260915-prototype-source/src/state/useBoard.js).
+// prototype's `pasteClipboard` (useBoard.js).
 // A repeated paste of the same copy offsets a bit further (a staircase,
 // matching repeated ⌘/Ctrl+D); if that would still land the paste
 // overlapping any existing container, it's pushed further out along the

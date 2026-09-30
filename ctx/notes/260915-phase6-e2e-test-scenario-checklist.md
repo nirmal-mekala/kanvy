@@ -2,23 +2,22 @@
 
 ## Status of this document
 
-Deliverable for prototype-migration phase 6 of
-`ctx/prompt/260915-migration-process.md` ("agent builds test suite").
-Phase 6 built the e2e/visual-regression *harness* (`e2e/fixtures/`,
-`e2e/visual/diff.ts`, `playwright.config.ts` /
-`playwright.visual.config.ts`, one smoke test per tier) but not full
-interaction/visual-regression test bodies — writing those against a UI
-that doesn't exist yet would mean guessing DOM/selector conventions phase
-7 hasn't decided, producing churn rather than TDD value (agreed with
-developer when revising the original phase 6 scope).
+Deliverable for phase 6 ("agent builds test suite") of the original
+prototype-to-React/TypeScript migration. Phase 6 built the
+e2e/visual-regression *harness* (`e2e/fixtures/`, `e2e/visual/diff.ts`,
+`playwright.config.ts` / `playwright.visual.config.ts`, one smoke test
+per tier) but not full interaction/visual-regression test bodies —
+writing those against a UI that doesn't exist yet would mean guessing
+DOM/selector conventions the implementation phase hadn't decided,
+producing churn rather than TDD value (agreed with developer when
+revising the original phase 6 scope).
 
-This checklist is the phase 7 to-do list for closing out real e2e
-coverage: each build stage in
-`ctx/notes/260915-prototype-migration-phase5-implementation-plan.md` §4
-should write and check off the scenarios below that its stage makes
-testable, using the fixtures already in `e2e/fixtures/` and the diff
-utility in `e2e/visual/diff.ts`. Check off an item only once a real
-Playwright spec exists and passes — this file is not itself a spec.
+This checklist was the to-do list for closing out real e2e coverage:
+each build stage in the implementation plan wrote and checked off the
+scenarios below that its stage made testable, using the fixtures in
+`e2e/fixtures/` and (for the now-removed visual tier) the diff utility in
+`e2e/visual/diff.ts`. It's kept as a record of the scenario matrix the
+interaction e2e suite (`e2e/*.spec.ts`) implements.
 
 ## Interaction e2e (spec §4, §5, §6, §7) — maps to phase 5 §4 Stages 4–9
 
@@ -182,6 +181,10 @@ just didn't exist yet); added to the shared `use` block.
 
 ## Visual-regression tier (phase 3 tooling §3) — Stage 10
 
+***This whole tier was later removed — see
+`ctx/notes/260917-remove-visual-regression-tier.md`. Kept below only as
+the historical record of what ran.***
+
 Each scenario: seed the same board state via `e2e/fixtures/board.ts` on
 both servers, screenshot via `page.screenshot()`, diff via
 `e2e/visual/diff.ts` at `threshold: 0.2` / `maxDiffPixelRatio: 0.01`
@@ -192,8 +195,8 @@ e.g. one case per card kind or container pattern) are written in
 `e2e/visual/scenarios.spec.ts`, using `e2e/visual/scenes.ts`'s shared
 scene-builder. **Now run and passing (21/21)**, via the
 `playwright-remote-browser` skill with both dev servers (the new app and
-the vendored prototype under `ctx/support/260915-prototype-source/`)
-started on two of this container's published ports
+the vendored prototype, then still kept under `ctx/support/`) started on
+two of this container's published ports
 (`KANVY_VISUAL_NEW_APP_PORT` / `KANVY_VISUAL_PROTOTYPE_PORT`, same
 mechanism as `KANVY_E2E_PORT`) — see AGENTS.md for the exact setup. This
 was the first time this tier ever actually ran against a live browser, and

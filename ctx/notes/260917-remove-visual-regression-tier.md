@@ -2,7 +2,7 @@
 
 The visual-regression tier (`e2e/visual/`, `playwright.visual.config.ts`,
 `pnpm e2e:visual`/`e2e:visual:setup`) diffed the new app's rendering
-against the live vendored prototype (`ctx/support/260915-prototype-source/`)
+against the live vendored prototype (then still kept in `ctx/support/`)
 via `pixelmatch`, per phase 3 tooling §3/Q12. It has been removed: the
 migration is complete, and pixel-comparing the two apps no longer serves
 its original purpose — the new app is allowed to render differently from
@@ -43,10 +43,6 @@ comparing the two apps was removed outright.
 
 ## What was kept
 
-- `ctx/support/260915-prototype-source/` — still valuable as manual
-  reference material for matching prototype behavior during future work
-  (per `AGENTS.md`'s `ctx/support` description), independent of the
-  removed automated comparison.
 - `pnpm e2e` (the interaction-behavior suite, `playwright.config.ts`) —
   unaffected; it never depended on the prototype.
 - The CI `actions/upload-artifact` step for `test-results/` on failure —

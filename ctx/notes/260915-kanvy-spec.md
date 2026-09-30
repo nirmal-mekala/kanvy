@@ -2,22 +2,19 @@
 
 ## Status of this document
 
-This is the prototype-migration phase 1 deliverable of the migration described in
-`ctx/prompt/260915-migration-process.md`: a spec of the *existing prototype's*
-behavior, corrected only where the migration prompt and the developer
-explicitly called for a data-model fix. It is not a spec for new features.
-
-Sources, in order of authority when they conflicted:
-
-1. `ctx/notes/260915-prototype-migration-phase1-questionnaire.md` — developer decisions (highest authority; overrides 2–4 wherever they conflict)
-2. `ctx/support/260915-dev-kanvy-natural-language-description.md` — developer's own description of the app
-3. `ctx/support/260915-prototype-source/` — the prototype's source code (source of truth for anything not covered by 1–2)
-4. `ctx/support/260915-prototype-claude-convos/dev-input.json` — the prompt history that produced the prototype (used to resolve ambiguity/intent, lowest authority)
+This is the authoritative spec for kanvy's behavior and data model — the
+target the app should match. It originated as the phase 1 deliverable of
+the original prototype-to-React/TypeScript migration (that migration,
+and the prototype it started from, are complete; process artifacts and
+the vendored prototype source have since been removed from the repo).
+Wherever this spec and the current code disagree, treat the disagreement
+as a bug to investigate, not license to change either one unilaterally.
 
 Anything marked **(wart, keep)** is known-imperfect behavior the developer
-explicitly chose to preserve rather than fix in this migration. Anything
-marked **(deferred to prototype-migration phase 2)** is a real open question, but one that
-belongs to schema/taxonomy alignment, not this document.
+explicitly chose to preserve rather than fix in the original migration.
+Anything marked **(deferred to prototype-migration phase 2)** was a real
+open question resolved in
+`ctx/notes/260915-prototype-migration-phase2-schema.md`.
 
 ## 1. What kanvy is
 
@@ -72,8 +69,7 @@ Rules to preserve from current behavior:
 ### 2.3 Container nesting — spatial ("sticky") membership (v0.1, reverting Q5)
 
 **v0.1 supersedes this section's original v0 decision.** v0 added a formal,
-stored `parentId` ownership field (per Q5, see
-`ctx/notes/260915-prototype-migration-phase1-questionnaire.md`), assigned
+stored `parentId` ownership field (per developer decision Q5), assigned
 explicitly on drop, on ctrl/cmd-drag container creation, and remapped on
 copy/paste and ⌘/Ctrl+D duplicate. In practice this needed bespoke
 assignment/remapping logic at every one of those mutation sites, and each
@@ -399,12 +395,12 @@ respect.
     bottom edge rather than cutting off text with no visual indication — a
     shadow/gradient fade was tried and dropped for feeling out of step
     with this app's otherwise flat, glyph-based affordances (task-status
-    dots, connector circles). See
-    `ctx/notes/260929-heading-truncation-indicator-tabled.md` for that
-    history and two real bugs found and fixed along the way: a stale
-    inline textarea height surviving a regular-to-heading conversion, and
-    an empty textarea's `scrollHeight` being measured from its wrapped
-    placeholder text rather than its actual (empty) value.
+    dots, connector circles) — see git history around 2026-09-29 for that
+    exploration and two real bugs it found and fixed along the way: a
+    stale inline textarea height surviving a regular-to-heading
+    conversion, and an empty textarea's `scrollHeight` being measured
+    from its wrapped placeholder text rather than its actual (empty)
+    value.
 - Toggle between regular/h1/h2/h3 via the selection menu. Switching
   between two heading levels (e.g. h1 → h2) only relabels the size — a
   user-resized box is preserved, not reset. Switching to `image` or `link`

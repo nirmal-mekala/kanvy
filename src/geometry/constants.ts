@@ -1,5 +1,5 @@
 // Size constants derived from GRID_SIZE (spec §3/§4.4/§5), ported from the
-// prototype's ctx/support/260915-prototype-source/src/data/board.js.
+// original prototype's board.js.
 
 import type { TextSize } from '../schema/node'
 import { GRID_SIZE } from './snap'

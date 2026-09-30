@@ -7,10 +7,9 @@
 //   1. Pre-v0 prototype documents: separate `cards`/`groups` arrays, flat
 //      optional fields (`imageId`, `linkUrl`/`linkTitle`/`linkImageUrl`/
 //      `linkStatus`, `textSize`, `taskStatus`), camelCase pattern keys, no
-//      `h`/`version`/timestamps on every entity. See
-//      ctx/support/260915-prototype-source/src/data/board.js and
-//      src/state/useBoard.js (`normalizeBoard`) for the shape this
-//      normalizes away from.
+//      `h`/`version`/timestamps on every entity — the original prototype's
+//      board.js/useBoard.js (`normalizeBoard`) shape this normalizes away
+//      from.
 //   2. Legacy v0-shaped documents (already `nodes`/`edges`/`images`) that
 //      are simply missing `version` or per-entity timestamps, OR are a
 //      pre-v0.1 (`version: 1`) document still carrying the formal `parentId`

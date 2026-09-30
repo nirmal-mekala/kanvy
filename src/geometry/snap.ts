@@ -1,6 +1,4 @@
-// Phase 6 stub — signatures only, per ctx/notes/260915-kanvy-spec.md §4.4.
-// Phase 7 Stage 3 fills in the real logic (see
-// ctx/notes/260915-prototype-migration-phase5-implementation-plan.md).
+// Grid/gutter snap math (spec §4.4).
 
 export interface Rect {
   x: number

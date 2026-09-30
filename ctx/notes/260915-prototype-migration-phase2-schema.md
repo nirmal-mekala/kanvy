@@ -1,17 +1,17 @@
-# kanvy — prototype-migration phase 2: schema alignment (draft)
+# kanvy — prototype-migration phase 2: schema alignment
 
 ## Status of this document
 
-Draft deliverable for prototype-migration phase 2 of
-`ctx/prompt/260915-migration-process.md` ("align on schema"). Builds on
-`ctx/notes/260915-kanvy-spec.md` (prototype-migration phase 1) and resolves the
-items that document explicitly deferred to this phase (its §14). Also sketches
-— but does not build — multiboard and a future JSON-on-disk + `json-server`
-backend, per the migration prompt's prototype-migration phase 2 scope.
+Deliverable for phase 2 ("align on schema") of the original
+prototype-to-React/TypeScript migration. Builds on
+`ctx/notes/260915-kanvy-spec.md` (phase 1) and resolves the items that
+document explicitly deferred to this phase (its §14). Also sketches —
+but does not build — multiboard and a future JSON-on-disk +
+`json-server` backend, both later built (see `AGENTS.md`'s summaries).
 
-This is a draft: decisions below marked **(confirmed)** were made directly by
-the developer in this session; everything else is a proposal open to
-revision before prototype-migration phase 3 (tooling/config) begins.
+This is the resolved schema shape: decisions below are final and are
+what `src/schema/` implements — cited directly from `board.ts`/`edge.ts`/
+`node.ts`.
 
 ## 1. Node collection shape — resolved
 
