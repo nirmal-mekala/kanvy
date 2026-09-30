@@ -1,8 +1,8 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;700&display=swap");
 /* The single stylesheet entry point. Import order is cascade order: later
    files deliberately override earlier ones at equal specificity (e.g.
    a11y.css's reduced-motion block), so add new files in a deliberate spot,
    not just at the end. */
+@import "./styles/fonts.css";
 @import "./styles/reset.css";
 @import "./styles/tokens.css";
 @import "./styles/base.css";
