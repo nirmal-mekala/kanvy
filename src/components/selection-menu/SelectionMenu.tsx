@@ -1,7 +1,7 @@
 // One menu for the whole current selection, however mixed (spec §4.3/§3/
 // §5.2/§6.1) — anchored to the combined bounding box by the caller
 // (Canvas.tsx). Ported from the prototype's inline selection-menu JSX in
-// Board.jsx onto Tailwind + this migration's discriminated `Node` union.
+// Board.jsx onto this migration's discriminated `Node` union.
 
 import {
   Heading1,

@@ -1,12 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;700&display=swap");
-@import "tailwindcss";
+@import "./styles/reset.css";
 
-/* Nord-derived palette as Tailwind v4 theme tokens (AGENTS.md Stack) —
-   default (light) values here; dark-mode values override the same
-   `--color-*` custom properties below, so every component referencing
-   `var(--color-*)` picks up the theme automatically without a duplicate
-   dark-mode class. Ported from the original prototype's index.css. */
-@theme {
+/* Nord-derived palette tokens — default (light) values here; dark-mode
+   values override the same `--color-*` custom properties below, so every
+   component referencing `var(--color-*)` picks up the theme automatically
+   without a duplicate dark-mode class. */
+:root {
   --color-paper: #e5e9f0; /* nord5 */
   --color-ink: #2e3440; /* nord0 */
   --color-line: #2e3440; /* nord0 */
@@ -44,11 +43,7 @@
 /* Modal dialogs (help panel, confirm modal, settings modal) use the system
    UI stack rather than the app's default monospace (--font-mono) — prose-
    heavy dialog content reads better in a sans-serif face than the canvas's
-   label/data typography does. Deliberately NOT named `--font-sans` (or any
-   other `--font-*` name): that's a reserved Tailwind v4 `@theme` namespace
-   Tailwind provides its own default for, which silently wins over a
-   same-named override placed in `@theme` here — this needs to be a plain,
-   non-`@theme` custom property to actually take the value below. */
+   label/data typography does. */
 :root {
   --modal-font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
