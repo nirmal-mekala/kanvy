@@ -26,6 +26,20 @@
      [data-theme="dark"] below), unlike the fixed hex this replaced. */
   --color-edge: #656a75;
   --font-mono: "Fira Code", "Courier New", monospace;
+  /* .field-message tone colors (FieldMessage.tsx, settings modal). Plain
+     nord11 text directly on --color-surface (the error tone's original
+     styling) was ~3.6:1 contrast in light mode, ~2.5:1 in dark, both
+     under WCAG AA's 4.5:1 for body text. A darkened/lightened variant per
+     tone and theme (each tuned for >=4.5:1 against --color-surface) plus
+     a tinted background box reads clearly in both, and gives the warning
+     tone (nord13 amber) its own identity distinct from error (nord11
+     coral) rather than reusing error's red for a non-error message. */
+  --color-danger-text: #96343d;
+  --color-danger-bg: rgba(191, 97, 106, 0.14);
+  --color-warn-text: #7a5900;
+  --color-warn-bg: rgba(235, 203, 139, 0.18);
+  --color-tip-text: #35659c;
+  --color-tip-bg: rgba(136, 192, 208, 0.14);
 }
 
 /* Modal dialogs (help panel, confirm modal, settings modal) use the system
@@ -66,6 +80,12 @@
   --color-border-static: #5c6270;
   --color-ink-soft: rgba(236, 239, 244, 0.4);
   --color-edge: #b3b7be;
+  --color-danger-text: #eda1a7;
+  --color-danger-bg: rgba(191, 97, 106, 0.22);
+  --color-warn-text: #e8c168;
+  --color-warn-bg: rgba(235, 203, 139, 0.16);
+  --color-tip-text: #8fc0e8;
+  --color-tip-bg: rgba(136, 192, 208, 0.16);
 }
 
 * {
@@ -1545,16 +1565,44 @@ input:focus-visible,
   font-size: 0.85rem;
 }
 
-.settings-modal__warning {
+/* FieldMessage.tsx — shared icon+text UI for a settings field's inline
+   notes (warning/tip/error), styled by `tone` rather than each getting
+   its own near-duplicate block. The connection-error banner (rendered
+   below .settings-modal__fields, not inside it) reuses tone="error". */
+.field-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
   font-size: 0.8rem;
-  color: #bf616a;
+  line-height: 1.4;
 }
 
-.settings-modal__error {
-  margin: 0 0 16px;
-  font-size: 0.85rem;
-  color: #bf616a;
+.field-message__icon {
+  flex-shrink: 0;
+}
+
+.field-message code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.field-message--tip {
+  color: var(--color-tip-text);
+  background: var(--color-tip-bg);
+}
+
+.field-message--warning {
+  color: var(--color-warn-text);
+  background: var(--color-warn-bg);
+}
+
+.field-message--error {
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg);
+  margin-bottom: 16px;
 }
 
 .settings-modal__actions {

@@ -24,6 +24,7 @@ import {
   switchToLocalMode,
 } from '../../state/networkBoardLoader'
 import { Modal } from '../modal/Modal'
+import { FieldMessage } from './FieldMessage'
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage comes from
@@ -120,17 +121,21 @@ export function SettingsModal() {
             checked={draftPersistToken}
             onChange={(e) => setDraftPersistToken(e.target.checked)}
           />
-          <span>Persist token to this browser's local storage</span>
+          <span>Dangerously persist token to this browser's local storage</span>
         </label>
         {draftPersistToken && (
-          <p className="settings-modal__warning">
+          <FieldMessage tone="warning">
             The token will be stored in plaintext in this browser's local
             storage. Anyone with access to this device/browser could read it.
-          </p>
+          </FieldMessage>
         )}
+        <FieldMessage tone="tip">
+          The board JSON downloaded from the toolbar can be served directly as a
+          json-server db file: <code>npx json-server &lt;file&gt;</code>.
+        </FieldMessage>
       </div>
 
-      {error && <p className="settings-modal__error">{error}</p>}
+      {error && <FieldMessage tone="error">{error}</FieldMessage>}
 
       <div className="settings-modal__actions">
         <button
