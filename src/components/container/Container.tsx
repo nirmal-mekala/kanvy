@@ -43,7 +43,7 @@ export function Container({
   theme: Theme
   viewMode: ViewMode
   selected?: boolean
-  /** A transient z-index bump for the whole gesture (spec §4.4/index.css's `.container-node--dragging`) — never a change to stored node order. */
+  /** A transient z-index bump for the whole gesture (spec §4.4/container.css's `.container-node--dragging`) — never a change to stored node order. */
   dragging?: boolean
   connectorsVisible?: boolean
   connectorActiveSide?: Side | null

@@ -139,7 +139,7 @@ export function EmojiSuggestionMenu({
   onSelectVariant: (row: number, col: number) => void
 }) {
   // Keeps the keyboard-highlighted item in view within `.emoji-menu`'s
-  // scrollable list (index.css: `max-height: 220px; overflow-y: auto;`) —
+  // scrollable list (emoji-menu.css: `max-height: 220px; overflow-y: auto;`) —
   // otherwise arrow-key navigation past the initially visible rows moves
   // `activeIndex` with nothing on screen to show for it.
   const activeItemRef = useRef<HTMLButtonElement | null>(null)

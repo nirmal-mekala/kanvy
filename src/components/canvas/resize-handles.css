@@ -1,0 +1,119 @@
+/* ---------- resize handles (spec §4.4: containers always, big-text cards only; board cards east/west only) ---------- */
+
+.resize-handle {
+  position: absolute;
+  touch-action: none;
+}
+
+/* The n/s/e/w resize handles and their same-side `.node-connector` dot
+   are both centered on that edge, so their hit areas fully overlap at
+   the exact point a user would naturally click for either gesture —
+   confirmed by dragging the n handle directly and checking
+   `document.elementFromPoint` there, which resolved to the connector
+   every time, silently swallowing the resize. Rather than resolving the
+   conflict with z-index (which would just swap which affordance becomes
+   unreachable), each cardinal handle's hit area is clipped to a notch
+   around the connector's own ~16px-wide hit area, so both remain
+   independently grabbable: the handle still covers the rest of its
+   strip, the connector still owns its own small spot. */
+.resize-handle--n,
+.resize-handle--s {
+  clip-path: polygon(
+    0 0,
+    calc(50% - 8px) 0,
+    calc(50% - 8px) 100%,
+    0 100%,
+    0 0,
+    100% 0,
+    100% 100%,
+    calc(50% + 8px) 100%,
+    calc(50% + 8px) 0,
+    100% 0
+  );
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(50% - 8px),
+    0 calc(50% - 8px),
+    0 0,
+    0 100%,
+    100% 100%,
+    100% calc(50% + 8px),
+    0 calc(50% + 8px),
+    0 100%
+  );
+}
+
+.resize-handle--n,
+.resize-handle--s {
+  left: 10px;
+  right: 10px;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resize-handle--n {
+  top: -5px;
+}
+
+.resize-handle--s {
+  bottom: -5px;
+}
+
+.resize-handle--e,
+.resize-handle--w {
+  top: 10px;
+  bottom: 10px;
+  width: 10px;
+  cursor: ew-resize;
+}
+
+.resize-handle--e {
+  right: -5px;
+}
+
+.resize-handle--w {
+  left: -5px;
+}
+
+.resize-handle--ne,
+.resize-handle--nw,
+.resize-handle--se,
+.resize-handle--sw {
+  width: 14px;
+  height: 14px;
+}
+
+.resize-handle--ne,
+.resize-handle--sw {
+  cursor: nesw-resize;
+}
+
+.resize-handle--nw,
+.resize-handle--se {
+  cursor: nwse-resize;
+}
+
+.resize-handle--ne {
+  top: -7px;
+  right: -7px;
+}
+
+.resize-handle--nw {
+  top: -7px;
+  left: -7px;
+}
+
+.resize-handle--se {
+  bottom: -7px;
+  right: -7px;
+}
+
+.resize-handle--sw {
+  bottom: -7px;
+  left: -7px;
+}

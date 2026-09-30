@@ -1,0 +1,173 @@
+/* ---------- board ---------- */
+
+.board {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-height: 0;
+  background-image: radial-gradient(var(--color-dot) 1px, transparent 1px);
+  user-select: none;
+  -webkit-user-drag: none;
+  /* Spec §12: basic touch support. Pointer Events already unify mouse/
+     touch/pen for pan/select/drag/resize (see useBoardInteraction.ts) —
+     this just stops the browser's native touch-scroll/pinch-zoom from
+     racing our own pan/zoom handling for a one-finger drag on blank
+     canvas. */
+  touch-action: none;
+}
+
+.board--panning {
+  cursor: grabbing;
+}
+
+/* Network mode's per-board navigation wait (design doc §6c) — should
+   usually be invisible (the background eager-load, §6b, has normally
+   already reached the board by the time it's clicked into); shown only
+   when that isn't yet true. */
+.board__loading {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+}
+
+.board__layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.board__bottom-bar {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.board__bottom-bar > :first-child {
+  justify-self: start;
+}
+
+.board__bottom-bar > :last-child {
+  justify-self: end;
+}
+
+.board__zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board__zoom-btn {
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 2px solid var(--color-border-soft);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.board__zoom-btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.board__zoom-btn--reset {
+  width: auto;
+  padding: 0 8px;
+  font-size: 0.75rem;
+}
+
+/* TanStack Query Devtools' floating toggle button (dev-only, App.tsx) —
+   `.tsqd-open-btn-container` is the library's own stable class name for
+   its fixed-position wrapper; its exact offsets are set inline via
+   CSS-in-JS at mount time (after this stylesheet, in source order), as a
+   same-specificity single-class rule — the doubled selector below bumps
+   specificity just enough to win without `!important` (which Biome's
+   `noImportantStyles` rule forbids; see the reduced-motion block further
+   down for this codebase's usual cascade-order approach, which doesn't
+   apply here since mount order isn't under our control). Its default
+   bottom-right position (12px inset) would sit right on top of
+   `.board__zoom`'s controls below — nudged up to clear them, keeping the
+   same 14px right-inset this app's other corner controls use. */
+.tsqd-open-btn-container.tsqd-open-btn-container {
+  bottom: 64px;
+  right: 14px;
+}
+
+/* A true slider, not a segmented button pair — one thumb, its position
+   (and icon) is the only indicator of the current mode. The thumb is
+   sized and colored identically to a standard icon button (.board__zoom-
+   btn's own 28px/2px-border/--color-surface/--color-ink), so it reads as
+   "one of the icon buttons" that happens to slide; the track is a
+   deliberately jumbo, similarly-colored housing around it (same
+   background, same border tone/width) — a border is what distinguishes
+   the thumb from the track, not a color difference, matching this app's
+   segmented-control precedent (.edge-direction-control's own active/
+   inactive states) rather than a high-contrast badge. `--board-mode-
+   toggle-travel` must equal the track's content-box width (its own
+   `width`, border-box, minus 2×(border + padding) on each side) minus the
+   thumb's width, so the thumb ends up flush against the padding on both
+   sides at rest — recompute it if track width, border, padding, or thumb
+   size change (currently 68 − 2×(2+2) − 28 = 32px). */
+.board__mode-toggle {
+  --board-mode-toggle-travel: 32px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 68px;
+  height: 36px;
+  padding: 2px;
+  border: 2px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.board__mode-toggle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.board__mode-toggle__thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.board__mode-toggle[aria-checked="true"] .board__mode-toggle__thumb {
+  transform: translateX(var(--board-mode-toggle-travel));
+}
+
+.board__marquee {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  border: 1px solid var(--color-outline);
+  pointer-events: none;
+}
+
+.board__container-preview {
+  position: absolute;
+  background: color-mix(in srgb, var(--color-outline) 12%, transparent);
+  border: 2px dashed var(--color-outline);
+  border-radius: var(--radius);
+  pointer-events: none;
+}

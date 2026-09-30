@@ -1,0 +1,66 @@
+/* ---------- confirm modal (multiboard support) ---------- */
+
+.confirm-backdrop {
+  z-index: 40;
+}
+
+.confirm-modal__body {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-ink-soft);
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-modal__btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.confirm-modal__btn--cancel {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 2px solid var(--color-border-soft);
+}
+
+.confirm-modal__btn--cancel:hover {
+  background: var(--color-surface-hover);
+}
+
+.confirm-modal__btn--confirm {
+  /* nord11 — matches colors/colorKey.ts's `coral` (used elsewhere for a
+     "destructive/attention" accent, e.g. recency mode's oldest tier). */
+  background: #bf616a;
+  color: white;
+  border: 2px solid transparent;
+}
+
+.confirm-modal__btn--confirm:hover {
+  opacity: 0.9;
+}
+
+.confirm-modal__btn--positive {
+  /* nord14 — matches colors/colorKey.ts's `lime`, used here as a
+     non-destructive "go ahead" accent so this doesn't read as an error
+     state the way the shared coral confirm color would. */
+  background: #a3be8c;
+  color: #2e3440;
+  border: 2px solid transparent;
+}
+
+.confirm-modal__btn--positive:hover {
+  opacity: 0.9;
+}
+
+.confirm-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

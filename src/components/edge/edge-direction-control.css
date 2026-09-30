@@ -1,0 +1,36 @@
+/* ---------- edge direction control (spec §4.6 — the edges half of the selection menu) ---------- */
+
+.edge-direction-control {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.edge-direction-control__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.edge-direction-control__btn:hover {
+  background: var(--color-surface-hover);
+}
+
+.edge-direction-control__btn--active {
+  background: var(--color-surface-hover);
+  outline: 1px solid var(--color-outline);
+}

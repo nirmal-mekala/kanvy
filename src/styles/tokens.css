@@ -1,0 +1,80 @@
+/* Nord-derived palette tokens — default (light) values here; dark-mode
+   values override the same `--color-*` custom properties below, so every
+   component referencing `var(--color-*)` picks up the theme automatically
+   without a duplicate dark-mode class. */
+:root {
+  --color-paper: #e5e9f0; /* nord5 */
+  --color-ink: #2e3440; /* nord0 */
+  --color-line: #2e3440; /* nord0 */
+  --color-surface: #eceff4; /* nord6 */
+  --color-surface-hover: #d8dee9; /* nord4 */
+  --color-dot: rgba(46, 52, 64, 0.08);
+  --color-border-soft: rgba(46, 52, 64, 0.2);
+  --color-outline: rgba(46, 52, 64, 0.45);
+  --color-ink-soft: rgba(46, 52, 64, 0.4);
+  --color-border-static: #c7cbd2;
+  /* Not user-configurable (spec §3). A flat (opaque) color, not an
+     ink alpha — the line and arrowhead paths overlap, and a translucent
+     stroke would visibly double-darken there. Equivalent to ink at 0.7
+     opacity over --color-paper, flattened to a solid hex so it stays a
+     single tone at every overlap. Theme-dependent (redefined in
+     [data-theme="dark"] below), unlike the fixed hex this replaced. */
+  --color-edge: #656a75;
+  --font-mono: "Fira Code", "Courier New", monospace;
+  /* .field-message tone colors (FieldMessage.tsx, settings modal). Plain
+     nord11 text directly on --color-surface (the error tone's original
+     styling) was ~3.6:1 contrast in light mode, ~2.5:1 in dark, both
+     under WCAG AA's 4.5:1 for body text. A darkened/lightened variant per
+     tone and theme (each tuned for >=4.5:1 against --color-surface) plus
+     a tinted background box reads clearly in both, and gives the warning
+     tone (nord13 amber) its own identity distinct from error (nord11
+     coral) rather than reusing error's red for a non-error message. */
+  --color-danger-text: #96343d;
+  --color-danger-bg: rgba(191, 97, 106, 0.14);
+  --color-warn-text: #7a5900;
+  --color-warn-bg: rgba(235, 203, 139, 0.18);
+  --color-tip-text: #35659c;
+  --color-tip-bg: rgba(136, 192, 208, 0.14);
+}
+
+/* Modal dialogs (help panel, confirm modal, settings modal) use the system
+   UI stack rather than the app's default monospace (--font-mono) — prose-
+   heavy dialog content reads better in a sans-serif face than the canvas's
+   label/data typography does. */
+:root {
+  --modal-font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --radius: 5px;
+  /* Matches .card's border width — .card__inner's own corner radius nests
+     concentrically inside it instead of leaving a sliver of .card's
+     background visible at each corner. */
+  --card-border-width: 3px;
+  font-family: var(--font-mono);
+  font-weight: 300;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #2e3440; /* nord0 */
+  --color-ink: #eceff4; /* nord6 */
+  --color-line: #eceff4; /* nord6 */
+  --color-surface: #3b4252; /* nord1 */
+  --color-surface-hover: #434c5e; /* nord2 */
+  --color-dot: rgba(236, 239, 244, 0.08);
+  --color-border-soft: rgba(236, 239, 244, 0.25);
+  --color-outline: rgba(236, 239, 244, 0.35);
+  --color-border-static: #5c6270;
+  --color-ink-soft: rgba(236, 239, 244, 0.4);
+  --color-edge: #b3b7be;
+  --color-danger-text: #eda1a7;
+  --color-danger-bg: rgba(191, 97, 106, 0.22);
+  --color-warn-text: #e8c168;
+  --color-warn-bg: rgba(235, 203, 139, 0.16);
+  --color-tip-text: #8fc0e8;
+  --color-tip-bg: rgba(136, 192, 208, 0.16);
+}

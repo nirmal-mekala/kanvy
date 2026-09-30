@@ -2,7 +2,7 @@
 // out of Card.tsx purely to keep that component's cognitive complexity
 // under Biome's threshold; no behavior of its own besides tracking whether
 // the loaded image is smaller than the card's fixed width, to avoid
-// upscaling it (see `.card__media--small` in index.css).
+// upscaling it (see `.card__media--small` in card.css).
 
 import { useState } from 'react'
 import { CARD_WIDTH } from '../../geometry/constants'

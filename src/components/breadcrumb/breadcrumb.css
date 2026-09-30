@@ -1,0 +1,35 @@
+/* ---------- breadcrumb (multiboard support) ----------
+   Lives inline in the toolbar row (not its own bar) so the toolbar's
+   fixed-height buttons — not the breadcrumb's variable content (bare
+   home icon vs. board title vs. title being edited) — set the row's
+   height; see .toolbar's align-items: center. */
+
+.breadcrumb {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-ink-soft);
+  font-size: 0.85rem;
+}
+
+.breadcrumb__home {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: var(--radius);
+  color: var(--color-ink);
+}
+
+.breadcrumb__home:hover {
+  background: var(--color-surface-hover);
+}
+
+.breadcrumb__chevron {
+  opacity: 0.6;
+}
+
+.breadcrumb .board-name.breadcrumb__title {
+  font-weight: 600;
+}

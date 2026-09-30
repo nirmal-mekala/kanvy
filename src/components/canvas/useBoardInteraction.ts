@@ -186,7 +186,7 @@ export function useBoardInteraction({
     useState<ScreenRect | null>(null)
   // The currently-dragged node plus whatever it's carrying, purely so
   // Canvas.tsx can apply a transient `--dragging` class (z-index bump —
-  // see index.css's `.card--dragging`/`.container-node--dragging`) for the
+  // see card.css's `.card--dragging`/container.css's `.container-node--dragging`) for the
   // whole gesture. Never touches stored node order/position: an earlier
   // revision instead reordered the underlying node array the moment a
   // drag started moving (`bringToFrontAtom`), which moved the dragged

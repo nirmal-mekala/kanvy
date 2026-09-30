@@ -24,7 +24,7 @@ export const HEADING_MIN_W = GRID_SIZE * 10
  * Minimum height for a heading-sized card's 8-way resize (spec §4.4/§5.2)
  * — one per level, since each level's font size needs a different amount
  * of vertical room to fit exactly one line without clipping it. Derived
- * from `.card--h{1,2,3} .card__content` (index.css): the card's 17px
+ * from `.card--h{1,2,3} .card__content` (components/card/card.css): the card's 17px
  * top bar-inset, plus the textarea's 8px top/bottom padding, plus
  * `line-height: 1.2` at that level's font size (h1 3rem/48px, h2
  * 2.25rem/36px, h3 1.75rem/28px), rounded up to the next grid multiple

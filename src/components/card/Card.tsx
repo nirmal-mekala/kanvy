@@ -56,7 +56,7 @@ function useAutoGrowHeight(
     if (!el) return
     if (skip) {
       // A heading's fixed height comes from CSS (`height: calc(100% -
-      // 17px)`, index.css), which an inline style always beats — so a
+      // 17px)`, card.css), which an inline style always beats — so a
       // stale `el.style.height` left over from a *previous* render where
       // this same textarea was a regular (auto-growing) card must be
       // cleared, not just skipped, or the heading is stuck rendering at
@@ -226,7 +226,7 @@ export function Card({
   theme: Theme
   viewMode: ViewMode
   selected?: boolean
-  /** A transient z-index bump for the whole gesture (spec §4.4/index.css's `.card--dragging`) — never a change to stored node order. */
+  /** A transient z-index bump for the whole gesture (spec §4.4/card.css's `.card--dragging`) — never a change to stored node order. */
   dragging?: boolean
   connectorsVisible?: boolean
   connectorActiveSide?: Side | null

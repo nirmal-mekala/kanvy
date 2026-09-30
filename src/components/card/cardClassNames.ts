@@ -5,7 +5,7 @@
 import type { CardNode, TextSize } from '../../schema/node'
 
 // Static literals (not a template-literal interpolation) so a CSS-usage
-// analyzer can actually match these against index.css's `.card--h1`/`.card--h2`/
+// analyzer can actually match these against card.css's `.card--h1`/`.card--h2`/
 // `.card--h3` rules — a dynamic `` `card--${size}` `` string is invisible
 // to that kind of static analysis and gets (falsely) flagged as dead CSS.
 const HEADING_CLASS: Record<TextSize, string | false> = {
