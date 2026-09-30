@@ -7,8 +7,7 @@
 // card's rendered height flowing into the persisted `h` field.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
-import type { Theme } from '../../colors/colorKey'
+import { resolveNodeAccent, type ViewMode } from '../../colors/borderColor'
 import type { Side } from '../../geometry/anchor'
 import type { CardNode } from '../../schema/node'
 import { NodeConnectors } from '../canvas/NodeConnectors'
@@ -198,7 +197,6 @@ function CardResizeHandles({
 export function Card({
   node,
   imageSrc,
-  theme,
   viewMode,
   selected = false,
   dragging = false,
@@ -223,7 +221,6 @@ export function Card({
 }: {
   node: CardNode
   imageSrc?: string
-  theme: Theme
   viewMode: ViewMode
   selected?: boolean
   /** A transient z-index bump for the whole gesture (spec §4.4/card.css's `.card--dragging`) — never a change to stored node order. */
@@ -265,7 +262,7 @@ export function Card({
   const isDone = node.task?.status === 'done'
   // Task mode dims everything that isn't a task, so tasks stand out.
   const isDimmedByViewMode = viewMode === 'task' && node.task === undefined
-  const borderColor = resolveNodeBorderColor(node, theme, viewMode)
+  const accent = resolveNodeAccent(node, viewMode, new Date())
 
   const cardElRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -302,6 +299,7 @@ export function Card({
       ref={cardElRef}
       data-node-id={node.id}
       data-testid="card"
+      data-accent={accent}
       className={cardClassNames(node, {
         headingSize: node.kind === 'text' ? node.size : null,
         isDone,
@@ -314,7 +312,6 @@ export function Card({
         top: node.y,
         width: node.w,
         height: isHeading ? node.h : undefined,
-        borderColor,
       }}
       onPointerDown={onPointerDown && ((e) => onPointerDown(node.id, e))}
       onPointerMove={onPointerMove}
@@ -326,7 +323,6 @@ export function Card({
       <CardBody
         node={node}
         imageSrc={imageSrc}
-        theme={theme}
         viewMode={viewMode}
         showCaption={showCaption}
         tinted={isDone || isDimmedByViewMode}

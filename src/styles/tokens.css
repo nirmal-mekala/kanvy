@@ -35,6 +35,31 @@
   --color-warn-bg: rgba(235, 203, 139, 0.18);
   --color-tip-text: #35659c;
   --color-tip-bg: rgba(136, 192, 208, 0.14);
+
+  /* User-selectable accent palette (spec §3; ColorKey). Duplicated in
+     colors/colorKey.ts, which SVG pattern generation needs as hex —
+     colors/palette.test.ts keeps the two in sync. `gray` is the one
+     theme-dependent accent; both of its values are also exposed on their
+     own because the gray swatch shows its light/dark split in either
+     theme. */
+  --color-accent-gray-light: #b8c0cc;
+  --color-accent-gray-dark: #4c566a; /* nord3 */
+  --color-accent-gray: var(--color-accent-gray-light);
+  --color-accent-coral: #bf616a; /* nord11 */
+  --color-accent-orange: #d08770; /* nord12 */
+  --color-accent-amber: #ebcb8b; /* nord13 */
+  --color-accent-lime: #a3be8c; /* nord14 */
+  --color-accent-teal: #8fbcbb; /* nord7 */
+  --color-accent-sky: #88c0d0; /* nord8 */
+  --color-accent-violet: #b48ead; /* nord15 */
+  --color-accent-pink: #81a1c1; /* nord9 — Nord has no pink */
+
+  /* Fixed task-status palette, chosen for glyph contrast (spec §3). Only
+     `todo` varies by theme. */
+  --color-task-todo: #4c566a; /* nord3 */
+  --color-task-blocked: #bf616a; /* nord11 */
+  --color-task-in-progress: #5e81ac; /* nord10 */
+  --color-task-done: #a3be8c; /* nord14 */
 }
 
 /* Modal dialogs (help panel, confirm modal, settings modal) use the system
@@ -77,4 +102,6 @@
   --color-warn-bg: rgba(235, 203, 139, 0.16);
   --color-tip-text: #8fc0e8;
   --color-tip-bg: rgba(136, 192, 208, 0.16);
+  --color-accent-gray: var(--color-accent-gray-dark);
+  --color-task-todo: #d8dee9; /* nord4 */
 }

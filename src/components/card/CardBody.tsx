@@ -18,7 +18,6 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import { LayoutDashboard, MoreHorizontal } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
-import type { Theme } from '../../colors/colorKey'
 import { useEmojiTrigger } from '../../emoji/useEmojiTrigger'
 import type { CardNode } from '../../schema/node'
 import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
@@ -56,7 +55,6 @@ function CardContentTruncationIndicator({ clipped }: { clipped: boolean }) {
 export function CardBody({
   node,
   imageSrc,
-  theme,
   viewMode,
   showCaption,
   tinted,
@@ -67,7 +65,6 @@ export function CardBody({
 }: {
   node: CardNode
   imageSrc: string | undefined
-  theme: Theme
   viewMode: ViewMode
   showCaption: boolean
   tinted: boolean
@@ -114,7 +111,6 @@ export function CardBody({
         {node.task && (
           <TaskStatusIcon
             status={node.task.status}
-            theme={theme}
             className="task-status-icon"
             ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
           />

@@ -475,7 +475,6 @@ export function Canvas() {
                 key={node.id}
                 node={node}
                 {...(imageSrc ? { imageSrc } : {})}
-                theme={theme}
                 viewMode={viewMode}
                 selected={selection.has(node.id)}
                 dragging={draggingIds?.has(node.id) ?? false}

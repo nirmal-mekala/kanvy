@@ -3,7 +3,7 @@
 // selection-menu wiring (Stage 8), and connector affordances (Stage 6).
 
 import { useState } from 'react'
-import { resolveNodeBorderColor, type ViewMode } from '../../colors/borderColor'
+import { resolveNodeAccent, type ViewMode } from '../../colors/borderColor'
 import { resolveColorHex, type Theme } from '../../colors/colorKey'
 import { patternBackgroundImage } from '../../colors/patterns'
 import type { Side } from '../../geometry/anchor'
@@ -69,7 +69,7 @@ export function Container({
   onConnectorPointerUp?: (e: React.PointerEvent) => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const borderColor = resolveNodeBorderColor(node, theme, viewMode)
+  const accent = resolveNodeAccent(node, viewMode, new Date())
   // The pattern tint matches the container's own selected color (spec §3)
   // — the same flat hex the border would use outside task/recency view
   // modes. Task view mode strips container backgrounds entirely (spec
@@ -91,13 +91,13 @@ export function Container({
     <div
       data-node-id={node.id}
       data-testid="container"
+      data-accent={accent}
       className={classNames}
       style={{
         left: node.x,
         top: node.y,
         width: node.w,
         height: node.h,
-        borderColor,
         backgroundImage: patternImage,
       }}
       onPointerEnter={() => setHovered(true)}
@@ -123,7 +123,6 @@ export function Container({
         {node.task && (
           <TaskStatusIcon
             status={node.task.status}
-            theme={theme}
             className="task-status-icon"
             ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
           />

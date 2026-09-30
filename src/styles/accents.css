@@ -1,0 +1,97 @@
+/* Palette consumers: maps the data attributes components set from their
+   node/selection state onto the tokens in tokens.css, so the palette
+   (and its per-theme values) lives entirely in CSS. */
+
+/* Card/container border (colors/borderColor.ts's resolveNodeAccent picks
+   the value from the node's color, task status, or recency). */
+:is(.card, .container-node)[data-accent="gray"] {
+  border-color: var(--color-accent-gray);
+}
+:is(.card, .container-node)[data-accent="coral"] {
+  border-color: var(--color-accent-coral);
+}
+:is(.card, .container-node)[data-accent="orange"] {
+  border-color: var(--color-accent-orange);
+}
+:is(.card, .container-node)[data-accent="amber"] {
+  border-color: var(--color-accent-amber);
+}
+:is(.card, .container-node)[data-accent="lime"] {
+  border-color: var(--color-accent-lime);
+}
+:is(.card, .container-node)[data-accent="teal"] {
+  border-color: var(--color-accent-teal);
+}
+:is(.card, .container-node)[data-accent="sky"] {
+  border-color: var(--color-accent-sky);
+}
+:is(.card, .container-node)[data-accent="violet"] {
+  border-color: var(--color-accent-violet);
+}
+:is(.card, .container-node)[data-accent="pink"] {
+  border-color: var(--color-accent-pink);
+}
+:is(.card, .container-node)[data-accent="task-todo"] {
+  border-color: var(--color-task-todo);
+}
+:is(.card, .container-node)[data-accent="task-blocked"] {
+  border-color: var(--color-task-blocked);
+}
+:is(.card, .container-node)[data-accent="task-in_progress"] {
+  border-color: var(--color-task-in-progress);
+}
+:is(.card, .container-node)[data-accent="task-done"] {
+  border-color: var(--color-task-done);
+}
+
+/* Color-picker swatches. The `background` shorthand (not
+   background-color) matters: it also resets `.swatch`'s background-clip,
+   matching how these rendered when the fill was an inline style. The
+   gray swatch shows both of gray's values regardless of the current
+   theme, signalling that it changes with the theme. */
+.swatch[data-color="gray"] {
+  background: linear-gradient(
+    90deg,
+    var(--color-accent-gray-light) 50%,
+    var(--color-accent-gray-dark) 50%
+  );
+}
+.swatch[data-color="coral"] {
+  background: var(--color-accent-coral);
+}
+.swatch[data-color="orange"] {
+  background: var(--color-accent-orange);
+}
+.swatch[data-color="amber"] {
+  background: var(--color-accent-amber);
+}
+.swatch[data-color="lime"] {
+  background: var(--color-accent-lime);
+}
+.swatch[data-color="teal"] {
+  background: var(--color-accent-teal);
+}
+.swatch[data-color="sky"] {
+  background: var(--color-accent-sky);
+}
+.swatch[data-color="violet"] {
+  background: var(--color-accent-violet);
+}
+.swatch[data-color="pink"] {
+  background: var(--color-accent-pink);
+}
+
+/* Task-status glyphs (TaskStatusIcon.tsx) — lucide strokes with
+   currentColor. */
+svg[data-task-status="todo"] {
+  color: var(--color-task-todo);
+}
+svg[data-task-status="blocked"] {
+  color: var(--color-task-blocked);
+}
+svg[data-task-status="in_progress"] {
+  color: var(--color-task-in-progress);
+}
+svg[data-task-status="done"] {
+  color: var(--color-task-done);
+}
