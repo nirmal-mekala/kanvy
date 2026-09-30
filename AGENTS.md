@@ -100,8 +100,18 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
   (hand-rolled to match the prototype). `nanoid` for ids. Conditional
   class composition is plain string-joining, not `clsx`. Debouncing is
   hand-rolled, not a library.
-- **Styling**: Tailwind v4 (CSS-first `@theme` config). Pixel-perfect
-  parity with the prototype is the goal.
+- **Styling**: plain CSS, BEM-named classes, no framework (Tailwind was
+  removed — see `ctx/notes/260930-styling-approach-audit.md`). One
+  stylesheet per component, colocated (`components/card/card.css`);
+  globals (fonts, vendored Preflight reset, tokens, a11y, palette
+  consumers) in `src/styles/`. `src/index.css` is the only entry point
+  and its `@import` order *is* the cascade order. Colors are tokens in
+  `styles/tokens.css`, dark mode redefines them under
+  `[data-theme="dark"]`; state-driven colors are data attributes
+  (`data-accent`, `data-color`, `data-task-status`) mapped in
+  `styles/accents.css`. Inline `style` is only for runtime values
+  (geometry, viewport transform, menu placement, generated SVG
+  patterns). Fira Code is self-hosted.
 - **State**: Jotai, granular `atomFamily`-per-entity (not one atom per
   board slice) — avoids whole-canvas re-renders on a single drag.
 - **Validation**: Zod is the source of truth for the data model; TS types
