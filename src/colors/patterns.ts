@@ -1,7 +1,7 @@
 // Container background fills (spec §3), built from the `hero-patterns`
 // package — an MIT-licensed port of the SVGs from heropatterns.com. Ported
-// from ctx/support/260915-prototype-source/src/data/patterns.js onto the
-// v0 schema's `PatternKey` names (schema/node.ts).
+// from the original prototype's patterns.js onto the v0 schema's
+// `PatternKey` names (schema/node.ts).
 
 import {
   fallingTriangles,

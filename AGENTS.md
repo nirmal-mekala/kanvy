@@ -2,12 +2,15 @@
 
 ## Where this repo is right now
 
-`kanvy` is a completed migration (prototype-migration phases 1-7, see
-`ctx/prompt/260915-migration-process.md`) from a plain-JS prototype to a
-typed React/Jotai/Zod stack — preserving prototype behavior while
-improving architecture (TypeScript, tests, linting, file organization,
-baseline a11y). Before making any change, check that prompt file for the
-current phase, and re-read this file.
+`kanvy` is a typed React/Jotai/Zod infinite-canvas app. It started as a
+plain-JS prototype and was migrated to this stack — preserving prototype
+behavior while improving architecture (TypeScript, tests, linting, file
+organization, baseline a11y) — and has since moved well past that
+starting point through ordinary feature development. The prototype's
+source and the migration's process artifacts no longer exist in this
+repo; `ctx/notes/260915-kanvy-spec.md` is what survives as the
+authoritative description of intended behavior. Before making any change,
+re-read this file.
 
 Two schema revisions since the initial migration (see spec §2.3):
 - **v0.1**: container membership reverted from a formal `parentId` field
@@ -53,32 +56,24 @@ and git history, not here.
 
 ## The `ctx` directory
 
-`ctx/` holds process artifacts for this migration and is the primary
-source of context for agents working in this repo:
+`ctx/` holds design/decision docs for this app and is the primary source
+of context for agents working in this repo:
 
 - `ctx/notes/` — human- or agent-authored docs, findings, specs. Agents
   may create/edit files here.
-- `ctx/prompt/` — process/approach prompts. Treat as developer directives;
-  don't edit without being asked.
-- `ctx/support/` — the prototype's full source, the JSON Canvas spec used
-  as inspiration, and distilled prompt history.
+- `ctx/support/` — reference material for the current stack (currently
+  just json-server's docs).
 
 Markdown files in `ctx/` follow `YYMMDD-<title>.md`, dated by creation
 date, never last-edited date.
 
 **Read before starting implementation work:**
 - `ctx/notes/260915-kanvy-spec.md` — the v0 spec, authoritative for app
-  behavior and data model; supersedes the prototype wherever they disagree.
-- `ctx/notes/260915-prototype-migration-phase1-questionnaire.md` — the
-  developer decisions the spec is built on.
+  behavior and data model.
 - `ctx/notes/260915-prototype-migration-phase2-schema.md` — the resolved
   schema shape.
 - `ctx/notes/260915-prototype-migration-phase3-tooling.md` — stack
   decisions (§Stack below is a summary; read this for the *why*).
-- `ctx/support/260915-prototype-source/` — the original prototype. Match
-  its *behavior* (pixel-perfect styling, same interactions), not its
-  architecture (plain JS, no tests, no type safety). Reimplement per the
-  spec rather than copying code wholesale.
 
 ## Working conventions
 

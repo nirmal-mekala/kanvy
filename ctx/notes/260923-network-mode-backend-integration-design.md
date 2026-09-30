@@ -3,10 +3,11 @@
 ## Status of this document
 
 Design notes from a conversation between the developer and an agent,
-capturing decisions already made plus the open questions still flagged
-for whoever implements this — not itself an implementation plan (see
-`ctx/prompt/260923-network-mode-backend-integration.md` for the
-actionable directive). Nothing described here is built yet.
+capturing decisions already made plus the open questions flagged for
+whoever implemented this — not itself an implementation plan. Network
+mode is now built (see `AGENTS.md`'s summary and `src/api/`,
+`src/state/networkBoardLoader.ts`); this doc remains the design
+rationale.
 
 No auth/sign-in system is in scope. "Auth token" below is a single
 user-supplied bearer string forwarded as a header — there's no login
@@ -225,11 +226,9 @@ state. The view stays on its last-good state underneath the banner.
 
 Ports **1993–1998** are bound host↔container for this environment. Use
 two of them: one for the Vite UI dev server, one for the json-server
-instance. `ctx/support/260915-kanvy-schema.json` and
-`260915-kanvy-db-sample.json` are the starting points for a sample
-`db.json` — regenerate/extend them to match the post-§4 array-ified
-`images` shape and the `boards`/`nodes`/`edges`/`images` collection
-split.
+instance. (This ended up built as `server/generate-db.ts`/`pnpm db:init`,
+which generates `db.json` from the app's own schema rather than from a
+hand-maintained sample — see `AGENTS.md`'s "Dev backend" summary.)
 
 ## 9. Docs/tests
 

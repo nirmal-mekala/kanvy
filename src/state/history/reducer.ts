@@ -1,6 +1,6 @@
 // Pure undo/redo history reducer — same shared-stack shape as the
-// prototype's `historyReducer` (ctx/support/260915-prototype-source/src/
-// state/useBoard.js), generalized over `T` so it isn't Board-specific, plus
+// prototype's `historyReducer` (useBoard.js), generalized over `T` so it
+// isn't Board-specific, plus
 // the spec §8/Q11 selection-restore-on-undo fix: an update may attach the
 // ids that should be re-selected if it's later undone (used by node/edge
 // deletion — see src/state/atoms/nodes.ts).

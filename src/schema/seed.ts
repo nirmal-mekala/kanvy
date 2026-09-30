@@ -1,8 +1,8 @@
 // The starter document used on a fresh install and as the fallback when a
 // persisted board can't be recovered (spec §9 Q12) — ported from the
-// prototype's `seedBoard` (ctx/support/260915-prototype-source/src/data/
-// board.js) into the v0 schema shape, then revised (260918) so a brand-new
-// user lands on a normal (non-home) board rather than the home board
+// prototype's `seedBoard` (board.js) into the v0 schema shape, then
+// revised (260918) so a brand-new user lands on a normal (non-home) board
+// rather than the home board
 // itself — the home board starts with just a board-card back-reference to
 // it, and a first-time visit is routed straight to the welcome board (see
 // `freshBoardIdAtom` in state/history/boardHistoryAtom.ts and the `/`

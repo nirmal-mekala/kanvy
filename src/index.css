@@ -5,8 +5,7 @@
    default (light) values here; dark-mode values override the same
    `--color-*` custom properties below, so every component referencing
    `var(--color-*)` picks up the theme automatically without a duplicate
-   dark-mode class. Ported from
-   ctx/support/260915-prototype-source/src/index.css. */
+   dark-mode class. Ported from the original prototype's index.css. */
 @theme {
   --color-paper: #e5e9f0; /* nord5 */
   --color-ink: #2e3440; /* nord0 */

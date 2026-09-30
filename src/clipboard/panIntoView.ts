@@ -2,7 +2,7 @@
 // fully visible, centering on it — a no-op if it's already fully visible
 // (spec §7: "if the paste lands outside the current viewport, the view
 // pans... to bring it fully into view"). Ported from the prototype's
-// `panIntoView` (ctx/support/260915-prototype-source/src/components/Board.jsx).
+// `panIntoView` (Board.jsx).
 
 import type { View } from '../components/canvas/viewportCoords'
 import type { Rect } from '../geometry/snap'
