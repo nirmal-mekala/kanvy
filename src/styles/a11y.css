@@ -1,0 +1,40 @@
+/* ---------- a11y baseline (spec §11, tier (a)) ---------- */
+
+/* Visible keyboard-focus indication on every interactive control — none
+   of the buttons/swatches/inputs above had one before. Scoped to
+   `:focus-visible` (not plain `:focus`) so a mouse click doesn't leave a
+   distracting ring, matching normal browser/OS focus-ring conventions. */
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
+}
+
+.card__content:focus-visible {
+  outline: 2px solid var(--color-outline);
+  outline-offset: -2px;
+}
+
+/* Only 4 cosmetic (non-essential) transitions exist in this stylesheet —
+   overridden here by matching selector + specificity (not `!important`,
+   which Biome's `noImportantStyles` rule forbids), relying on cascade
+   order since this block comes last. */
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  .toolbar__btn {
+    transition: none;
+  }
+
+  .card {
+    transition: none;
+  }
+
+  .board__mode-toggle__thumb {
+    transition: none;
+  }
+}

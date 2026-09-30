@@ -1,0 +1,54 @@
+/* ---------- edges (connections between nodes) ---------- */
+
+.board__edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.edge__line {
+  fill: none;
+  stroke: var(--color-edge);
+  stroke-width: 3;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.edge--selected .edge__line {
+  stroke: var(--color-ink);
+  stroke-width: 4;
+}
+
+.edge__arrowhead {
+  fill: var(--color-edge);
+  pointer-events: none;
+}
+
+/* Recolored to --color-ink when its edge is selected — matches the
+   prototype's Board.jsx-drawn selected-arrowhead treatment (opaque,
+   unlike the translucent --color-outline used for other selection
+   outlines, since a fill would otherwise let the background show
+   through). */
+.edge__arrowhead--selected {
+  fill: var(--color-ink);
+}
+
+/* Invisible, much wider than .edge__line — the actual click target for
+   selecting an edge (spec §4.3), since the visible line alone is too thin
+   to reliably hit. */
+.edge__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.edge__preview {
+  fill: none;
+  stroke: var(--color-outline);
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+}

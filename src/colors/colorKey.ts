@@ -18,6 +18,9 @@ export type Theme = 'light' | 'dark'
 
 // Nord's Frost + Aurora accents (nord3, nord7-9, nord11-15). Nord has no
 // pink, so that slot borrows nord9 (a mid blue) instead — spec §3.
+// Mirrors styles/tokens.css's `--color-accent-*`, which is what renders
+// borders/swatches; the hex here exists for SVG pattern generation.
+// colors/palette.test.ts keeps the two in sync.
 const COLORS: Record<ColorKey, string> = {
   gray: '#4c566a', // nord3
   coral: '#bf616a', // nord11
@@ -48,19 +51,4 @@ export function resolveColorHex(color: ColorKey, theme: Theme): string {
 /** True only for `gray` — the one swatch that renders as a half-light/half-dark split circle. */
 export function isThemeDynamic(color: ColorKey): boolean {
   return color === 'gray'
-}
-
-/**
- * CSS `background` value for a color-picker swatch button (spec §3) — a
- * plain fill for every static color, but a half-light/half-dark split for
- * `gray` specifically, so its swatch visibly signals "this one changes
- * with the theme." Always shows both halves regardless of the current
- * theme — `resolveColorHex` is what picks the single theme-appropriate one
- * for actually rendering a card/container/edge.
- */
-export function swatchBackground(color: ColorKey): string {
-  if (color === 'gray') {
-    return `linear-gradient(90deg, ${GRAY_LIGHT} 50%, ${COLORS.gray} 50%)`
-  }
-  return COLORS[color]
 }

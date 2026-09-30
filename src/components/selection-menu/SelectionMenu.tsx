@@ -1,7 +1,7 @@
 // One menu for the whole current selection, however mixed (spec §4.3/§3/
 // §5.2/§6.1) — anchored to the combined bounding box by the caller
 // (Canvas.tsx). Ported from the prototype's inline selection-menu JSX in
-// Board.jsx onto Tailwind + this migration's discriminated `Node` union.
+// Board.jsx onto this migration's discriminated `Node` union.
 
 import {
   Heading1,
@@ -12,11 +12,7 @@ import {
   type LucideIcon,
   Type,
 } from 'lucide-react'
-import {
-  resolveColorHex,
-  swatchBackground,
-  type Theme,
-} from '../../colors/colorKey'
+import { resolveColorHex, type Theme } from '../../colors/colorKey'
 import { patternBackgroundImage } from '../../colors/patterns'
 import {
   type CardNode,
@@ -107,7 +103,7 @@ export function SelectionMenu({
             key={color}
             type="button"
             className={`swatch${commonColor === color ? ' swatch--active' : ''}`}
-            style={{ background: swatchBackground(color) }}
+            data-color={color}
             title={color}
             onClick={() => onSetColor(color)}
           />
@@ -192,7 +188,7 @@ export function SelectionMenu({
                 title={status.replace('_', ' ')}
                 onClick={() => onSetTaskStatus(status)}
               >
-                <TaskStatusIcon status={status} theme={theme} size={14} />
+                <TaskStatusIcon status={status} size={14} />
               </button>
             ))}
           </div>

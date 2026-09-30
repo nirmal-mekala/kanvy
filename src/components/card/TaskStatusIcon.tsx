@@ -4,11 +4,7 @@
 // from the original prototype's TaskStatusIcon.jsx.
 
 import { Circle, CircleCheck, CircleEllipsis, CircleX } from 'lucide-react'
-import type { Theme } from '../../colors/colorKey'
-import {
-  resolveTaskStatusColor,
-  type TaskStatus,
-} from '../../colors/taskStatus'
+import type { TaskStatus } from '../../colors/taskStatus'
 
 const ICONS: Record<TaskStatus, typeof Circle> = {
   todo: Circle,
@@ -19,14 +15,12 @@ const ICONS: Record<TaskStatus, typeof Circle> = {
 
 export function TaskStatusIcon({
   status,
-  theme,
   size = 12,
   strokeWidth = 2,
   className,
   ariaLabel,
 }: {
   status: TaskStatus
-  theme: Theme
   size?: number
   strokeWidth?: number
   className?: string
@@ -42,7 +36,7 @@ export function TaskStatusIcon({
     <Icon
       size={size}
       strokeWidth={strokeWidth}
-      color={resolveTaskStatusColor(status, theme)}
+      data-task-status={status}
       className={className}
       role={ariaLabel ? 'img' : undefined}
       aria-label={ariaLabel}

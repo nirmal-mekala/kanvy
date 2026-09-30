@@ -1,0 +1,71 @@
+/* Shared by every full-screen dialog (help panel, confirm modal, settings
+   modal) — components/modal/Modal.tsx portals this to `document.body`,
+   and `position: fixed` (not `absolute`) is what makes that portal
+   actually cover the viewport: `absolute` would still size itself against
+   whatever positioned ancestor happens to contain the portal target,
+   which for `document.body` is the initial containing block anyway, but
+   `fixed` doesn't depend on that being true. Each dialog pairs this with
+   its own z-index modifier class (`.help-backdrop`/`.confirm-backdrop`/
+   `.settings-backdrop`) so a later-opened dialog always sits on top. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-backdrop__dismiss {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+/* Shared dialog chrome — every modal built on components/modal/Modal.tsx
+   gets this for free. Sizing itself is one of exactly two fixed
+   footprints (`.modal-dialog--standard`/`.modal-dialog--compact` below),
+   not per-modal content-sizing, so dialogs of the same size never shift
+   position/dimensions when swapped for one another. Content taller than
+   the dialog scrolls inside it (`overflow: auto`) rather than growing it.
+   Sans-serif (--modal-font-family), not this app's default --font-mono. */
+.modal-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 24px 28px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-outline);
+  border-radius: var(--radius);
+  font-family: var(--modal-font-family);
+  font-weight: 400;
+}
+
+/* The app's one "full dialog" size — help panel, settings modal: enough
+   room for a scrollable list/form, not just a line or two of text. */
+.modal-dialog--standard {
+  width: 560px;
+  max-width: 90vw;
+  height: 480px;
+  max-height: 85vh;
+}
+
+/* The app's one "quick confirmation" size — confirm modal: sized to its
+   (short, title+body+two-buttons) content rather than the standard
+   dialog's fixed height, so a yes/no prompt doesn't dwarf its own text. */
+.modal-dialog--compact {
+  width: min(420px, 90vw);
+  max-height: 85vh;
+}
+
+.modal-dialog__title {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}

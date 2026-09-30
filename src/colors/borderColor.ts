@@ -1,13 +1,17 @@
-// Shared border-color resolution for cards and containers (spec §3, §6.2)
+// Shared border-accent resolution for cards and containers (spec §3, §6.2)
 // — identical algorithm the prototype duplicates between Card.jsx and
 // Group.jsx (both read the same three branches), consolidated here once
-// instead of copied per component.
+// instead of copied per component. Returns a palette key, not a color:
+// the element carries it as `data-accent` and styles/accents.css maps it
+// to the (theme-aware) token.
 
-import { type ColorKey, resolveColorHex, type Theme } from './colorKey'
+import type { ColorKey } from './colorKey'
 import { resolveRecencyColor } from './recency'
-import { resolveTaskStatusColor, type TaskStatus } from './taskStatus'
+import type { TaskStatus } from './taskStatus'
 
 export type ViewMode = 'standard' | 'task' | 'recency'
+
+export type NodeAccent = ColorKey | `task-${TaskStatus}`
 
 export interface BorderColorInput {
   color: ColorKey
@@ -22,21 +26,14 @@ export interface BorderColorInput {
  * border derives from `updatedAt` regardless of task status. Otherwise,
  * the node's own selected accent color (spec §6.2).
  */
-export function resolveNodeBorderColor(
+export function resolveNodeAccent(
   node: BorderColorInput,
-  theme: Theme,
   viewMode: ViewMode,
-): string {
+  now: Date,
+): NodeAccent {
   if (viewMode === 'task') {
-    return node.task
-      ? resolveTaskStatusColor(node.task.status, theme)
-      : resolveColorHex('gray', theme)
+    return node.task ? `task-${node.task.status}` : 'gray'
   }
-  if (viewMode === 'recency') {
-    return resolveColorHex(
-      resolveRecencyColor(node.updatedAt, new Date()),
-      theme,
-    )
-  }
-  return resolveColorHex(node.color, theme)
+  if (viewMode === 'recency') return resolveRecencyColor(node.updatedAt, now)
+  return node.color
 }

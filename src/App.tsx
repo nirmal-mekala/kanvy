@@ -22,8 +22,8 @@
 // statically-known `import.meta.env.DEV` check drop the whole `import()`
 // from a production bundle. Its default floating toggle button would
 // otherwise collide with this app's own bottom bar (`.board__bottom-bar`,
-// index.css — help/mode-toggle/zoom controls) — so it's nudged up above
-// `.board__zoom` via a `.tsqd-open-btn-container` override in index.css
+// components/canvas/canvas.css — help/mode-toggle/zoom controls) — so it's nudged up above
+// `.board__zoom` via a `.tsqd-open-btn-container` override in canvas.css
 // rather than left at its default 12px-from-corner position.
 
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -53,7 +53,7 @@ function App() {
   const setBootPhase = useSetAtom(bootPhaseAtom)
 
   // Matches the prototype's useTheme.js: the theme lives on <html>'s
-  // data-theme attribute, so index.css's `[data-theme='dark']` override
+  // data-theme attribute, so styles/tokens.css's `[data-theme='dark']` override
   // cascades to every component regardless of DOM depth.
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)

@@ -1,0 +1,99 @@
+.settings-backdrop {
+  z-index: 40;
+}
+
+.settings-modal__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* `overflow-y: auto` makes this a scroll container, which clips content
+     — including the focus outline, which paints outside the input's own
+     box — at this element's edges rather than the modal's. The padding
+     gives that outline room; negative margin cancels the resulting inset
+     so the fields still line up with the title/actions above and below. */
+  padding: 4px 6px;
+  margin: -4px -6px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.settings-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-modal__label {
+  font-size: 0.8rem;
+  color: var(--color-ink);
+}
+
+.settings-modal__input {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border-soft);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.settings-modal__checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+/* FieldMessage.tsx — shared icon+text UI for a settings field's inline
+   notes (warning/tip/error), styled by `tone` rather than each getting
+   its own near-duplicate block. The connection-error banner (rendered
+   below .settings-modal__fields, not inside it) reuses tone="error". */
+.field-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.field-message__icon {
+  flex-shrink: 0;
+}
+
+.field-message code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.field-message--tip {
+  color: var(--color-tip-text);
+  background: var(--color-tip-bg);
+}
+
+.field-message--warning {
+  color: var(--color-warn-text);
+  background: var(--color-warn-bg);
+}
+
+.field-message--error {
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg);
+  margin-bottom: 16px;
+}
+
+.settings-modal__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-modal__actions-group {
+  display: flex;
+  gap: 10px;
+}

@@ -1,0 +1,43 @@
+/* ---------- container ---------- */
+
+/* Never given a z-index — its stacking relies entirely on DOM order (it's
+   rendered before cards) so cards always paint on top of it. */
+.container-node {
+  position: absolute;
+  background-color: var(--color-surface);
+  background-repeat: repeat;
+  border: 3px solid var(--color-line);
+  border-radius: var(--radius);
+  user-select: none;
+}
+
+.container-node__drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 16px; /* matches GRID_SIZE */
+  padding: 1px 3px;
+  background: var(--color-surface-hover);
+  border-bottom: 1px solid var(--color-border-soft);
+  cursor: grab;
+  touch-action: none;
+}
+
+.container-node--selected {
+  outline: 2px solid var(--color-outline);
+  outline-offset: 2px;
+}
+
+/* Transient z-index bump for the whole drag gesture (paints above any
+   other, non-dragging container it's dragged over — never above a card:
+   ties against `.card`'s own z-index: 1 go to the card, since cards
+   always paint after containers in DOM order). Never a reorder of the
+   underlying node array — see `.card--dragging`'s comment above for why. */
+.container-node--dragging {
+  z-index: 1;
+}
+
+.container-node__drag-handle:active {
+  cursor: grabbing;
+}

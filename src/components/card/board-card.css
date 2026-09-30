@@ -1,0 +1,34 @@
+/* ---------- board card (multiboard support, revised 260918 — single
+   icon+name row replacing the earlier centered big-icon layout, see
+   ctx/notes/260918-board-node-redesign.md) ---------- */
+
+.card__board-body {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 8px;
+  color: var(--color-ink-soft);
+  -webkit-user-drag: none;
+}
+
+.card--done .card__board-body,
+.card--dimmed .card__board-body {
+  color: var(--color-ink-soft);
+  opacity: 0.6;
+}
+
+/* The board-kind "this is a board" glyph now lives centered in the drag
+   bar (space is precious — it no longer shares the name row) rather than
+   inline with the name/edit control. Absolutely centered (against
+   `.card__bar`'s own `position: relative`, set above) so it's independent
+   of the bar's other, edge-anchored children (recency indicator on the
+   left, task-status glyph pinned right). */
+.card__board-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-ink-soft);
+  pointer-events: none;
+}

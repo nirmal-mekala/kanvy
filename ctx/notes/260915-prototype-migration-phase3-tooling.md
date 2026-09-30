@@ -177,7 +177,10 @@ unit tests for pure functions, no dedicated component tier):
   small and simple enough that a primitives library would be net
   abstraction overhead rather than a win. `lucide-react` stays for icons,
   per "preserve icons."
-- **Tailwind (Q16):**
+- **Tailwind (Q16):** ***(later removed in favor of plain CSS — see
+  `ctx/notes/260930-styling-approach-audit.md`; no component ever used
+  Tailwind utilities, and the "deep integration" palette below never
+  landed. Kept below only as the original design record.)***
   - **Version:** Tailwind v4 (CSS-first `@theme` config), matching the
     prototype's already-current React 19/Vite versions.
   - **Color palette — deep Tailwind integration (confirmed):** the Nord-
@@ -204,7 +207,8 @@ unit tests for pure functions, no dedicated component tier):
     open item.
 - **ID generation (confirmed, post-questionnaire):** `nanoid` for node/edge/
   image ids, replacing whatever ad hoc id scheme the prototype uses today.
-- **Conditional class composition (confirmed, post-questionnaire):** `clsx`
+- **Conditional class composition (confirmed, post-questionnaire;
+  later reversed to plain string-joining):** `clsx`
   for composing Tailwind classes across view-mode/task-status/recency-color
   branching (genuinely branchy per §4's color-token integration above) —
   not `tailwind-merge`, since this app has no user-supplied/override class
@@ -238,7 +242,7 @@ implementation plan, not fixed further here.
 | Language | TypeScript, full `strict` + stricter opts |
 | UI | React 19 (unchanged from prototype) |
 | Build tool | Vite (unchanged from prototype) |
-| Styling | Tailwind v4, `@theme`-based color tokens |
+| Styling | ~~Tailwind v4, `@theme`-based color tokens~~ plain CSS (260930) |
 | State | Jotai, `atomFamily`-granular |
 | Validation | Zod (source of truth for types, board-load + import validation) |
 | Linting/formatting | Biome (`recommended` + `noExcessiveCognitiveComplexity`) |
