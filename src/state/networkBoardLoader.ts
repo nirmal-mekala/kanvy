@@ -12,7 +12,7 @@
 
 import { atom, getDefaultStore } from 'jotai'
 import { queryClient } from '../api/queryClient'
-import { fetchCollection } from '../api/restClient'
+import { fetchCollection, testConnection } from '../api/restClient'
 import type { Board, ImageEntry } from '../schema/board'
 import type { BoardMeta } from '../schema/boardMeta'
 import { ROOT_BOARD_ID } from '../schema/boardMeta'
@@ -213,6 +213,30 @@ export async function initializeNetworkMode(
     throw error
   } finally {
     store.set(networkHomeLoadingAtom, false)
+  }
+}
+
+/**
+ * App.tsx's boot-time reconnect attempt: if a base URL was persisted from a
+ * prior session, tries it once. Success switches into Network mode and
+ * fully loads it; failure leaves the mode flag untouched (still whatever it
+ * was — Local, by default) without touching what's persisted, so the next
+ * reload retries the same way. Pulled out of App.tsx's own effect (rather
+ * than inlined there) so the actual network-call branching is a plain,
+ * store-driven, directly-unit-testable function — the effect itself only
+ * needs to own the mount-lifecycle `cancelled` guard around calling this.
+ */
+export async function attemptBootReconnect(
+  config: NetworkConfig,
+): Promise<'connected' | 'failed'> {
+  const store = getDefaultStore()
+  try {
+    await testConnection(config)
+    store.set(accessModeAtom, 'network')
+    await initializeNetworkMode(config)
+    return 'connected'
+  } catch {
+    return 'failed'
   }
 }
 

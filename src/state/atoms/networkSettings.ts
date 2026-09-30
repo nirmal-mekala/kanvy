@@ -45,7 +45,23 @@ function initialPersistToken(): boolean {
 
 export const accessModeAtom = atom<AccessMode>('local')
 
-export const networkConfigAtom = atom<NetworkConfig>(initialNetworkConfig())
+const bootConfig = initialNetworkConfig()
+
+export const networkConfigAtom = atom<NetworkConfig>(bootConfig)
+
+/**
+ * Whether App.tsx's boot-time reconnect attempt (a persisted base URL, if
+ * any) has settled yet. Starts `'resolving'` only when there's something to
+ * wait for — a persisted base URL — so local-only users see no change from
+ * today's synchronous initial render. While `'resolving'`, App.tsx holds
+ * off mounting the router entirely, so neither a stale local board nor an
+ * unresolved-mode router decision (`boardRoute.beforeLoad`'s existence
+ * check) can render/run before the reconnect attempt (success or failure)
+ * has actually committed its result to `accessModeAtom`/`boardsAtom`.
+ */
+export const bootPhaseAtom = atom<'resolving' | 'ready'>(
+  bootConfig.baseUrl ? 'resolving' : 'ready',
+)
 
 /** Whether the current auth token should be (or is) mirrored to localStorage — drives the settings modal's "persist token" checkbox default. */
 export const persistTokenAtom = atom<boolean>(initialPersistToken())

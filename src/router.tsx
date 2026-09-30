@@ -2,12 +2,12 @@
 // support-design.md §6, revised 260918 — see ctx/notes/260918-url-scheme-
 // and-board-title-visibility.md): the root board is the home screen and
 // lives at `/`, the root of the URL; every other board lives at `/$boardId`
-// (no `/board` prefix). The `/$boardId` route's `beforeLoad` reads the live
-// `boards` collection via jotai's default store (this app doesn't use a
-// scoped Provider, so the default store is the one and only store, safely
-// readable outside React) and redirects to `/` for the root board id itself
-// (it has its own route already) or for an unknown/trashed board id — a
-// stale/hand-edited URL shouldn't hard-crash the router. `/` itself is
+// (no `/board` prefix). The `/$boardId` route's `beforeLoad` resolves the
+// board id via `resolveBoardAccess` (state/boardAccessResolver.ts, checks
+// both access modes, switching into whichever one actually has the board)
+// and redirects to `/` for the root board id itself (it has its own route
+// already) or for a board id unknown/trashed in both modes — a stale/
+// hand-edited URL shouldn't hard-crash the router. `/` itself is
 // never redirected for that "self" case, even if (through some broken
 // invariant) root were somehow missing from `boards` — redirecting it to
 // itself on a failed check would infinite-loop. It *is* redirected exactly
@@ -33,14 +33,16 @@ import { Toolbar } from './components/toolbar/Toolbar'
 import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
 import { currentBoardIdAtom } from './state/atoms/currentBoard'
+import { resolveBoardAccess } from './state/boardAccessResolver'
 import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 import { ensureBoardLoaded } from './state/networkBoardLoader'
 import { registerBoardNavigator } from './state/networkReconcile'
 
 /**
- * Reactive counterpart to `boardRoute.beforeLoad`'s `boardExists` guard:
- * that guard only runs at navigation time, so a board that disappears out
- * from under an already-rendered route — e.g. `initializeNetworkMode`'s
+ * Reactive counterpart to `boardRoute.beforeLoad`'s `resolveBoardAccess`
+ * guard: that guard only runs at navigation time, so a board that
+ * disappears out from under an already-rendered route — e.g.
+ * `initializeNetworkMode`'s
  * boot-time auto-reconnect (App.tsx) or `switchToLocalMode` wholesale-
  * replacing `boardsAtom` after the route already resolved, or an undo that
  * removes the viewed board's own `create` op — leaves the URL pointed at a
@@ -104,12 +106,6 @@ const homeRoute = createRoute({
   component: () => <BoardPage boardId={ROOT_BOARD_ID} />,
 })
 
-function boardExists(boardId: string): boolean {
-  return getDefaultStore()
-    .get(boardsAtom)
-    .some((board) => board.id === boardId && board.status !== 'trashed')
-}
-
 function BoardRouteComponent() {
   const { boardId } = boardRoute.useParams()
   return <BoardPage boardId={boardId} />
@@ -124,8 +120,17 @@ export const boardRoute = createRoute({
   // resident) and resolves immediately if the background eager-load
   // (§6b) already reached this board, so this await is invisible in both
   // of those cases and only actually blocks the one case it needs to.
+  //
+  // `resolveBoardAccess` (state/boardAccessResolver.ts) checks the
+  // *other* access mode too before giving up — a board id only found
+  // there switches the whole app into that mode rather than redirecting
+  // home, so a bookmarked/linked board id from either mode's storage
+  // works regardless of which mode the app happens to currently be in.
   beforeLoad: async ({ params }) => {
-    if (params.boardId === ROOT_BOARD_ID || !boardExists(params.boardId)) {
+    if (params.boardId === ROOT_BOARD_ID) {
+      throw redirect({ to: '/' })
+    }
+    if ((await resolveBoardAccess(params.boardId)) === 'not-found') {
       throw redirect({ to: '/' })
     }
     // See homeRoute's `beforeLoad` comment: set pre-mount, not via a
