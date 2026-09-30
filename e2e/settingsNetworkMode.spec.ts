@@ -377,7 +377,7 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
     }
   })
 
-  test('a currently-viewed board orphaned by the boot-time auto-reconnect (App.tsx) redirects home instead of rendering with a blank title (regression: this used to leave a blank-title, empty-canvas board UI at the stale URL)', async ({
+  test('navigating straight to a board id that only exists in local storage, with valid network settings persisted, renders it and switches the whole app into Local mode (cross-mode board resolution, state/boardAccessResolver.ts)', async ({
     page,
   }) => {
     const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
@@ -386,9 +386,10 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       // (`sampleDb()` only has `root`/`b1`) — that the app is already
       // showing when a *persisted* network base URL (as if Settings had
       // been confirmed in a prior session) triggers App.tsx's boot-time
-      // auto-reconnect and wholesale-replaces `boardsAtom` out from under
-      // it.
-      const LOCAL_DOCUMENT_WITH_ORPHANED_BOARD = {
+      // auto-reconnect, which resolves into Network mode before the
+      // router ever evaluates this navigation (bootPhaseAtom's render
+      // gate, App.tsx).
+      const LOCAL_DOCUMENT_WITH_LOCAL_ONLY_BOARD = {
         version: 5,
         nodes: [],
         edges: [],
@@ -410,7 +411,7 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
         ],
         images: [],
       }
-      await seedBoard(page, LOCAL_DOCUMENT_WITH_ORPHANED_BOARD, 'kanvy.board')
+      await seedBoard(page, LOCAL_DOCUMENT_WITH_LOCAL_ONLY_BOARD, 'kanvy.board')
       await page.addInitScript((port) => {
         window.localStorage.setItem(
           'kanvy-network-base-url',
@@ -418,17 +419,72 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
         )
       }, server.port)
 
-      // `boardRoute.beforeLoad` lets this through at navigation time
-      // (mode is still local there, and the board exists in the seeded
-      // local document), but the boot-time auto-reconnect (App.tsx) can
-      // finish swapping in the network backend's own `boards`/nodes/edges
-      // — which don't include this board — before or shortly after that
-      // render lands. Either way, the reactive board-existence watcher
-      // (router.tsx's `useBoardExistenceGuard`) should catch the orphaned
-      // board and send the user home, rather than leaving them on a
-      // blank-title, empty-canvas board UI at the stale URL.
+      // `boardRoute.beforeLoad`'s `resolveBoardAccess` doesn't find
+      // `local-only` in Network mode's `boardsAtom` (already resolved by
+      // the time this navigation runs), falls back to peeking local
+      // storage, finds it there, and switches the whole app into Local
+      // mode rather than redirecting home — the URL, the board's own
+      // content, and the mode toggle should all reflect that.
       await page.goto('/local-only')
+      await expect(page).toHaveURL('/local-only', { timeout: 10_000 })
+      await expect(page.getByText('Local-only board')).toBeVisible()
+      await expect(
+        page.getByRole('switch', { name: 'Switch to Network mode' }),
+      ).toHaveAttribute('aria-checked', 'false')
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('navigating straight to a board id that only exists on the network, from Local mode, renders it and switches the whole app into Network mode', async ({
+    page,
+  }) => {
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
+    try {
+      // No persisted network base URL means the app boots straight into
+      // Local mode. `sampleDb()`'s `b1` only exists on the network
+      // backend, never in the seeded local document — but settings *are*
+      // persisted below, so `resolveBoardAccess` should still try the
+      // network once the board isn't found locally.
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.addInitScript((port) => {
+        window.localStorage.setItem(
+          'kanvy-network-base-url',
+          `http://localhost:${port}`,
+        )
+      }, server.port)
+
+      await page.goto('/b1')
+      await expect(page).toHaveURL('/b1', { timeout: 10_000 })
+      await expect(page.getByText('Network board')).toBeVisible({
+        timeout: 10_000,
+      })
+      await expect(
+        page.getByRole('switch', { name: 'Switch to Local mode' }),
+      ).toHaveAttribute('aria-checked', 'true')
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('navigating to a board id absent from both Local and Network storage redirects home, landing in Network mode since valid settings are configured', async ({
+    page,
+  }) => {
+    const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.addInitScript((port) => {
+        window.localStorage.setItem(
+          'kanvy-network-base-url',
+          `http://localhost:${port}`,
+        )
+      }, server.port)
+
+      await page.goto('/nowhere')
       await expect(page).toHaveURL('/', { timeout: 10_000 })
+      await expect(
+        page.getByRole('switch', { name: 'Switch to Local mode' }),
+      ).toHaveAttribute('aria-checked', 'true')
     } finally {
       await server.stop()
     }

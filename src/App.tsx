@@ -31,15 +31,11 @@ import { RouterProvider } from '@tanstack/react-router'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense, useEffect } from 'react'
 import { queryClient } from './api/queryClient'
-import { testConnection } from './api/restClient'
 import { router } from './router'
-import {
-  accessModeAtom,
-  networkConfigAtom,
-} from './state/atoms/networkSettings'
+import { bootPhaseAtom, networkConfigAtom } from './state/atoms/networkSettings'
 import { themeAtom } from './state/atoms/theme'
 import { pushToastAtom } from './state/atoms/toasts'
-import { initializeNetworkMode } from './state/networkBoardLoader'
+import { attemptBootReconnect } from './state/networkBoardLoader'
 
 const ReactQueryDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -52,8 +48,9 @@ const ReactQueryDevtools = import.meta.env.DEV
 function App() {
   const theme = useAtomValue(themeAtom)
   const networkConfig = useAtomValue(networkConfigAtom)
-  const setAccessMode = useSetAtom(accessModeAtom)
   const pushToast = useSetAtom(pushToastAtom)
+  const bootPhase = useAtomValue(bootPhaseAtom)
+  const setBootPhase = useSetAtom(bootPhaseAtom)
 
   // Matches the prototype's useTheme.js: the theme lives on <html>'s
   // data-theme attribute, so index.css's `[data-theme='dark']` override
@@ -66,30 +63,38 @@ function App() {
   // session, try it once on mount. Success switches into Network mode;
   // failure just toasts and leaves the app in its default Local mode,
   // without touching what's persisted (so the next reload retries the
-  // same way — see networkSettings.ts). Runs after mount, so it never
-  // delays local mode's own synchronous initial board load
-  // (state/history/boardHistoryAtom.ts).
+  // same way — see networkSettings.ts). `bootPhaseAtom` starts `'ready'`
+  // immediately when there's no base URL to try, so local mode's own
+  // synchronous initial board load is never delayed by this effect; when
+  // there is one, rendering is held at the loading shell below until this
+  // settles, so neither a stale local-board flash nor a router decision
+  // made against not-yet-resolved `boardsAtom` data (router.tsx's
+  // `boardRoute.beforeLoad`) can happen first.
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally a one-shot effect run once on mount, not on every config/atom change
   useEffect(() => {
     if (!networkConfig.baseUrl) return
     let cancelled = false
-    void (async () => {
-      try {
-        await testConnection(networkConfig)
-        if (cancelled) return
-        setAccessMode('network')
-        await initializeNetworkMode(networkConfig)
-      } catch {
-        if (cancelled) return
+    void attemptBootReconnect(networkConfig).then((result) => {
+      if (cancelled) return
+      if (result === 'failed') {
         pushToast(
           'Could not connect to the network backend — check your connection settings.',
         )
       }
-    })()
+      setBootPhase('ready')
+    })
     return () => {
       cancelled = true
     }
   }, [])
+
+  if (bootPhase === 'resolving') {
+    return (
+      <div className="board__loading" role="status">
+        Loading…
+      </div>
+    )
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
