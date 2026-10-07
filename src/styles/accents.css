@@ -2,46 +2,119 @@
    node/selection state onto the tokens in tokens.css, so the palette
    (and its per-theme values) lives entirely in CSS. */
 
-/* Card/container border (colors/borderColor.ts's resolveNodeAccent picks
-   the value from the node's color, task status, or recency). */
-:is(.card, .container-node)[data-accent="gray"] {
-  border-color: var(--color-accent-gray);
-}
+/* Card/container accent (colors/borderColor.ts's resolveNodeAccent picks
+   the value from the node's color, task status, or recency) — "tinted
+   cards" (ctx/notes/261007-tinted-cards.md): a chromatic accent colors the
+   whole component (fill + edge + accent-hued ink), not only its border.
+
+   Mechanism: each [data-accent] rule only names its color (`--accent`).
+   One shared rule below then *re-themes the node locally* by redefining
+   the same tokens the rest of the stylesheet already consumes
+   (--color-surface, --color-ink, --color-border-soft, …). Every existing
+   component rule — hover, drag bar, caption, placeholder, done/strike,
+   focus ring, selection outline, connectors, board name + edit button,
+   duotone image tint — then picks up the tint with no per-color
+   duplication and no per-element overrides.
+
+   Neutral accents (gray, task-todo) are deliberately left out of the
+   tinted rule, so they keep the original border-only styling exactly — no
+   accent variable is ever left undefined.
+
+   Recipe knobs (the only numbers to tune) live in the two theme rules:
+     --tint-fill   background
+     --tint-ink    text/glyph color, derived from the accent (not black)
+     --tint-edge   border
+   Mixing is in oklab. Verified contrast (WCAG, ink vs fill) across every
+   tinted accent: light >= 6.27:1, dark >= 4.60:1 (dark amber is the
+   tightest — re-check it if --tint-fill / --tint-ink change). */
+
+/* Which color each accent paints with. */
 :is(.card, .container-node)[data-accent="coral"] {
-  border-color: var(--color-accent-coral);
+  --accent: var(--color-accent-coral);
 }
 :is(.card, .container-node)[data-accent="orange"] {
-  border-color: var(--color-accent-orange);
+  --accent: var(--color-accent-orange);
 }
 :is(.card, .container-node)[data-accent="amber"] {
-  border-color: var(--color-accent-amber);
+  --accent: var(--color-accent-amber);
 }
 :is(.card, .container-node)[data-accent="lime"] {
-  border-color: var(--color-accent-lime);
+  --accent: var(--color-accent-lime);
 }
 :is(.card, .container-node)[data-accent="teal"] {
-  border-color: var(--color-accent-teal);
+  --accent: var(--color-accent-teal);
 }
 :is(.card, .container-node)[data-accent="sky"] {
-  border-color: var(--color-accent-sky);
+  --accent: var(--color-accent-sky);
 }
 :is(.card, .container-node)[data-accent="violet"] {
-  border-color: var(--color-accent-violet);
+  --accent: var(--color-accent-violet);
 }
 :is(.card, .container-node)[data-accent="pink"] {
-  border-color: var(--color-accent-pink);
+  --accent: var(--color-accent-pink);
+}
+:is(.card, .container-node)[data-accent="task-blocked"] {
+  --accent: var(--color-task-blocked);
+}
+:is(.card, .container-node)[data-accent="task-in_progress"] {
+  --accent: var(--color-task-in-progress);
+}
+:is(.card, .container-node)[data-accent="task-done"] {
+  --accent: var(--color-task-done);
+}
+
+/* Neutral accents: original border-only treatment, untouched. */
+:is(.card, .container-node)[data-accent="gray"] {
+  border-color: var(--color-accent-gray);
 }
 :is(.card, .container-node)[data-accent="task-todo"] {
   border-color: var(--color-task-todo);
 }
-:is(.card, .container-node)[data-accent="task-blocked"] {
-  border-color: var(--color-task-blocked);
+
+/* Shared: re-theme the node from the recipe (the --tint-* knobs are set
+   per theme by the two rules after this one). */
+:is(.card, .container-node)[data-accent]:not(
+  [data-accent="gray"],
+  [data-accent="task-todo"]
+) {
+  --color-surface: var(--tint-fill);
+  --color-surface-hover: color-mix(
+    in oklab,
+    var(--tint-fill) 90%,
+    var(--tint-ink)
+  );
+  --color-ink: var(--tint-ink);
+  --color-ink-soft: color-mix(in oklab, var(--tint-ink) 55%, transparent);
+  --color-dot: color-mix(in oklab, var(--tint-ink) 7%, transparent);
+  --color-border-soft: color-mix(in oklab, var(--tint-ink) 22%, transparent);
+  --color-outline: color-mix(in oklab, var(--tint-ink) 60%, transparent);
+  border-color: var(--tint-edge);
 }
-:is(.card, .container-node)[data-accent="task-in_progress"] {
-  border-color: var(--color-task-in-progress);
+
+/* Recipe — light theme: the accent itself, lifted slightly toward white
+   so the mid-tone accents (coral, task blue) don't go muddy, with a deep
+   accent-hued ink and a darkened accent edge. */
+:is(.card, .container-node)[data-accent]:not(
+  [data-accent="gray"],
+  [data-accent="task-todo"]
+) {
+  --tint-fill: color-mix(in oklab, var(--accent) 82%, white);
+  --tint-ink: color-mix(in oklab, var(--accent) 28%, black);
+  --tint-edge: color-mix(in oklab, var(--accent) 72%, black);
 }
-:is(.card, .container-node)[data-accent="task-done"] {
-  border-color: var(--color-task-done);
+
+/* Recipe — dark theme: a full-strength pastel block reads as glare on the
+   dark canvas, so the fill is pulled down toward the theme surface; the
+   border carries the full-strength accent instead, and the ink flips to
+   a pale accent-hued tone. */
+[data-theme="dark"]
+:is(.card, .container-node)[data-accent]:not(
+  [data-accent="gray"],
+  [data-accent="task-todo"]
+) {
+  --tint-fill: color-mix(in oklab, var(--accent) 42%, #2e3440);
+  --tint-ink: color-mix(in oklab, var(--accent) 16%, white);
+  --tint-edge: var(--accent);
 }
 
 /* Color-picker swatches. The `background` shorthand (not
@@ -94,4 +167,16 @@ svg[data-task-status="in_progress"] {
 }
 svg[data-task-status="done"] {
   color: var(--color-task-done);
+}
+
+/* On a tinted node the status glyph sits on its own status/accent color
+   (e.g. done-green on a lime card), so it draws in the node's ink —
+   status still reads from the glyph's shape, and in task view mode from
+   the node's own fill. Untinted (gray/todo) nodes keep the colored glyphs
+   above. */
+:is(.card, .container-node)[data-accent]:not(
+  [data-accent="gray"],
+  [data-accent="task-todo"]
+) svg[data-task-status] {
+  color: var(--color-ink);
 }

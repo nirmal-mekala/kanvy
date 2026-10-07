@@ -23,6 +23,10 @@ Schema revisions since the initial migration (see spec §2.3):
   its id is an ordinary generated one. Local documents migrate on read;
   network reads are Zod-validated strictly and never repaired. See
   `ctx/notes/261006-root-board-isroot.md`.
+- **Tinted nodes** (visual, not schema): a chromatic accent colors the
+  whole card/container (fill + edge + ink), not only its border; gray and
+  task-todo stay border-only, and pink is a muted rose, not nord9. See
+  `ctx/notes/261007-tinted-cards.md`.
 
 Multi-board support (spec §14's deferred "Multiboard support" item) is
 implemented: the schema v3 shape (`boards` collection, `boardId`-scoped
@@ -147,7 +151,12 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
   change the way a static fixture would; `dev:server` runs it
   automatically first (only creates the file if missing — never clobbers
   a live session's data), and `pnpm db:init -- --force` resets it
-  explicitly.
+  explicitly. Its content is a design-review fixture: one showcase board
+  per topic (kinds, accents, task states, recency bands, images, links,
+  containers, edges) covering every persisted node state, for reviewing
+  visual changes across theme × view mode. Restart json-server after a
+  `--force` regen — it otherwise rewrites the file from its stale
+  in-memory copy on the next write.
 - **Linting/formatting**: Biome (`recommended` + cognitive-complexity
   opt-in), also owns formatting — no Prettier. 2-space indentation.
 - **Code health**: `fallow` — complexity/duplication/circular-dependency/

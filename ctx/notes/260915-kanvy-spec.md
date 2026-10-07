@@ -187,7 +187,9 @@ meaningful) node/edge data isn't buried under base64 blobs.
   `gray` (nord3, plus a distinct lighter `GRAY_LIGHT` swatch used only in
   light mode), `coral` (nord11), `orange` (nord12), `amber` (nord13), `lime`
   (nord14), `teal` (nord7), `sky` (nord8), `violet` (nord15), `pink`
-  (nord9 — Nord has no true pink, this is a deliberate substitution).
+  (a muted rose, `#d295b2`, between violet and coral — Nord has no true
+  pink; v0 borrowed nord9, a blue, which never read as pink. Changed
+  261007, see `ctx/notes/261007-tinted-cards.md`).
   - `gray` is the default color for freshly created cards/containers/edges
     and is deliberately low-contrast/neutral in both themes (its light-mode
     value is a distinct hex from its dark-mode value, unlike every other
@@ -195,6 +197,19 @@ meaningful) node/edge data isn't buried under base64 blobs.
   - A `gray` swatch renders as a half-light/half-dark split circle in color
     pickers, signaling "this one is theme-dynamic"; every other swatch is a
     plain fill.
+- **Tinted nodes** (261007, `ctx/notes/261007-tinted-cards.md`): a
+  card/container's resolved accent (§6.2 — its own color, task status, or
+  recency band) colors the *whole* node, not only its 3px border — fill,
+  edge, and accent-hued ink (text, glyphs, drag bar, placeholder, focus
+  ring, selection outline, connector dots, done/dimmed image duotone).
+  Light theme: fill is the accent lifted toward white, ink a deep accent
+  shade, edge the accent darkened. Dark theme: fill is the accent pulled
+  toward the dark surface, edge the full-strength accent, ink a pale
+  accent tint. The neutral accents — `gray` (the default) and task
+  `todo` — are *not* tinted and keep border-only styling. On a tinted
+  node the task-status glyph draws in the node's ink rather than its
+  status color (status reads from glyph shape, and in task view from the
+  fill). Color-picker swatches still show the raw accent.
 - **Task-status colors** are a separate fixed 4-color palette, chosen for
   glyph contrast rather than subtlety: `todo` neutral (theme-dependent hex,
   higher contrast than default gray), `blocked` red (nord11), `in_progress`
@@ -211,8 +226,9 @@ meaningful) node/edge data isn't buried under base64 blobs.
   `kanvy` wordmark in the top bar, which is bold. Lowercase wordmark.
 - **Container backgrounds:** SVG patterns from the `hero-patterns` package
   (MIT-licensed), tiled at a fixed opacity and tinted with the container's
-  own selected accent color (the same flat hex its border uses outside
-  task/recency view modes) over the container's neutral base fill.
+  own selected accent color (the same flat hex its accent uses outside
+  task/recency view modes) over the container's base fill (tinted, per
+  "Tinted nodes" above, unless the color is `gray`).
   Available patterns: none (plain), falling triangles, leaf, wiggle, plus,
   lines in motion, topography, rain, squares.
 - **Grid:** a dot-matrix background at `GRID_SIZE = 16px` pitch. Card/edge
@@ -336,7 +352,7 @@ respect.
 - Created via Ctrl/Cmd + click-drag on blank canvas (always wins over
   starting on top of an existing card/container).
 - Always rendered beneath cards.
-- Selectable, colorable (border only), patternable (background), and can be
+- Selectable, colorable (tinted fill + border, §3), patternable (background), and can be
   a task (see §6).
 
 ### 4.6 Connections (edges)
@@ -470,7 +486,8 @@ respect.
 - Toggling "Default" → "Task" on an already-task item is idempotent — it
   never resets an existing status back to `todo`.
 - A small non-interactive status glyph renders in the card/container's drag
-  bar, colored per §3's task-status palette.
+  bar, colored per §3's task-status palette (drawn in the node's own ink
+  instead on a tinted node, §3).
 - `done` gets additional styling: caption text struck through and dimmed;
   any image (own or link preview) rendered monochrome with a theme-tinted
   overlay (lighten toward the theme's ink color, not plain grayscale) rather
@@ -484,12 +501,12 @@ Selected from a menu (eye icon) in the top bar; persisted across sessions.
   node's own selected accent color.
 - **Task:** every non-task node is dimmed (dimmed text/image treatment, and
   its border/pattern goes to the neutral default color). Every task node's
-  border shows its task-status color instead of its own accent color
-  (louder signal than the glyph alone). Container backgrounds/patterns are
+  accent (tint, §3) shows its task-status color instead of its own accent
+  color (louder signal than the glyph alone); `todo` stays neutral. Container backgrounds/patterns are
   suppressed entirely in this mode (plain neutral only), so the border's
   status color isn't competing with a pattern. `done` nodes remain dimmed
   even though they're tasks.
-- **Recency:** every card/container's border color is derived from
+- **Recency:** every card/container's accent (tint, §3) is derived from
   `updatedAt` instead of its own accent color, ignoring task status
   entirely. Four gradations, most-recent to stalest — **(wart, keep, per
   Q8–Q9)**:

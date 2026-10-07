@@ -17,7 +17,7 @@ export type ColorKey =
 export type Theme = 'light' | 'dark'
 
 // Nord's Frost + Aurora accents (nord3, nord7-9, nord11-15). Nord has no
-// pink, so that slot borrows nord9 (a mid blue) instead — spec §3.
+// pink, so that slot is a muted rose between nord15 and nord11 — spec §3.
 // Mirrors styles/tokens.css's `--color-accent-*`, which is what renders
 // borders/swatches; the hex here exists for SVG pattern generation.
 // colors/palette.test.ts keeps the two in sync.
@@ -30,7 +30,7 @@ const COLORS: Record<ColorKey, string> = {
   teal: '#8fbcbb', // nord7
   sky: '#88c0d0', // nord8
   violet: '#b48ead', // nord15
-  pink: '#81a1c1', // nord9
+  pink: '#d295b2', // muted rose, not a Nord color
 }
 
 // nord3 (COLORS.gray) reads as low-contrast in dark mode but as a strong,

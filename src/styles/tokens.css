@@ -52,7 +52,9 @@
   --color-accent-teal: #8fbcbb; /* nord7 */
   --color-accent-sky: #88c0d0; /* nord8 */
   --color-accent-violet: #b48ead; /* nord15 */
-  --color-accent-pink: #81a1c1; /* nord9 — Nord has no pink */
+  /* Nord has no pink — a muted rose between violet (nord15) and coral
+     (nord11) in the Aurora family. */
+  --color-accent-pink: #d295b2;
 
   /* Fixed task-status palette, chosen for glyph contrast (spec §3). Only
      `todo` varies by theme. */
