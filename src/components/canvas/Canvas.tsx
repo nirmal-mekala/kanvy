@@ -51,6 +51,7 @@ import { useConnectionInteraction } from './useConnectionInteraction'
 import {
   clamp,
   FIT_PADDING,
+  gridScreenSpacing,
   MAX_ZOOM,
   MIN_ZOOM,
   WHEEL_ZOOM_INTENSITY,
@@ -391,7 +392,7 @@ export function Canvas() {
       className={`board${panning ? ' board--panning' : ''}`}
       style={{
         backgroundPosition: `${view.x}px ${view.y}px`,
-        backgroundSize: `${GRID_SIZE * view.zoom}px ${GRID_SIZE * view.zoom}px`,
+        backgroundSize: `${gridScreenSpacing(view.zoom)}px ${gridScreenSpacing(view.zoom)}px`,
       }}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={handlePointerDown}

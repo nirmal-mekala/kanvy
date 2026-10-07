@@ -247,7 +247,9 @@ meaningful) node/edge data isn't buried under base64 blobs.
   scroll (non-zoom axis).
 - Zoom: Ctrl/Cmd + scroll or trackpad pinch (reported as a wheel event with
   `ctrlKey` set), or the on-screen zoom in/out buttons (fixed step factor).
-  Range roughly 25%–250%.
+  Range roughly 10%–250% (floor lowered from 25% so large boards still
+  fit on one screen). Below ~8px on-screen spacing the background dot
+  grid thins out (spacing doubles) so it doesn't become a solid wash.
 - Zoom-by-wheel keeps the point under the cursor visually fixed; zoom-by-
   button zooms around the viewport center.
 - Clicking the zoom-percentage readout resets zoom to 100% (no keyboard
