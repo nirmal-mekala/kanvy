@@ -44,7 +44,7 @@ import { atom, getDefaultStore } from 'jotai'
 import { fetchBoard, saveBoard, saveBoardOverNetwork } from '../../api/boardApi'
 import { queryClient } from '../../api/queryClient'
 import type { Board } from '../../schema/board'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
+import { rootBoardId } from '../../schema/boardMeta'
 import { currentBoardIdAtom } from '../atoms/currentBoard'
 import { accessModeAtom, networkConfigAtom } from '../atoms/networkSettings'
 import { selectionAtom } from '../atoms/selection'
@@ -58,12 +58,8 @@ import {
   type Op,
   type ReplaceBoardOp,
 } from '../ops'
-import {
-  createDebouncedSaver,
-  type LoadResult,
-  loadBoard,
-} from '../persistence/storage'
-import { reapEntities } from '../reaper'
+import { createDebouncedSaver, type LoadResult } from '../persistence/storage'
+import { currentBoardAtom, initialBoard, initialLoad } from './liveBoard'
 import {
   createHistoryState,
   type HistoryState,
@@ -113,8 +109,6 @@ function mergePendingSave(prev: PendingSave, next: PendingSave): PendingSave {
     board: next.board,
   }
 }
-
-const initialLoad: LoadResult = loadBoard()
 
 // Local-mode read-path parity (network mode design doc §6d): the actual
 // initial load above stays a synchronous localStorage read — this app has
@@ -198,23 +192,9 @@ export const freshBoardIdAtom = atom<string | undefined>(
   initialLoad.ok ? initialLoad.freshBoardId : undefined,
 )
 
-// On-load tombstone reaper (state/reaper.ts, design doc §5/§7; extended to
-// nodes/edges/images by schema v4, ctx/notes/260921-action-based-undo-and-
-// tombstoning.md): permanently frees trashed content once its tombstone is
-// old enough that an accidental delete has had ample time to be noticed.
-// Applied directly to the initial board *before* history is created —
-// reaping isn't a user action and must never itself become an undo step
-// (undoing it would silently resurrect content the reaper just decided
-// was safe to free). If nothing's reapable this is a no-op (same
-// reference back).
-const initialBoard = reapEntities(initialLoad.board, Date.now())
-
 export const boardHistoryAtom = atom<HistoryState<AttributedOps>>(
-  createHistoryState({ ops: [], boardId: ROOT_BOARD_ID }),
+  createHistoryState({ ops: [], boardId: rootBoardId(initialBoard.boards) }),
 )
-
-/** The live, materialized board — advanced by `updateBoardAtom`/undo/redo applying ops against it, not itself part of the undo stack (see module comment). */
-export const currentBoardAtom = atom<Board>(initialBoard)
 
 export const boardAtom = atom((get) => get(currentBoardAtom))
 

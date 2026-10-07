@@ -2,7 +2,6 @@ import { createStore } from 'jotai'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Board } from '../../schema/board'
 import { SCHEMA_VERSION } from '../../schema/board'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 
 class MemoryStorage {
   private store = new Map<string, string>()
@@ -21,6 +20,7 @@ class MemoryStorage {
 }
 
 const now = '2026-01-01T00:00:00.000Z'
+const ROOT_ID = 'h0me0b0ard00'
 
 function boardWithChild(): Board {
   return {
@@ -29,9 +29,10 @@ function boardWithChild(): Board {
     edges: [],
     boards: [
       {
-        id: ROOT_BOARD_ID,
+        id: ROOT_ID,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: now,
         updatedAt: now,
       },
@@ -39,6 +40,7 @@ function boardWithChild(): Board {
         id: 'child-1',
         title: 'Untitled board',
         status: 'active',
+        isRoot: false,
         createdAt: now,
         updatedAt: now,
       },
@@ -53,12 +55,14 @@ async function freshState() {
   vi.resetModules()
   const boardsModule = await import('./boards')
   const historyModule = await import('../history/boardHistoryAtom')
+  const liveBoardModule = await import('../history/liveBoard')
   const currentBoardModule = await import('./currentBoard')
   const store = createStore()
   return {
     store,
     ...boardsModule,
     ...historyModule,
+    ...liveBoardModule,
     ...currentBoardModule,
   }
 }
@@ -71,10 +75,7 @@ describe('boardsAtom / boardFamily', () => {
   it('boardsAtom reflects the loaded boards collection', async () => {
     const { store, boardsAtom, currentBoardAtom } = await freshState()
     store.set(currentBoardAtom, boardWithChild())
-    expect(store.get(boardsAtom).map((b) => b.id)).toEqual([
-      ROOT_BOARD_ID,
-      'child-1',
-    ])
+    expect(store.get(boardsAtom).map((b) => b.id)).toEqual([ROOT_ID, 'child-1'])
   })
 
   it('boardFamily(id) looks up a single board by id', async () => {
@@ -82,6 +83,43 @@ describe('boardsAtom / boardFamily', () => {
     store.set(currentBoardAtom, boardWithChild())
     expect(store.get(boardFamily('child-1'))?.title).toBe('Untitled board')
     expect(store.get(boardFamily('nonexistent'))).toBeUndefined()
+  })
+})
+
+describe('rootBoardIdAtom / currentBoardIdAtom', () => {
+  it('rootBoardIdAtom is whichever board is isRoot, not a fixed id', async () => {
+    const { store, rootBoardIdAtom, currentBoardAtom } = await freshState()
+    store.set(currentBoardAtom, boardWithChild())
+    expect(store.get(rootBoardIdAtom)).toBe(ROOT_ID)
+  })
+
+  it('a fresh seed document has a generated (non-legacy) root id', async () => {
+    const { store, rootBoardIdAtom } = await freshState()
+    expect(store.get(rootBoardIdAtom)).toMatch(/^[0-9a-z]{12}$/)
+    expect(store.get(rootBoardIdAtom)).not.toBe('root')
+  })
+
+  it('viewing home (undefined) resolves to the root board', async () => {
+    const { store, currentBoardIdAtom, currentBoardAtom } = await freshState()
+    store.set(currentBoardAtom, boardWithChild())
+    store.set(currentBoardIdAtom, 'child-1')
+    expect(store.get(currentBoardIdAtom)).toBe('child-1')
+    store.set(currentBoardIdAtom, undefined)
+    expect(store.get(currentBoardIdAtom)).toBe(ROOT_ID)
+  })
+
+  it('viewing home follows a wholesale document swap (e.g. a mode switch) to the new root', async () => {
+    const { store, currentBoardIdAtom, currentBoardAtom } = await freshState()
+    store.set(currentBoardAtom, boardWithChild())
+    store.set(currentBoardIdAtom, undefined)
+    const other = boardWithChild()
+    store.set(currentBoardAtom, {
+      ...other,
+      boards: other.boards.map((b) =>
+        b.isRoot ? { ...b, id: 'other0root00' } : b,
+      ),
+    })
+    expect(store.get(currentBoardIdAtom)).toBe('other0root00')
   })
 })
 
@@ -96,15 +134,15 @@ describe('renameBoardAtom', () => {
     expect(store.get(boardFamily('child-1'))?.title).toBe('My board')
   })
 
-  it('is a no-op for the reserved root board (its title is fixed)', async () => {
+  it('is a no-op for the root board (its title is fixed)', async () => {
     const { store, boardFamily, renameBoardAtom, currentBoardAtom, boardAtom } =
       await freshState()
     store.set(currentBoardAtom, boardWithChild())
     const before = store.get(boardAtom)
 
-    store.set(renameBoardAtom, ROOT_BOARD_ID, 'New home title')
+    store.set(renameBoardAtom, ROOT_ID, 'New home title')
 
-    expect(store.get(boardFamily(ROOT_BOARD_ID))?.title).toBe('Home')
+    expect(store.get(boardFamily(ROOT_ID))?.title).toBe('Home')
     expect(store.get(boardAtom)).toBe(before)
   })
 
@@ -133,7 +171,7 @@ describe('renameBoardAtom', () => {
     // Renaming a board-node's target board from root (Sub-phase 4's
     // on-canvas rename) — attribution is root, the board acted *from*.
     vi.advanceTimersByTime(1000)
-    store.set(currentBoardIdAtom, ROOT_BOARD_ID)
+    store.set(currentBoardIdAtom, ROOT_ID)
     store.set(renameBoardAtom, 'child-1', 'Renamed from root')
     expect(store.get(boardFamily('child-1'))?.title).toBe('Renamed from root')
 
@@ -144,24 +182,27 @@ describe('renameBoardAtom', () => {
 
 describe('createBoardAtom', () => {
   it('mints a new boards entry and a board-node referencing it, in one atomic step, while viewing root', async () => {
-    const { store, createBoardAtom, boardAtom } = await freshState()
+    const { store, createBoardAtom, boardAtom, rootBoardIdAtom } =
+      await freshState()
     const boardsBefore = store.get(boardAtom).boards.length
     const nodesBefore = store.get(boardAtom).nodes.length
 
     store.set(createBoardAtom, 100, 100)
 
     const board = store.get(boardAtom)
+    const rootId = store.get(rootBoardIdAtom)
     expect(board.boards).toHaveLength(boardsBefore + 1)
     expect(board.nodes).toHaveLength(nodesBefore + 1)
 
     const newBoardMeta = board.boards.at(-1)
     const newNode = board.nodes.at(-1)
     expect(newBoardMeta?.title).toBe('Untitled board')
+    expect(newBoardMeta?.isRoot).toBe(false)
     if (newNode?.type !== 'card' || newNode.kind !== 'board') {
       throw new Error('expected the new node to be a board card')
     }
     expect(newNode.boardRef).toBe(newBoardMeta?.id)
-    expect(newNode.boardId).toBe(ROOT_BOARD_ID)
+    expect(newNode.boardId).toBe(rootId)
   })
 
   it('undoing the creation removes both the boards entry and the board-node together', async () => {
@@ -224,6 +265,7 @@ describe('duplicateBoardNodesAtom', () => {
     expect(after.boards).toHaveLength(boardsBefore + 1)
     expect(after.nodes).toHaveLength(nodesBefore + 1)
     expect(result[0]?.boardRef).not.toBe(boardCard.boardRef)
+    expect(after.boards.at(-1)?.isRoot).toBe(false)
     expect(result[0]?.x).toBe(boardCard.x + 40)
   })
 

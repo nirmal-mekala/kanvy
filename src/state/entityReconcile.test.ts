@@ -10,7 +10,7 @@ import { type AttributedOps, applyOps, type Op } from './ops'
 function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -33,6 +33,7 @@ function boardMeta(id: string, overrides: Partial<BoardMeta> = {}): BoardMeta {
     id,
     title: 'Untitled board',
     status: 'active',
+    isRoot: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -62,7 +63,7 @@ describe('reconcileEntityId', () => {
       nodes: [
         node('n-inside', { boardId: 'client-board' }),
         node('n-card', {
-          boardId: 'root',
+          boardId: 'h0me0b0ard00',
           kind: 'board',
           boardRef: 'client-board',
         } as Partial<Node>),
@@ -140,7 +141,10 @@ describe('reconcileHistoryIds', () => {
       entity: 'board',
       value: boardMeta('client-board'),
     }
-    const attributed: AttributedOps = { ops: [createOp], boardId: 'root' }
+    const attributed: AttributedOps = {
+      ops: [createOp],
+      boardId: 'h0me0b0ard00',
+    }
     const history = createHistoryState(attributed)
     const reconciled = reconcileHistoryIds(
       history,
@@ -164,7 +168,10 @@ describe('reconcileHistoryIds', () => {
       before: { x: 0 },
       after: { x: 5 },
     }
-    const attributed: AttributedOps = { ops: [updateOp], boardId: 'root' }
+    const attributed: AttributedOps = {
+      ops: [updateOp],
+      boardId: 'h0me0b0ard00',
+    }
     const history = createHistoryState(attributed)
     const reconciled = reconcileHistoryIds(
       history,
@@ -180,7 +187,7 @@ describe('reconcileHistoryIds', () => {
   it('is a no-op when oldId === newId', () => {
     const history = createHistoryState<AttributedOps>({
       ops: [],
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
     })
     expect(reconcileHistoryIds(history, 'node', 'n1', 'n1')).toBe(history)
   })
@@ -196,7 +203,7 @@ describe('reconcileHistoryIds', () => {
     const history = {
       ...createHistoryState<AttributedOps>({
         ops: [updateOp],
-        boardId: 'root',
+        boardId: 'h0me0b0ard00',
       }),
       lastActionAt: 12345,
     }

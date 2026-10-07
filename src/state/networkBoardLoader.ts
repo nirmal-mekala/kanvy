@@ -13,17 +13,23 @@
 import { atom, getDefaultStore } from 'jotai'
 import { queryClient } from '../api/queryClient'
 import { fetchCollection, testConnection } from '../api/restClient'
-import type { Board, ImageEntry } from '../schema/board'
-import type { BoardMeta } from '../schema/boardMeta'
-import { ROOT_BOARD_ID } from '../schema/boardMeta'
-import type { Edge } from '../schema/edge'
-import type { ImageCard, Node } from '../schema/node'
+import { ResponseValidationError } from '../api/validateEntries'
+import { type Board, type ImageEntry, ImageEntrySchema } from '../schema/board'
+import {
+  type BoardMeta,
+  BoardMetaSchema,
+  rootBoardId,
+  rootBoardIssues,
+} from '../schema/boardMeta'
+import { type Edge, EdgeSchema } from '../schema/edge'
+import { type ImageCard, type Node, NodeSchema } from '../schema/node'
 import {
   accessModeAtom,
   type NetworkConfig,
   networkConfigAtom,
 } from './atoms/networkSettings'
-import { boardHistoryAtom, currentBoardAtom } from './history/boardHistoryAtom'
+import { boardHistoryAtom } from './history/boardHistoryAtom'
+import { currentBoardAtom } from './history/liveBoard'
 import { createHistoryState } from './history/reducer'
 import { loadBoard } from './persistence/storage'
 import { reapEntities } from './reaper'
@@ -69,7 +75,7 @@ async function fetchReferencedImages(
     ),
   ]
   if (imageIds.length === 0) return []
-  return fetchCollection<ImageEntry>(config, 'images', {
+  return fetchCollection(config, 'images', ImageEntrySchema, {
     'id:in': imageIds.join(','),
   })
 }
@@ -79,11 +85,27 @@ async function fetchBoardContent(
   boardId: string,
 ): Promise<BoardContent> {
   const [nodes, edges] = await Promise.all([
-    fetchCollection<Node>(config, 'nodes', { boardId }),
-    fetchCollection<Edge>(config, 'edges', { boardId }),
+    fetchCollection(config, 'nodes', NodeSchema, { boardId }),
+    fetchCollection(config, 'edges', EdgeSchema, { boardId }),
   ])
   const images = await fetchReferencedImages(config, nodes)
   return { nodes, edges, images }
+}
+
+/**
+ * Every `boards` entry, validated entry-by-entry (`fetchCollection`) and
+ * then as a collection: exactly one active root board (schema v6,
+ * `rootBoardIssues`). A backend that fails either check fails the whole
+ * network load with a `ResponseValidationError` naming the problem — there
+ * is no fallback root, and no guessing which board was meant to be one.
+ */
+async function fetchBoards(config: NetworkConfig): Promise<BoardMeta[]> {
+  const boards = await fetchCollection(config, 'boards', BoardMetaSchema)
+  const issues = rootBoardIssues(boards)
+  if (issues.length > 0) {
+    throw new ResponseValidationError(`GET /boards: ${issues.join('; ')}`)
+  }
+  return boards
 }
 
 /** Exported for direct unit testing — see networkBoardLoader.test.ts. Merges freshly-fetched content into the live document, deduping anything already resident by id (so a redundant re-fetch of an already-loaded board is harmless). */
@@ -175,14 +197,19 @@ export async function initializeNetworkMode(
   const store = getDefaultStore()
   store.set(networkHomeLoadingAtom, true)
   store.set(networkLoadErrorAtom, undefined)
+  // Known only once `GET /boards` has succeeded — the root board is
+  // whichever entry the server marks `isRoot` (schema v6), not a fixed id.
+  let rootId: string | undefined
   try {
     const boards = await queryClient.fetchQuery({
       queryKey: ['network', 'boards'] as const,
-      queryFn: () => fetchCollection<BoardMeta>(config, 'boards'),
+      queryFn: () => fetchBoards(config),
     })
+    const homeId = rootBoardId(boards)
+    rootId = homeId
     const rootContent = await queryClient.fetchQuery({
-      queryKey: boardContentQueryKey(ROOT_BOARD_ID),
-      queryFn: () => fetchBoardContent(config, ROOT_BOARD_ID),
+      queryKey: boardContentQueryKey(homeId),
+      queryFn: () => fetchBoardContent(config, homeId),
     })
     store.set(currentBoardAtom, (board) => ({
       ...board,
@@ -193,20 +220,22 @@ export async function initializeNetworkMode(
     }))
     store.set(
       boardHistoryAtom,
-      createHistoryState({ ops: [], boardId: ROOT_BOARD_ID }),
+      createHistoryState({ ops: [], boardId: homeId }),
     )
-    store.set(loadedBoardIdsAtom, new Set([ROOT_BOARD_ID]))
+    store.set(loadedBoardIdsAtom, new Set([homeId]))
     void eagerLoadOtherBoards(
-      boards.map((b) => b.id).filter((id) => id !== ROOT_BOARD_ID),
+      boards.map((b) => b.id).filter((id) => id !== homeId),
     )
   } catch (error) {
     store.set(networkLoadErrorAtom, {
       message: `Couldn't load boards from the network — ${(error as Error).message}`,
       retry: () => {
         queryClient.removeQueries({ queryKey: ['network', 'boards'] })
-        queryClient.removeQueries({
-          queryKey: boardContentQueryKey(ROOT_BOARD_ID),
-        })
+        if (rootId !== undefined) {
+          queryClient.removeQueries({
+            queryKey: boardContentQueryKey(rootId),
+          })
+        }
         void initializeNetworkMode(config)
       },
     })
@@ -254,7 +283,7 @@ export function switchToLocalMode(): void {
   store.set(currentBoardAtom, board)
   store.set(
     boardHistoryAtom,
-    createHistoryState({ ops: [], boardId: ROOT_BOARD_ID }),
+    createHistoryState({ ops: [], boardId: rootBoardId(board.boards) }),
   )
   store.set(loadedBoardIdsAtom, new Set())
   store.set(networkLoadErrorAtom, undefined)

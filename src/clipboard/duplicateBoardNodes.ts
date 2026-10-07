@@ -66,6 +66,9 @@ export function duplicateBoardNodes(
       id: newBoardId,
       title,
       status: 'active',
+      // A duplicate is always an ordinary board — the root board has no
+      // board node pointing at it to be duplicated from.
+      isRoot: false,
       createdAt: now,
       updatedAt: now,
     })

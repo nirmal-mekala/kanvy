@@ -36,10 +36,13 @@ import {
 } from '../../clipboard/systemClipboard'
 import { boundingBox } from '../../geometry/containment'
 import type { Rect } from '../../geometry/snap'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
+
 import type { BoardCard, Node, NodeId } from '../../schema/node'
 import { duplicateBoardNodesAtom } from '../../state/atoms/boards'
-import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
+import {
+  currentBoardIdAtom,
+  rootBoardIdAtom,
+} from '../../state/atoms/currentBoard'
 import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { addNodesAtom, removeEntitiesAtom } from '../../state/atoms/nodes'
 import { selectionAtom, setSelectionAtom } from '../../state/atoms/selection'
@@ -115,9 +118,10 @@ export function useClipboardShortcuts({
   const undo = useSetAtom(undoBoardAtom)
   const redo = useSetAtom(redoBoardAtom)
   const currentBoardId = useAtomValue(currentBoardIdAtom)
+  const rootBoardId = useAtomValue(rootBoardIdAtom)
   // Root only ever creates `board`/`container` nodes — text/image/link
   // creation paths are disabled there (multiboard support design doc §3).
-  const isRoot = currentBoardId === ROOT_BOARD_ID
+  const isRoot = currentBoardId === rootBoardId
   // The confirm modal's "hidden cost" copy (design doc §4) needs every
   // board's content counted, not just the current board's own — `nodes`
   // (this hook's prop) is already scoped to the current board by

@@ -7,7 +7,7 @@ import { applyOps, mergeOpLists, type Op } from './ops'
 function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'text',
     size: 'regular',

@@ -6,7 +6,7 @@
 // key-ordering guarantee, which does not rely on object key order alone.
 
 import { z } from 'zod'
-import { BoardMetaSchema } from './boardMeta'
+import { BoardMetaSchema, rootBoardIssues } from './boardMeta'
 import { EdgeSchema } from './edge'
 import { NodeSchema } from './node'
 
@@ -27,19 +27,28 @@ import { NodeSchema } from './node'
 // array-ifies `images` from a `{ [id]: dataUri }` record into an
 // `{id, dataUri}[]` array -- a REST collection (json-server or otherwise)
 // needs an array of entries with an `id` field, not a bare record.
-export const SCHEMA_VERSION = 5
+// v6 (ctx/notes/261006-root-board-isroot.md) replaces the reserved
+// `id: 'root'` home board with a required `isRoot` flag on every `boards`
+// entry; the root board's id is an ordinary generated one.
+export const SCHEMA_VERSION = 6
 
-// fallow-ignore-next-line unused-export
-export const ImageEntrySchema = z
-  .object({ id: z.string(), dataUri: z.string() })
-  .strict()
+export const ImageEntrySchema = z.object({
+  id: z.string(),
+  dataUri: z.string(),
+})
 export type ImageEntry = z.infer<typeof ImageEntrySchema>
 
-export const BoardSchema = z.object({
-  version: z.number(),
-  nodes: z.array(NodeSchema),
-  edges: z.array(EdgeSchema),
-  boards: z.array(BoardMetaSchema),
-  images: z.array(ImageEntrySchema),
-})
+export const BoardSchema = z
+  .object({
+    version: z.number(),
+    nodes: z.array(NodeSchema),
+    edges: z.array(EdgeSchema),
+    boards: z.array(BoardMetaSchema),
+    images: z.array(ImageEntrySchema),
+  })
+  .superRefine((board, ctx) => {
+    for (const message of rootBoardIssues(board.boards)) {
+      ctx.addIssue({ code: 'custom', path: ['boards'], message })
+    }
+  })
 export type Board = z.infer<typeof BoardSchema>

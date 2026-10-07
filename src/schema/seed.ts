@@ -12,7 +12,6 @@
 import { CARD_WIDTH, NEW_CARD_HEIGHT_ESTIMATE } from '../geometry/constants'
 import type { Board } from './board'
 import { SCHEMA_VERSION } from './board'
-import { ROOT_BOARD_ID } from './boardMeta'
 import { generateId } from './legacy'
 
 const SEED_CARD_X = 88 // snapToGrid(80), spec §3 grid-midpoint offset
@@ -27,13 +26,14 @@ export interface SeedResult {
 /** A fresh seed document, with new ids/timestamps each call. */
 export function createSeedBoard(): SeedResult {
   const now = new Date().toISOString()
+  const rootBoardId = generateId()
   const welcomeBoardId = generateId()
   const board: Board = {
     version: SCHEMA_VERSION,
     nodes: [
       {
         id: generateId(),
-        boardId: ROOT_BOARD_ID,
+        boardId: rootBoardId,
         type: 'card',
         kind: 'board',
         boardRef: welcomeBoardId,
@@ -69,9 +69,10 @@ export function createSeedBoard(): SeedResult {
     edges: [],
     boards: [
       {
-        id: ROOT_BOARD_ID,
+        id: rootBoardId,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: now,
         updatedAt: now,
       },
@@ -79,6 +80,7 @@ export function createSeedBoard(): SeedResult {
         id: welcomeBoardId,
         title: 'My Kanvy Board',
         status: 'active',
+        isRoot: false,
         createdAt: now,
         updatedAt: now,
       },

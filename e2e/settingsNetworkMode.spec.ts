@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { NETWORK_ROOT_ID, ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 import { dispatchPaste } from './fixtures/clipboard'
 import { startJsonServer } from './fixtures/jsonServer'
 import { makeImageDataUri, makeNoisyImageDataUri } from './fixtures/testImage'
@@ -20,14 +20,15 @@ test.describe.configure({ mode: 'serial' })
 // chance to open the settings modal. Every other e2e spec that
 // navigates to `/` follows this same seed-first convention.
 const EMPTY_LOCAL_DOCUMENT = {
-  version: 5,
+  version: 6,
   nodes: [],
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: ROOT_BOARD_ID,
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
@@ -62,9 +63,10 @@ function sampleDb() {
   return {
     boards: [
       {
-        id: 'root',
+        id: NETWORK_ROOT_ID,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -72,6 +74,7 @@ function sampleDb() {
         id: 'b1',
         title: 'Network board',
         status: 'active',
+        isRoot: false,
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -79,7 +82,7 @@ function sampleDb() {
     nodes: [
       {
         id: 'n0',
-        boardId: 'root',
+        boardId: NETWORK_ROOT_ID,
         type: 'card',
         kind: 'board',
         boardRef: 'b1',
@@ -171,6 +174,34 @@ test.describe('settings modal (network mode design doc §2)', () => {
         0,
         { timeout: 10_000 },
       )
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('Confirm against a reachable backend whose boards predate isRoot keeps the modal open and names the schema problem (no silent migration of server data — ctx/notes/261006-root-board-isroot.md)', async ({
+    page,
+  }) => {
+    const db = sampleDb()
+    const legacyDb = {
+      ...db,
+      boards: db.boards.map(({ isRoot: _isRoot, ...meta }) => meta),
+    }
+    const server = await startJsonServer(legacyDb, JSON_SERVER_PORT)
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+
+      await page.getByTitle('Settings').click()
+      await page
+        .getByPlaceholder('http://localhost:1996')
+        .fill(`http://localhost:${server.port}`)
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
+
+      await expect(
+        page.getByText(/doesn't match this app's schema.*isRoot/),
+      ).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByPlaceholder('http://localhost:1996')).toBeVisible()
     } finally {
       await server.stop()
     }
@@ -383,21 +414,22 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
     const server = await startJsonServer(sampleDb(), JSON_SERVER_PORT)
     try {
       // A local-only board — never present in the json-server backend
-      // (`sampleDb()` only has `root`/`b1`) — that the app is already
+      // (`sampleDb()` only has its own root board and `b1`) — that the app is already
       // showing when a *persisted* network base URL (as if Settings had
       // been confirmed in a prior session) triggers App.tsx's boot-time
       // auto-reconnect, which resolves into Network mode before the
       // router ever evaluates this navigation (bootPhaseAtom's render
       // gate, App.tsx).
       const LOCAL_DOCUMENT_WITH_LOCAL_ONLY_BOARD = {
-        version: 5,
+        version: 6,
         nodes: [],
         edges: [],
         boards: [
           {
-            id: 'root',
+            id: ROOT_BOARD_ID,
             title: 'Home',
             status: 'active',
+            isRoot: true,
             createdAt: NOW,
             updatedAt: NOW,
           },
@@ -405,6 +437,7 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
             id: 'local-only',
             title: 'Local-only board',
             status: 'active',
+            isRoot: false,
             createdAt: NOW,
             updatedAt: NOW,
           },

@@ -28,7 +28,7 @@ describe('computeBoardActionImpact', () => {
       node('a', 'child-1'),
       node('b', 'child-1'),
       node('c', 'child-2'),
-      node('d', 'root'),
+      node('d', 'h0me0b0ard00'),
     ]
     expect(computeBoardActionImpact(['child-1', 'child-2'], allNodes)).toEqual({
       boardCount: 2,
@@ -37,7 +37,7 @@ describe('computeBoardActionImpact', () => {
   })
 
   it('does not double count or include unrelated boards', () => {
-    const allNodes = [node('a', 'child-1'), node('b', 'root')]
+    const allNodes = [node('a', 'child-1'), node('b', 'h0me0b0ard00')]
     expect(computeBoardActionImpact(['child-1'], allNodes)).toEqual({
       boardCount: 1,
       nodeCount: 1,

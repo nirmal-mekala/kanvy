@@ -1,7 +1,7 @@
 // Container creation (spec §4.5): Ctrl/Cmd+click-drag on blank canvas,
 // always winning over starting on top of an existing card/container.
 
-import { ROOT_BOARD_ID } from '../schema/boardMeta'
+import { UNASSIGNED_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { ContainerNode } from '../schema/node'
 
@@ -19,7 +19,7 @@ export function createContainer(rect: {
   const now = new Date().toISOString()
   return {
     id: generateId(),
-    boardId: ROOT_BOARD_ID,
+    boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
     index: 0,
     type: 'container',

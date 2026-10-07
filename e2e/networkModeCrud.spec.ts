@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { NETWORK_ROOT_ID, ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 import { startJsonServer } from './fixtures/jsonServer'
 
 // Closes the coverage gaps a 260924 audit flagged: Board/board-card,
@@ -35,14 +35,15 @@ const NOW = '2026-01-01T00:00:00.000Z'
 const SAMPLE_BOARD_ID = 'b1'
 
 const EMPTY_LOCAL_DOCUMENT = {
-  version: 5,
+  version: 6,
   nodes: [],
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: ROOT_BOARD_ID,
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: NOW,
       updatedAt: NOW,
     },
@@ -55,9 +56,10 @@ function baseDb(extraNodes: Record<string, unknown>[] = []) {
   return {
     boards: [
       {
-        id: 'root',
+        id: NETWORK_ROOT_ID,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -65,6 +67,7 @@ function baseDb(extraNodes: Record<string, unknown>[] = []) {
         id: SAMPLE_BOARD_ID,
         title: 'Sample board',
         status: 'active',
+        isRoot: false,
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -72,7 +75,7 @@ function baseDb(extraNodes: Record<string, unknown>[] = []) {
     nodes: [
       {
         id: 'n0',
-        boardId: 'root',
+        boardId: NETWORK_ROOT_ID,
         type: 'card',
         kind: 'board',
         boardRef: SAMPLE_BOARD_ID,
@@ -181,6 +184,23 @@ test.describe('board CRUD over the network', () => {
           { timeout: 10_000 },
         )
         .toBe(boardsBefore.length + 1)
+      // Schema v6: the new board is persisted as an ordinary board (it'd
+      // fail the next load's `GET /boards` validation otherwise), and its
+      // board-card lands on the *network* root — `/` followed the mode
+      // switch to the server's `isRoot` board, not the local one.
+      const createdBoard = (await getCollection(page, baseUrl, 'boards')).find(
+        (b) => !boardsBefore.some((before) => before.id === b.id),
+      )
+      expect(createdBoard?.isRoot).toBe(false)
+      await expect
+        .poll(
+          async () =>
+            (await getCollection(page, baseUrl, 'nodes')).find(
+              (n) => n.boardRef === createdBoard?.id,
+            )?.boardId,
+          { timeout: 10_000 },
+        )
+        .toBe(NETWORK_ROOT_ID)
       const newBoardCard = page.locator('.card--board').last()
 
       // UPDATE — on-canvas rename (BoardNameEditor.tsx, shared with the

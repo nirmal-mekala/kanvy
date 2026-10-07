@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 import { dispatchPaste } from './fixtures/clipboard'
 
 // Multiboard support, Sub-phases 3-4 (ctx/notes/260917-multiboard-
@@ -15,7 +15,7 @@ const NOW = '2026-01-01T00:00:00.000Z'
 
 const ROOT_CARD = {
   id: 'root-card',
-  boardId: 'root',
+  boardId: ROOT_BOARD_ID,
   type: 'card',
   kind: 'text',
   size: 'regular',
@@ -37,14 +37,15 @@ const CHILD_CARD = {
 }
 
 const TWO_BOARD_DOCUMENT = {
-  version: 3,
+  version: 6,
   nodes: [ROOT_CARD, CHILD_CARD],
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: ROOT_BOARD_ID,
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: NOW,
       updatedAt: NOW,
     },
@@ -52,6 +53,7 @@ const TWO_BOARD_DOCUMENT = {
       id: 'child-1',
       title: 'Untitled board',
       status: 'active',
+      isRoot: false,
       createdAt: NOW,
       updatedAt: NOW,
     },
@@ -102,13 +104,59 @@ test('navigating to an unknown board id redirects to /', async ({ page }) => {
   await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
 })
 
-test('navigating to /root (the reserved root board id as a path segment) redirects to /', async ({
+test("navigating to the root board's own id as a path segment redirects to /", async ({
   page,
 }) => {
   await seedBoard(page, TWO_BOARD_DOCUMENT, 'kanvy.board')
-  await page.goto('/root')
+  await page.goto(`/${ROOT_BOARD_ID}`)
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.locator('[data-testid="canvas-root"]')).toBeVisible()
+  await expect(page.getByText('Root content')).toBeVisible()
+})
+
+// Schema v6 (ctx/notes/261006-root-board-isroot.md): a document persisted
+// before `isRoot` existed designates its home board by the reserved id
+// `'root'`. It must still load — migrated on read, not treated as corrupt.
+test.describe('a pre-v6 localStorage document (reserved "root" id, no isRoot)', () => {
+  const LEGACY_V5_DOCUMENT = {
+    ...TWO_BOARD_DOCUMENT,
+    version: 5,
+    nodes: [
+      { ...ROOT_CARD, boardId: 'root', status: 'active', index: 0 },
+      { ...CHILD_CARD, status: 'active', index: 0 },
+    ],
+    boards: TWO_BOARD_DOCUMENT.boards.map(({ isRoot, ...meta }) =>
+      isRoot ? { ...meta, id: 'root' } : meta,
+    ),
+    images: [],
+  }
+
+  test('loads without a recovery notice, with its home content still on /', async ({
+    page,
+  }) => {
+    await seedBoard(page, LEGACY_V5_DOCUMENT, 'kanvy.board')
+    await page.goto('/')
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByText('Root content')).toBeVisible()
+    await expect(page.getByText("couldn't be read")).toHaveCount(0)
+  })
+
+  test('its child boards keep their ids and stay reachable', async ({
+    page,
+  }) => {
+    await seedBoard(page, LEGACY_V5_DOCUMENT, 'kanvy.board')
+    await page.goto('/child-1')
+    await expect(page).toHaveURL(/\/child-1$/)
+    await expect(page.getByText('Child content')).toBeVisible()
+  })
+
+  test('/root is no longer special — it is just an unknown board id, redirected home', async ({
+    page,
+  }) => {
+    await seedBoard(page, LEGACY_V5_DOCUMENT, 'kanvy.board')
+    await page.goto('/root')
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByText('Root content')).toBeVisible()
+  })
 })
 
 test('the breadcrumb shows only the home icon on root, with no editable title', async ({
@@ -224,14 +272,15 @@ test('breadcrumb rename also commits on blur, not just Enter/checkmark', async (
 // "Welcome to Kanvy" text card on root — these scenarios need a genuinely
 // empty root to make single-card assertions meaningful.
 const EMPTY_ROOT_DOCUMENT = {
-  version: 3,
+  version: 6,
   nodes: [],
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: ROOT_BOARD_ID,
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: NOW,
       updatedAt: NOW,
     },

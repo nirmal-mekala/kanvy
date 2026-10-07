@@ -24,11 +24,14 @@ import { newImageCard, newLinkCard, newTextCard } from '../../cards/newCard'
 import { isPlainUrl } from '../../cards/urlSlurp'
 import { isEditableTarget } from '../../clipboard/dom'
 import { hasNodeClipboardContentAtom } from '../../clipboard/nodeClipboard'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
+
 import { generateId } from '../../schema/legacy'
 import type { CardNode, Node, NodeId } from '../../schema/node'
 import { createBoardAtom } from '../../state/atoms/boards'
-import { currentBoardIdAtom } from '../../state/atoms/currentBoard'
+import {
+  currentBoardIdAtom,
+  rootBoardIdAtom,
+} from '../../state/atoms/currentBoard'
 import {
   addNodeAtom,
   replaceNodeAtom,
@@ -67,9 +70,10 @@ export function useCardCreation({
   const createBoard = useSetAtom(createBoardAtom)
   const hasNodeClipboardContent = useAtomValue(hasNodeClipboardContentAtom)
   const currentBoardId = useAtomValue(currentBoardIdAtom)
+  const rootBoardId = useAtomValue(rootBoardIdAtom)
   // Root only ever creates `board`/`container` nodes — text/image/link
   // creation paths are disabled there (multiboard support design doc §3).
-  const isRoot = currentBoardId === ROOT_BOARD_ID
+  const isRoot = currentBoardId === rootBoardId
 
   function pointFromEvent(clientX: number, clientY: number) {
     return worldPoint(

@@ -2,7 +2,7 @@
 // (see convertCardKind.ts for converting an existing card in place).
 
 import { CARD_WIDTH, NEW_CARD_HEIGHT_ESTIMATE } from '../geometry/constants'
-import { ROOT_BOARD_ID } from '../schema/boardMeta'
+import { UNASSIGNED_BOARD_ID } from '../schema/boardMeta'
 import { generateId } from '../schema/legacy'
 import type { CardNode } from '../schema/node'
 
@@ -18,7 +18,7 @@ export function newTextCard(x: number, y: number, content = ''): CardNode {
   const now = new Date().toISOString()
   return {
     id: generateId(),
-    boardId: ROOT_BOARD_ID,
+    boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
     index: 0,
     type: 'card',
@@ -46,7 +46,7 @@ export function newImageCard(
   const h = Math.round(CARD_WIDTH / aspectRatio)
   return {
     id: generateId(),
-    boardId: ROOT_BOARD_ID,
+    boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
     index: 0,
     type: 'card',
@@ -68,7 +68,7 @@ export function newLinkCard(x: number, y: number, url: string): CardNode {
   const now = new Date().toISOString()
   return {
     id: generateId(),
-    boardId: ROOT_BOARD_ID,
+    boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
     index: 0,
     type: 'card',
@@ -97,7 +97,7 @@ export function newBoardCard(x: number, y: number, boardRef: string): CardNode {
   const now = new Date().toISOString()
   return {
     id: generateId(),
-    boardId: ROOT_BOARD_ID,
+    boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
     index: 0,
     type: 'card',

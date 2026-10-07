@@ -610,7 +610,9 @@ concrete decisions (Q12–Q15):
   field (or missing other now-required fields, e.g. timestamps) must
   normalize/backfill rather than fail, matching today's forgiving
   `normalizeBoard`/timestamp-backfill behavior — this leniency is a feature
-  to keep, not a wart.
+  to keep, not a wart. This applies to *local* documents only: network-mode
+  reads are validated strictly and never repaired (schema v6,
+  `ctx/notes/261006-root-board-isroot.md`).
 
 ## 10. Third-party integrations
 
