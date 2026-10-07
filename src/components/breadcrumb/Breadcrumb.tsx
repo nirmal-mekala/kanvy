@@ -16,20 +16,21 @@
 import { Link } from '@tanstack/react-router'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { Home } from 'lucide-react'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
+import { rootBoardIdAtom } from '../../state/atoms/currentBoard'
 import { BoardNameEditor } from '../board/BoardNameEditor'
 
 export function Breadcrumb({ boardId }: { boardId: string }) {
   const board = useAtomValue(boardFamily(boardId))
   const renameBoard = useSetAtom(renameBoardAtom)
+  const rootBoardId = useAtomValue(rootBoardIdAtom)
 
   return (
     <div className="breadcrumb">
       <Link to="/" className="breadcrumb__home" aria-label="Home">
         <Home size={16} strokeWidth={2} />
       </Link>
-      {boardId !== ROOT_BOARD_ID && (
+      {boardId !== rootBoardId && (
         <>
           <span className="breadcrumb__chevron" aria-hidden="true">
             /

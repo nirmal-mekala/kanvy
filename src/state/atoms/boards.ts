@@ -6,14 +6,13 @@
 import { atom } from 'jotai'
 import { newBoardCard } from '../../cards/newCard'
 import { duplicateBoardNodes } from '../../clipboard/duplicateBoardNodes'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
 import { generateId } from '../../schema/legacy'
 import type { BoardCard } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
 import { nextNodeIndex } from '../liveEntities'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
-import { currentBoardIdAtom } from './currentBoard'
+import { currentBoardIdAtom, rootBoardIdAtom } from './currentBoard'
 
 export const boardsAtom = atom((get) => get(boardAtom).boards)
 
@@ -37,9 +36,8 @@ export const boardFamily = atomFamily((id: string) =>
 export const renameBoardAtom = atom(
   null,
   (get, set, targetBoardId: string, title: string) => {
-    if (targetBoardId === ROOT_BOARD_ID) return
     const meta = get(boardAtom).boards.find((b) => b.id === targetBoardId)
-    if (!meta || meta.title === title) return
+    if (!meta || meta.isRoot || meta.title === title) return
     const now = new Date().toISOString()
     set(updateBoardAtom, get(currentBoardIdAtom), [
       {
@@ -66,7 +64,7 @@ export const renameBoardAtom = atom(
  */
 export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
   const currentBoardId = get(currentBoardIdAtom)
-  if (currentBoardId !== ROOT_BOARD_ID) return
+  if (currentBoardId !== get(rootBoardIdAtom)) return
   const newBoardId = generateId()
   const now = new Date().toISOString()
   const board = get(boardAtom)
@@ -78,6 +76,7 @@ export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
         id: newBoardId,
         title: 'Untitled board',
         status: 'active',
+        isRoot: false,
         createdAt: now,
         updatedAt: now,
       },

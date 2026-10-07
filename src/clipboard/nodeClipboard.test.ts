@@ -9,7 +9,7 @@ import {
 function textNode(id: string, x: number, y: number): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -29,7 +29,7 @@ function textNode(id: string, x: number, y: number): Node {
 function containerNode(id: string, x: number, y: number): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'container',
     pattern: 'none',
     color: 'gray',
@@ -47,7 +47,7 @@ function containerNode(id: string, x: number, y: number): Node {
 function boardCard(id: string, boardRef: string, x = 100, y = 100): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'board',
     boardRef,

@@ -30,16 +30,50 @@ function page<T>(data: T[]) {
   }
 }
 
+const ts = '2026-01-01T00:00:00.000Z'
+
+/** A `GET /boards` entry as a v6 backend stores it. */
+function serverBoard(id: string, isRoot: boolean) {
+  return {
+    id,
+    title: id,
+    status: 'active',
+    isRoot,
+    createdAt: ts,
+    updatedAt: ts,
+  }
+}
+
+/** A `fetch` stub serving `boards` for `/boards` and nothing for every other collection. */
+function stubServer(boards: unknown[]) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      const u = new URL(url)
+      if (u.pathname.endsWith('/boards')) {
+        return new Response(JSON.stringify(page(boards)), { status: 200 })
+      }
+      if (u.pathname.endsWith('/nodes') || u.pathname.endsWith('/edges')) {
+        return new Response(JSON.stringify(page([])), { status: 200 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    }),
+  )
+}
+
+const CONFIG = { baseUrl: 'https://api.example.test/', authToken: '' }
+
 function emptyBoard(): Board {
   return {
-    version: 5,
+    version: 6,
     nodes: [],
     edges: [],
     boards: [
       {
-        id: 'root',
+        id: 'h0me0b0ard00',
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
       },
@@ -96,8 +130,17 @@ async function freshState() {
   vi.resetModules()
   const { getDefaultStore } = await import('jotai')
   const { accessModeAtom } = await import('./atoms/networkSettings')
-  const { attemptBootReconnect } = await import('./networkBoardLoader')
-  return { store: getDefaultStore(), accessModeAtom, attemptBootReconnect }
+  const { attemptBootReconnect, networkLoadErrorAtom } = await import(
+    './networkBoardLoader'
+  )
+  const { rootBoardIdAtom } = await import('./atoms/currentBoard')
+  return {
+    store: getDefaultStore(),
+    accessModeAtom,
+    attemptBootReconnect,
+    networkLoadErrorAtom,
+    rootBoardIdAtom,
+  }
 }
 
 beforeEach(() => {
@@ -109,30 +152,48 @@ afterEach(() => {
 })
 
 describe('attemptBootReconnect', () => {
-  it('switches to Network mode on a successful connection', async () => {
+  it("switches to Network mode on a successful connection, homing on the server's isRoot board", async () => {
     const s = await freshState()
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        const u = new URL(url)
-        if (
-          u.pathname.endsWith('/boards') ||
-          u.pathname.endsWith('/nodes') ||
-          u.pathname.endsWith('/edges')
-        ) {
-          return new Response(JSON.stringify(page([])), { status: 200 })
-        }
-        throw new Error(`unexpected fetch: ${url}`)
-      }),
-    )
+    stubServer([serverBoard('s3rv3rr00t00', true), serverBoard('b1', false)])
 
-    const result = await s.attemptBootReconnect({
-      baseUrl: 'https://api.example.test/',
-      authToken: '',
-    })
+    const result = await s.attemptBootReconnect(CONFIG)
 
     expect(result).toBe('connected')
     expect(s.store.get(s.accessModeAtom)).toBe('network')
+    expect(s.store.get(s.rootBoardIdAtom)).toBe('s3rv3rr00t00')
+  })
+
+  it('fails, naming the board and field, when a server board predates isRoot', async () => {
+    const s = await freshState()
+    const { isRoot: _isRoot, ...legacyRoot } = serverBoard('root', true)
+    stubServer([legacyRoot])
+
+    const result = await s.attemptBootReconnect(CONFIG)
+
+    expect(result).toBe('failed')
+    expect(s.store.get(s.networkLoadErrorAtom)?.message).toMatch(
+      /GET \/boards returned 1 invalid entry: id "root" \(isRoot: /,
+    )
+  })
+
+  it('fails when the server has no root board (including an empty boards collection)', async () => {
+    const s = await freshState()
+    stubServer([])
+
+    expect(await s.attemptBootReconnect(CONFIG)).toBe('failed')
+    expect(s.store.get(s.networkLoadErrorAtom)?.message).toMatch(
+      /GET \/boards: no board has isRoot: true/,
+    )
+  })
+
+  it('fails when the server marks more than one board as root, rather than picking one', async () => {
+    const s = await freshState()
+    stubServer([serverBoard('r1', true), serverBoard('r2', true)])
+
+    expect(await s.attemptBootReconnect(CONFIG)).toBe('failed')
+    expect(s.store.get(s.networkLoadErrorAtom)?.message).toMatch(
+      /2 boards have isRoot: true \("r1", "r2"\)/,
+    )
   })
 
   it('stays in Local mode when the connection fails', async () => {

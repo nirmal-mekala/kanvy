@@ -29,7 +29,7 @@ const validBoard: Board = {
   nodes: [
     {
       id: 'c1',
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
       type: 'card',
       kind: 'text',
       size: 'regular',
@@ -48,9 +48,10 @@ const validBoard: Board = {
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: 'h0me0b0ard00',
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     },
@@ -99,6 +100,39 @@ describe('loadBoard', () => {
       nodes: [{ bogus: true }],
       edges: [],
       images: [],
+    })
+    localStorage.setItem(STORAGE_KEY, raw)
+    const result = loadBoard()
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.reason).toBe('validation-error')
+      expect(result.raw).toBe(raw)
+    }
+  })
+
+  it("migrates a pre-v6 document (reserved 'root' id, no isRoot) instead of treating it as corrupt", () => {
+    const v5 = {
+      ...validBoard,
+      version: 5,
+      nodes: validBoard.nodes.map((node) => ({ ...node, boardId: 'root' })),
+      boards: validBoard.boards.map(({ isRoot: _isRoot, ...meta }) => ({
+        ...meta,
+        id: 'root',
+      })),
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(v5))
+    const result = loadBoard()
+    expect(result.ok).toBe(true)
+    const root = result.board.boards.find((b) => b.isRoot)
+    expect(root?.id).toMatch(/^[0-9a-z]{12}$/)
+    expect(result.board.nodes[0]?.boardId).toBe(root?.id)
+    expect(result.board.version).toBe(SCHEMA_VERSION)
+  })
+
+  it('reports a validation error (not a silent repair) for a v6 document with no root board, preserving the raw bytes', () => {
+    const raw = JSON.stringify({
+      ...validBoard,
+      boards: validBoard.boards.map((meta) => ({ ...meta, isRoot: false })),
     })
     localStorage.setItem(STORAGE_KEY, raw)
     const result = loadBoard()

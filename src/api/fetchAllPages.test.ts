@@ -42,9 +42,9 @@ describe('fetchAllPages', () => {
   it('preserves existing query params (e.g. a boardId filter) across every page request', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(page([], null)))
 
-    await fetchAllPages('http://x/nodes?boardId=root', {}, fetchImpl)
+    await fetchAllPages('http://x/nodes?boardId=h0me0b0ard00', {}, fetchImpl)
     const calledUrl = new URL(fetchImpl.mock.calls[0]?.[0] as string)
-    expect(calledUrl.searchParams.get('boardId')).toBe('root')
+    expect(calledUrl.searchParams.get('boardId')).toBe('h0me0b0ard00')
     expect(calledUrl.searchParams.get('_page')).toBe('1')
   })
 

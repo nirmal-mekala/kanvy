@@ -9,9 +9,10 @@ const board: Board = {
   edges: [],
   boards: [
     {
-      id: 'root',
+      id: 'h0me0b0ard00',
       title: 'Home',
       status: 'active',
+      isRoot: true,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     },

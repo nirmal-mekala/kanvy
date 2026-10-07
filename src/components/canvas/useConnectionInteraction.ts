@@ -10,7 +10,7 @@ import { useRef, useState } from 'react'
 import type { Side } from '../../geometry/anchor'
 import { anchorPoint, pickSide } from '../../geometry/anchor'
 import type { Rect } from '../../geometry/snap'
-import { ROOT_BOARD_ID } from '../../schema/boardMeta'
+import { UNASSIGNED_BOARD_ID } from '../../schema/boardMeta'
 import type { Edge } from '../../schema/edge'
 import { generateId } from '../../schema/legacy'
 import type { Node, NodeId } from '../../schema/node'
@@ -136,7 +136,7 @@ export function useConnectionInteraction({
       id: generateId(),
       // Overwritten by addEdgeAtom's own board-stamping — kept here only
       // to satisfy the schema's required field at construction time.
-      boardId: ROOT_BOARD_ID,
+      boardId: UNASSIGNED_BOARD_ID,
       fromNodeId: state.fromId,
       fromSide: state.fromSide,
       toNodeId: current.hoverId,

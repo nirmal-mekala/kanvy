@@ -9,7 +9,7 @@ import {
 
 const headingText: CardNode = {
   id: 'c1',
-  boardId: 'root',
+  boardId: 'h0me0b0ard00',
   type: 'card',
   kind: 'text',
   size: 'h1',

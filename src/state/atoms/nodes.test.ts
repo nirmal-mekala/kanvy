@@ -21,7 +21,7 @@ class MemoryStorage {
 function linkNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'link',
     x: 0,
@@ -41,7 +41,7 @@ function linkNode(id: string, overrides: Partial<Node> = {}): Node {
 function textNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
-    boardId: 'root',
+    boardId: 'h0me0b0ard00',
     type: 'card',
     kind: 'text',
     size: 'regular',
@@ -69,6 +69,7 @@ async function freshState() {
   const nodesModule = await import('./nodes')
   const edgesModule = await import('./edges')
   const historyModule = await import('../history/boardHistoryAtom')
+  const liveBoardModule = await import('../history/liveBoard')
   const selectionModule = await import('./selection')
   const currentBoardModule = await import('./currentBoard')
   const boardsModule = await import('./boards')
@@ -79,6 +80,7 @@ async function freshState() {
     ...nodesModule,
     ...edgesModule,
     ...historyModule,
+    ...liveBoardModule,
     ...selectionModule,
     ...currentBoardModule,
     ...boardsModule,
@@ -219,7 +221,7 @@ describe('nodes atoms', () => {
 
     const container: Node = {
       id: 'container1',
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
       type: 'container',
       pattern: 'none',
       x: 0,
@@ -237,7 +239,7 @@ describe('nodes atoms', () => {
     store.set(addNodeAtom, child)
     store.set(addEdgeAtom, {
       id: 'e1',
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
       fromNodeId: 'container1',
       fromSide: 'right',
       toNodeId: 'child1',
@@ -298,7 +300,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     store.set(addNodeAtom, textNode('child-1'))
 
     expect(store.get(nodeIdsAtom)).toEqual(['child-1'])
-    store.set(currentBoardIdAtom, 'root')
+    store.set(currentBoardIdAtom, undefined)
     expect(store.get(nodeIdsAtom)).toContain('root-1')
     expect(store.get(nodeIdsAtom)).not.toContain('child-1')
   })
@@ -307,7 +309,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     const { store, addNodeAtom, boardAtom, currentBoardIdAtom } =
       await freshState()
     store.set(currentBoardIdAtom, 'child')
-    store.set(addNodeAtom, textNode('n1', { boardId: 'root' }))
+    store.set(addNodeAtom, textNode('n1', { boardId: 'h0me0b0ard00' }))
 
     const node = store.get(boardAtom).nodes.find((n) => n.id === 'n1')
     expect(node?.boardId).toBe('child')
@@ -332,7 +334,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     store.set(addNodeAtom, textNode('b'))
     store.set(addEdgeAtom, {
       id: 'e1',
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
       fromNodeId: 'a',
       fromSide: 'right',
       toNodeId: 'b',
@@ -353,7 +355,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     store.set(addNodeAtom, textNode('b'))
     store.set(addEdgeAtom, {
       id: 'root-edge',
-      boardId: 'root',
+      boardId: 'h0me0b0ard00',
       fromNodeId: 'a',
       fromSide: 'right',
       toNodeId: 'b',
@@ -381,7 +383,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     })
 
     expect(store.get(edgeIdsAtom)).toEqual(['child-edge'])
-    store.set(currentBoardIdAtom, 'root')
+    store.set(currentBoardIdAtom, undefined)
     expect(store.get(edgeIdsAtom)).toEqual(['root-edge'])
   })
 
@@ -399,7 +401,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
 
     // Back on root, whose own action is still on top: undo works normally.
-    store.set(currentBoardIdAtom, 'root')
+    store.set(currentBoardIdAtom, undefined)
     store.set(undoBoardAtom)
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount)
   })
@@ -422,7 +424,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     store.set(redoBoardAtom)
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount)
 
-    store.set(currentBoardIdAtom, 'root')
+    store.set(currentBoardIdAtom, undefined)
     store.set(redoBoardAtom)
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 1)
   })
@@ -438,7 +440,7 @@ describe('multiboard scoping (ctx/notes/260917-multiboard-support-design.md §2,
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 2)
 
     // root-1 is no longer the topmost entry — root's undo can't reach it.
-    store.set(currentBoardIdAtom, 'root')
+    store.set(currentBoardIdAtom, undefined)
     store.set(undoBoardAtom)
     expect(store.get(boardAtom).nodes).toHaveLength(initialCount + 2)
 
@@ -477,6 +479,7 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
           id: 'child-1',
           title: 'Untitled board',
           status: 'active' as const,
+          isRoot: false,
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
         },
@@ -489,6 +492,24 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     const board = store.get(boardAtom)
     expect(board.nodes.find((n) => n.id === 'bn1')?.status).toBe('trashed')
     expect(board.boards.find((b) => b.id === 'child-1')?.status).toBe('trashed')
+  })
+
+  it('never trashes the root board, even via a board node that (through a hand-edited document) points at it', async () => {
+    const {
+      store,
+      addNodeAtom,
+      removeEntitiesAtom,
+      boardAtom,
+      rootBoardIdAtom,
+    } = await freshState()
+    const rootId = store.get(rootBoardIdAtom)
+    store.set(addNodeAtom, boardCard('bn-root', rootId))
+
+    store.set(removeEntitiesAtom, ['bn-root'])
+
+    const board = store.get(boardAtom)
+    expect(board.nodes.find((n) => n.id === 'bn-root')?.status).toBe('trashed')
+    expect(board.boards.find((b) => b.id === rootId)?.status).toBe('active')
   })
 
   it('leaves other boards untouched when deleting an unrelated (non-board) node', async () => {
@@ -520,6 +541,7 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
           id: 'child-1',
           title: 'Untitled board',
           status: 'active' as const,
+          isRoot: false,
           createdAt: '2026-01-01T00:00:00.000Z',
           updatedAt: '2026-01-01T00:00:00.000Z',
         },

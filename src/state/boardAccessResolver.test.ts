@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Board } from '../schema/board'
 import { SCHEMA_VERSION } from '../schema/board'
-import { ROOT_BOARD_ID } from '../schema/boardMeta'
 
 class MemoryStorage {
   private store = new Map<string, string>()
@@ -20,7 +19,9 @@ class MemoryStorage {
 }
 
 const now = '2026-01-01T00:00:00.000Z'
+const ROOT_ID = 'h0me0b0ard00'
 
+/** A document with one `boards` entry per id — the first is the root board. */
 function boardWith(
   ids: readonly (string | { id: string; status: 'active' | 'trashed' })[],
 ): Board {
@@ -28,12 +29,19 @@ function boardWith(
     version: SCHEMA_VERSION,
     nodes: [],
     edges: [],
-    boards: ids.map((entry) => {
+    boards: ids.map((entry, index) => {
       const { id, status } =
         typeof entry === 'string'
           ? { id: entry, status: 'active' as const }
           : entry
-      return { id, title: id, status, createdAt: now, updatedAt: now }
+      return {
+        id,
+        title: id,
+        status,
+        isRoot: index === 0,
+        createdAt: now,
+        updatedAt: now,
+      }
     }),
     images: [],
   }
@@ -65,7 +73,7 @@ async function freshState() {
   const { accessModeAtom, networkConfigAtom } = await import(
     './atoms/networkSettings'
   )
-  const { currentBoardAtom } = await import('./history/boardHistoryAtom')
+  const { currentBoardAtom } = await import('./history/liveBoard')
   const { boardsAtom } = await import('./atoms/boards')
   const { resolveBoardAccess } = await import('./boardAccessResolver')
   const { writeBoard } = await import('./persistence/storage')
@@ -92,7 +100,7 @@ describe('resolveBoardAccess', () => {
   it('resolves immediately when the board is already in the current mode', async () => {
     const s = await freshState()
     s.store.set(s.accessModeAtom, 'network')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID, 'net-1']))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID, 'net-1']))
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
 
@@ -103,9 +111,9 @@ describe('resolveBoardAccess', () => {
 
   it('switches to Local mode when a board only exists in local storage', async () => {
     const s = await freshState()
-    s.writeBoard(boardWith([ROOT_BOARD_ID, 'local-only']))
+    s.writeBoard(boardWith([ROOT_ID, 'local-only']))
     s.store.set(s.accessModeAtom, 'network')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID, 'net-1']))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID, 'net-1']))
 
     await expect(s.resolveBoardAccess('local-only')).resolves.toBe('ok')
     expect(s.store.get(s.accessModeAtom)).toBe('local')
@@ -114,11 +122,9 @@ describe('resolveBoardAccess', () => {
 
   it('does not switch modes when the board is trashed in local storage', async () => {
     const s = await freshState()
-    s.writeBoard(
-      boardWith([ROOT_BOARD_ID, { id: 'trashed-1', status: 'trashed' }]),
-    )
+    s.writeBoard(boardWith([ROOT_ID, { id: 'trashed-1', status: 'trashed' }]))
     s.store.set(s.accessModeAtom, 'network')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID]))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID]))
 
     await expect(s.resolveBoardAccess('trashed-1')).resolves.toBe('not-found')
     expect(s.store.get(s.accessModeAtom)).toBe('network')
@@ -127,16 +133,17 @@ describe('resolveBoardAccess', () => {
   it('switches to Network mode when a board is found there after a successful connection', async () => {
     const s = await freshState()
     s.store.set(s.accessModeAtom, 'local')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID]))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID]))
     s.store.set(s.networkConfigAtom, {
       baseUrl: 'https://api.example.test/',
       authToken: '',
     })
     const boards = [
       {
-        id: ROOT_BOARD_ID,
+        id: ROOT_ID,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: now,
         updatedAt: now,
       },
@@ -144,6 +151,7 @@ describe('resolveBoardAccess', () => {
         id: 'net-only',
         title: 'Net only',
         status: 'active',
+        isRoot: false,
         createdAt: now,
         updatedAt: now,
       },
@@ -170,7 +178,7 @@ describe('resolveBoardAccess', () => {
   it('stays in Local mode when the connection test fails', async () => {
     const s = await freshState()
     s.store.set(s.accessModeAtom, 'local')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID]))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID]))
     s.store.set(s.networkConfigAtom, {
       baseUrl: 'https://api.example.test/',
       authToken: '',
@@ -187,7 +195,7 @@ describe('resolveBoardAccess', () => {
   it('is not-found without attempting a connection when no base URL is configured', async () => {
     const s = await freshState()
     s.store.set(s.accessModeAtom, 'local')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID]))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID]))
     const fetchSpy = vi.fn()
     vi.stubGlobal('fetch', fetchSpy)
 
@@ -197,9 +205,9 @@ describe('resolveBoardAccess', () => {
 
   it('is not-found, without switching modes, when a board exists in neither', async () => {
     const s = await freshState()
-    s.writeBoard(boardWith([ROOT_BOARD_ID]))
+    s.writeBoard(boardWith([ROOT_ID]))
     s.store.set(s.accessModeAtom, 'network')
-    s.store.set(s.currentBoardAtom, boardWith([ROOT_BOARD_ID]))
+    s.store.set(s.currentBoardAtom, boardWith([ROOT_ID]))
 
     await expect(s.resolveBoardAccess('nowhere')).resolves.toBe('not-found')
     expect(s.store.get(s.accessModeAtom)).toBe('network')

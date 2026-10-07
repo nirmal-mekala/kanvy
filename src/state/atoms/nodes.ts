@@ -396,7 +396,14 @@ export const removeEntitiesAtom = atom(
         .map((node) => node.boardRef),
     )
     for (const meta of board.boards) {
-      if (trashedBoardIds.has(meta.id) && meta.status !== 'trashed') {
+      // The root board is never deletable (design doc §2) — and a trashed
+      // root fails `BoardSchema` on the next load (schema v6) — so a board
+      // node that somehow points at it never takes it down with it.
+      if (
+        trashedBoardIds.has(meta.id) &&
+        meta.status !== 'trashed' &&
+        !meta.isRoot
+      ) {
         ops.push({
           kind: 'update',
           entity: 'board',

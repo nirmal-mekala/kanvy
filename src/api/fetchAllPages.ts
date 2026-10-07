@@ -20,7 +20,7 @@ const FETCH_ALL_PAGES_PER_PAGE = 200
 
 /**
  * Fetches every page of `url` (a json-server collection endpoint, with any
- * of its own query params already applied — e.g. `?boardId=root`) and
+ * of its own query params already applied — e.g. `?boardId=<id>`) and
  * concatenates their `data` arrays. Stops once the server reports no next
  * page, or a page comes back empty (defensive against a server that
  * doesn't paginate at all and just returns everything on page 1 — either

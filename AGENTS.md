@@ -12,12 +12,17 @@ repo; `ctx/notes/260915-kanvy-spec.md` is what survives as the
 authoritative description of intended behavior. Before making any change,
 re-read this file.
 
-Two schema revisions since the initial migration (see spec §2.3):
+Schema revisions since the initial migration (see spec §2.3):
 - **v0.1**: container membership reverted from a formal `parentId` field
   to purely spatial (derived fresh from x/y/w/h, never stored) — see
   `ctx/notes/260916-v0.1-spatial-containers.md` for the rationale.
 - Drag-carry requires a node to be *completely within* the dragged
   container, not merely overlapping it.
+- **v6**: the home board is designated by a required `isRoot` flag
+  (exactly one active root per document), not the reserved id `'root'` —
+  its id is an ordinary generated one. Local documents migrate on read;
+  network reads are Zod-validated strictly and never repaired. See
+  `ctx/notes/261006-root-board-isroot.md`.
 
 Multi-board support (spec §14's deferred "Multiboard support" item) is
 implemented: the schema v3 shape (`boards` collection, `boardId`-scoped

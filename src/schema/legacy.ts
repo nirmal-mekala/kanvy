@@ -17,18 +17,32 @@
 //      in place rather than reconstructed, and always stamped with the
 //      current `SCHEMA_VERSION` regardless of what version they arrived as.
 //      A pre-v3 document (no `boards` array, no per-entity `boardId`) is
-//      also normalized here: every node/edge is stamped `boardId: 'root'`
-//      and a single synthesized root `boards` entry is added — today's
-//      only board becomes "the root board" for free, with no data loss and
-//      no user-visible change (multiboard support,
+//      also normalized here: every node/edge is stamped with the root
+//      board's id and a single synthesized root `boards` entry is added —
+//      today's only board becomes "the root board" for free, with no data
+//      loss and no user-visible change (multiboard support,
 //      ctx/notes/260917-multiboard-support-design.md §2).
+//
+// Root-board designation (schema v6, ctx/notes/261006-root-board-isroot.md):
+// every pre-v6 document identified its home board by the reserved id
+// `'root'`. Migrating one mints a fresh id for that board, rewrites every
+// `boardId`/`boardRef` that pointed at `'root'` to it, and stamps `isRoot`
+// on every `boards` entry (true only for the old `'root'` board). A v6+
+// document is never given this treatment — its `isRoot` flags and
+// `boardId`s pass through untouched, and anything missing is left for
+// `BoardSchema` to reject rather than guessed at.
 
 import { customAlphabet } from 'nanoid'
 import { SCHEMA_VERSION } from './board'
-import { ROOT_BOARD_ID } from './boardMeta'
 import type { PatternKey, TextSize } from './node'
 
 const nanoid = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12)
+
+/** The reserved home-board id every pre-v6 document used, before `isRoot` replaced it. Only ever read here, to recognize and migrate it. */
+const LEGACY_ROOT_BOARD_ID = 'root'
+
+/** The first schema version that designates the root board with `isRoot` instead of `LEGACY_ROOT_BOARD_ID`. */
+const IS_ROOT_SCHEMA_VERSION = 6
 
 // The prototype never stored a card's height (purely DOM-derived) — this
 // mirrors its NEW_CARD_HEIGHT_ESTIMATE fallback, used here only to backfill
@@ -74,52 +88,96 @@ function backfillTimestamps(
   }
 }
 
-/** Stamps `boardId: 'root'` onto an entity from before multiboard support existed, unless it already has one (a v3 document, or a pre-v3 document a caller has already stamped). */
-function backfillBoardId(
-  entity: Record<string, unknown>,
-): Record<string, unknown> {
-  return {
-    ...entity,
-    boardId:
-      typeof entity.boardId === 'string' ? entity.boardId : ROOT_BOARD_ID,
-  }
+/** True for a document from before schema v6's `isRoot` flag — anything not explicitly stamped v6 or later, including every unversioned/pre-v0 document. */
+function predatesIsRoot(parsed: Record<string, unknown>): boolean {
+  return !(
+    typeof parsed.version === 'number' &&
+    parsed.version >= IS_ROOT_SCHEMA_VERSION
+  )
+}
+
+/** Maps a pre-v6 board reference (`boardId`/`boardRef`) onto the migrated root board's fresh id when it was the reserved `'root'`; any other value passes through. */
+function migrateLegacyBoardRef(value: unknown, rootId: string): unknown {
+  return value === LEGACY_ROOT_BOARD_ID ? rootId : value
 }
 
 /**
- * Normalizes a pre-existing `boards` array (already-v3 documents just
- * missing a timestamp or two), or synthesizes the single root entry a
- * pre-v3 document never had. Either way, the reserved root board is always
- * present — a document that's missing it (or has an incomplete one) gets
- * it filled in, never left absent, since every node/edge is about to be
- * stamped with a `boardId` that must resolve to *some* `boards` entry.
+ * Pre-v6 only (`rootId` is the migrated root board's fresh id): stamps
+ * `boardId` onto an entity from before multiboard support existed, and
+ * repoints a `boardId`/`boardRef` of `'root'` at `rootId`. A v6+ entity
+ * (`rootId` undefined) is returned untouched — a missing `boardId` there
+ * is a real defect for `NodeSchema`/`EdgeSchema` to reject, not a legacy
+ * gap to fill.
+ */
+function migrateBoardRefs(
+  entity: Record<string, unknown>,
+  rootId: string | undefined,
+): Record<string, unknown> {
+  if (rootId === undefined) return entity
+  return {
+    ...entity,
+    boardId:
+      typeof entity.boardId === 'string'
+        ? migrateLegacyBoardRef(entity.boardId, rootId)
+        : rootId,
+    ...('boardRef' in entity
+      ? { boardRef: migrateLegacyBoardRef(entity.boardRef, rootId) }
+      : {}),
+  }
+}
+
+/** Backfills a timestamp or two (already-v3 documents) and a default title/status onto every pre-existing `boards` entry. `isRoot` passes through exactly as given — see `normalizeBoardsCollection` for the pre-v6 case. */
+function normalizeBoardEntries(
+  parsed: Record<string, unknown>,
+  now: string,
+): Record<string, unknown>[] {
+  if (!Array.isArray(parsed.boards)) return []
+  return parsed.boards.filter(isRecord).map((board) => {
+    const timestamped = backfillTimestamps(board, now)
+    return {
+      id: board.id,
+      title: typeof board.title === 'string' ? board.title : 'Untitled board',
+      status: board.status === 'trashed' ? 'trashed' : 'active',
+      isRoot: board.isRoot,
+      createdAt: timestamped.createdAt,
+      updatedAt: timestamped.updatedAt,
+    }
+  })
+}
+
+/**
+ * Normalizes a pre-existing `boards` array, and — for a pre-v6 document
+ * (`rootId` defined) — migrates it onto `isRoot`: the reserved `'root'`
+ * entry becomes `rootId` with `isRoot: true`, every other entry gets
+ * `isRoot: false`, and a document with no `'root'` entry at all (every
+ * pre-v3 document, which never had a `boards` array) gets one synthesized,
+ * since every node/edge is about to be stamped with a `boardId` that must
+ * resolve to *some* `boards` entry. A v6+ document is never given a
+ * synthesized root — a missing or duplicated one fails `BoardSchema`.
  */
 function normalizeBoardsCollection(
   parsed: Record<string, unknown>,
   now: string,
+  rootId: string | undefined,
 ): Record<string, unknown>[] {
-  const existing = Array.isArray(parsed.boards)
-    ? parsed.boards.filter(isRecord).map((board) => {
-        const timestamped = backfillTimestamps(board, now)
-        return {
-          id: board.id,
-          title:
-            typeof board.title === 'string' ? board.title : 'Untitled board',
-          status: board.status === 'trashed' ? 'trashed' : 'active',
-          createdAt: timestamped.createdAt,
-          updatedAt: timestamped.updatedAt,
-        }
-      })
-    : []
-  if (existing.some((board) => board.id === ROOT_BOARD_ID)) return existing
+  const existing = normalizeBoardEntries(parsed, now)
+  if (rootId === undefined) return existing
+  const migrated = existing.map((board) => ({
+    ...board,
+    id: migrateLegacyBoardRef(board.id, rootId),
+    isRoot: board.id === LEGACY_ROOT_BOARD_ID,
+  }))
+  if (migrated.some((board) => board.isRoot)) return migrated
   return [
     {
-      id: ROOT_BOARD_ID,
+      id: rootId,
       title: 'Home',
       status: 'active' as const,
+      isRoot: true,
       createdAt: now,
       updatedAt: now,
     },
-    ...existing,
+    ...migrated,
   ]
 }
 
@@ -135,8 +193,7 @@ function assignNodeStatusAndIndex(nodes: unknown[]): unknown[] {
   const counters = new Map<string, number>()
   return nodes.map((node) => {
     if (!isRecord(node)) return node
-    const boardId =
-      typeof node.boardId === 'string' ? node.boardId : ROOT_BOARD_ID
+    const boardId = String(node.boardId)
     const next = counters.get(boardId) ?? 0
     counters.set(boardId, next + 1)
     return {
@@ -210,6 +267,7 @@ function legacyCardKindFields(
 function normalizeLegacyCard(
   card: Record<string, unknown>,
   now: string,
+  rootId: string,
 ): Record<string, unknown> {
   const base = backfillTimestamps(card, now)
   const task = normalizeTask(card)
@@ -217,7 +275,7 @@ function normalizeLegacyCard(
 
   return {
     id: base.id,
-    boardId: ROOT_BOARD_ID,
+    boardId: rootId,
     x: base.x,
     y: base.y,
     w: base.w,
@@ -235,6 +293,7 @@ function normalizeLegacyCard(
 function normalizeLegacyGroup(
   group: Record<string, unknown>,
   now: string,
+  rootId: string,
 ): Record<string, unknown> {
   const base = backfillTimestamps(group, now)
   const task = normalizeTask(group)
@@ -245,7 +304,7 @@ function normalizeLegacyGroup(
 
   return {
     id: base.id,
-    boardId: ROOT_BOARD_ID,
+    boardId: rootId,
     x: base.x,
     y: base.y,
     w: base.w,
@@ -262,11 +321,12 @@ function normalizeLegacyGroup(
 function normalizeLegacyEdge(
   edge: Record<string, unknown>,
   now: string,
+  rootId: string,
 ): Record<string, unknown> {
   const base = backfillTimestamps(edge, now)
   return {
     id: base.id,
-    boardId: ROOT_BOARD_ID,
+    boardId: rootId,
     fromNodeId: base.fromNodeId ?? base.fromId,
     fromSide: base.fromSide,
     toNodeId: base.toNodeId ?? base.toId,
@@ -297,6 +357,8 @@ function normalizePreV0Board(
   const cards = Array.isArray(parsed.cards) ? parsed.cards : []
   const groups = Array.isArray(parsed.groups) ? parsed.groups : []
   const edges = Array.isArray(parsed.edges) ? parsed.edges : []
+  // Always pre-v6 (pre-v0 predates every version stamp) — see module comment.
+  const rootId = generateId()
   return {
     version: SCHEMA_VERSION,
     // Containers first so array-order-as-z-index (phase 2 schema §1) keeps
@@ -304,13 +366,17 @@ function normalizePreV0Board(
     nodes: assignNodeStatusAndIndex([
       ...groups
         .filter(isRecord)
-        .map((group) => normalizeLegacyGroup(group, now)),
-      ...cards.filter(isRecord).map((card) => normalizeLegacyCard(card, now)),
+        .map((group) => normalizeLegacyGroup(group, now, rootId)),
+      ...cards
+        .filter(isRecord)
+        .map((card) => normalizeLegacyCard(card, now, rootId)),
     ]),
     edges: backfillEdgeStatuses(
-      edges.filter(isRecord).map((edge) => normalizeLegacyEdge(edge, now)),
+      edges
+        .filter(isRecord)
+        .map((edge) => normalizeLegacyEdge(edge, now, rootId)),
     ),
-    boards: normalizeBoardsCollection(parsed, now),
+    boards: normalizeBoardsCollection(parsed, now, rootId),
     images: normalizeImages(parsed.images),
   }
 }
@@ -339,6 +405,7 @@ function backfillV0Board(
 ): unknown {
   const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
   const edges = Array.isArray(parsed.edges) ? parsed.edges : []
+  const rootId = predatesIsRoot(parsed) ? generateId() : undefined
   return {
     // Always stamp the current version — a v1 document migrating here has
     // just had `parentId` stripped, so it's no longer meaningfully "v1".
@@ -346,18 +413,21 @@ function backfillV0Board(
     nodes: assignNodeStatusAndIndex(
       nodes.map((node) =>
         isRecord(node)
-          ? backfillBoardId(
+          ? migrateBoardRefs(
               migrateTextSize(stripParentId(backfillTimestamps(node, now))),
+              rootId,
             )
           : node,
       ),
     ),
     edges: backfillEdgeStatuses(
       edges.map((edge) =>
-        isRecord(edge) ? backfillBoardId(backfillTimestamps(edge, now)) : edge,
+        isRecord(edge)
+          ? migrateBoardRefs(backfillTimestamps(edge, now), rootId)
+          : edge,
       ),
     ),
-    boards: normalizeBoardsCollection(parsed, now),
+    boards: normalizeBoardsCollection(parsed, now, rootId),
     images: normalizeImages(parsed.images),
   }
 }

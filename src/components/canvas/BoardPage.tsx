@@ -4,7 +4,7 @@
 // previous approach) went stale across the home/board unmount boundary.
 // `boardId` is passed in as a prop rather than read via route params
 // here, since this component is shared by both the home route (`/`,
-// fixed at `ROOT_BOARD_ID`) and the `/$boardId` route (router.tsx) —
+// the live document's `isRoot` board) and the `/$boardId` route (router.tsx) —
 // reading params directly would only work for the latter.
 //
 // Neither the multiboard design doc nor the implementation plan's Q1/Q2

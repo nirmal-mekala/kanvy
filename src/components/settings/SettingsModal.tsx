@@ -10,6 +10,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useState } from 'react'
 import { testConnection } from '../../api/restClient'
+import { ResponseValidationError } from '../../api/validateEntries'
 import {
   accessModeAtom,
   clearNetworkAuthSettings,
@@ -25,6 +26,18 @@ import {
 } from '../../state/networkBoardLoader'
 import { Modal } from '../modal/Modal'
 import { FieldMessage } from './FieldMessage'
+
+/**
+ * The inline error for a failed Confirm. A schema mismatch (e.g. a
+ * `boards` entry missing `isRoot`) is a data problem on a server that
+ * *was* reachable — say exactly what's wrong rather than the generic
+ * connection message.
+ */
+function confirmErrorMessage(error: unknown): string {
+  return error instanceof ResponseValidationError
+    ? `The server's data doesn't match this app's schema — ${error.message}`
+    : 'Could not connect — check the base URL and try again.'
+}
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
 // aren't a required tier for v0 (spec §13); real coverage comes from
@@ -63,8 +76,8 @@ export function SettingsModal() {
       // closing the modal on a mode that then has no data.
       await initializeNetworkMode(config)
       onClose()
-    } catch {
-      setError('Could not connect — check the base URL and try again.')
+    } catch (caught) {
+      setError(confirmErrorMessage(caught))
     } finally {
       setTesting(false)
     }

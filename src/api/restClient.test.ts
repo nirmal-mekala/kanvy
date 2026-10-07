@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
+import { BoardMetaSchema } from '../schema/boardMeta'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import { fetchCollection, testConnection } from './restClient'
+import { ResponseValidationError } from './validateEntries'
+
+const IdOnlySchema = z.object({ id: z.string() })
 
 function paginatedResponse(data: unknown[]): Response {
   return {
@@ -65,11 +70,38 @@ describe('fetchCollection', () => {
     const result = await fetchCollection(
       config,
       'nodes',
-      { boardId: 'root' },
+      IdOnlySchema,
+      { boardId: 'h0me0b0ard00' },
       fetchImpl,
     )
     expect(result).toEqual([{ id: 'n1' }])
     const [url] = fetchImpl.mock.calls[0] as [string]
-    expect(new URL(url).searchParams.get('boardId')).toBe('root')
+    expect(new URL(url).searchParams.get('boardId')).toBe('h0me0b0ard00')
+  })
+
+  it('rejects with a ResponseValidationError naming the entry and field when an entry fails its schema (e.g. a pre-v6 board with no isRoot)', async () => {
+    const config: NetworkConfig = { baseUrl: 'http://x:1996', authToken: '' }
+    const fetchImpl = vi.fn().mockResolvedValue(
+      paginatedResponse([
+        {
+          id: 'root',
+          title: 'Home',
+          status: 'active',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ]),
+    )
+    const request = fetchCollection(
+      config,
+      'boards',
+      BoardMetaSchema,
+      undefined,
+      fetchImpl,
+    )
+    await expect(request).rejects.toBeInstanceOf(ResponseValidationError)
+    await expect(request).rejects.toThrow(
+      /^GET \/boards returned 1 invalid entry: id "root" \(isRoot: .*boolean/,
+    )
   })
 })

@@ -122,7 +122,7 @@ export type TextSize = z.infer<typeof TextSizeSchema>
 export const TextCardSchema = CardBaseSchema.extend({
   kind: z.literal('text'),
   size: TextSizeSchema,
-}).strict()
+})
 // fallow-ignore-next-line unused-type
 export type TextCard = z.infer<typeof TextCardSchema>
 
@@ -130,25 +130,23 @@ export type TextCard = z.infer<typeof TextCardSchema>
 export const ImageCardSchema = CardBaseSchema.extend({
   kind: z.literal('image'),
   imageId: z.string(),
-}).strict()
+})
 export type ImageCard = z.infer<typeof ImageCardSchema>
 
 // fallow-ignore-next-line unused-export
 export const LinkCardSchema = CardBaseSchema.extend({
   kind: z.literal('link'),
-  link: z
-    .object({
-      url: z.string(),
-      title: z.string().optional(),
-      imageUrl: z.string().optional(),
-      status: z.enum(['loading', 'ready', 'error']),
-    })
-    .strict(),
-}).strict()
+  link: z.object({
+    url: z.string(),
+    title: z.string().optional(),
+    imageUrl: z.string().optional(),
+    status: z.enum(['loading', 'ready', 'error']),
+  }),
+})
 // fallow-ignore-next-line unused-type
 export type LinkCard = z.infer<typeof LinkCardSchema>
 
-// Usable only on the home board (`boardId === ROOT_BOARD_ID`, enforced by
+// Usable only on the home board (the `isRoot` board, enforced by
 // the state layer, not this schema — see
 // ctx/notes/260917-multiboard-support-design.md §2/§3). No node-local
 // title/caption field: the displayed title always resolves through
@@ -160,7 +158,7 @@ export type LinkCard = z.infer<typeof LinkCardSchema>
 export const BoardCardSchema = CardBaseSchema.extend({
   kind: z.literal('board'),
   boardRef: BoardIdSchema,
-}).strict()
+})
 // fallow-ignore-next-line unused-type
 export type BoardCard = z.infer<typeof BoardCardSchema>
 
@@ -184,7 +182,7 @@ export type CardNode = z.infer<typeof CardNodeSchema>
 export const ContainerNodeSchema = NodeBaseSchema.extend({
   type: z.literal('container'),
   pattern: PatternKeySchema,
-}).strict()
+})
 // fallow-ignore-next-line unused-type
 export type ContainerNode = z.infer<typeof ContainerNodeSchema>
 

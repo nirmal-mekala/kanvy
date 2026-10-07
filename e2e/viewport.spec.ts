@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 
 // Stage 4 (canvas & node rendering) — spec §4.1. Written against
 // components/canvas/Canvas.tsx's actual DOM: `[data-testid="canvas-root"]`
@@ -225,7 +225,7 @@ test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit 
   // would not be anywhere near the viewport.
   const BOARD_CARD = {
     id: 'board-card',
-    boardId: 'root',
+    boardId: ROOT_BOARD_ID,
     type: 'card',
     kind: 'board',
     boardRef: 'child-1',
@@ -246,14 +246,15 @@ test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit 
     y: 2000,
   }
   const doc = {
-    version: 3,
+    version: 6,
     nodes: [BOARD_CARD, CHILD_CARD],
     edges: [],
     boards: [
       {
-        id: 'root',
+        id: ROOT_BOARD_ID,
         title: 'Home',
         status: 'active',
+        isRoot: true,
         createdAt: NOW,
         updatedAt: NOW,
       },
@@ -261,6 +262,7 @@ test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit 
         id: 'child-1',
         title: 'Child board',
         status: 'active',
+        isRoot: false,
         createdAt: NOW,
         updatedAt: NOW,
       },

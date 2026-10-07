@@ -23,12 +23,16 @@ import { fileURLToPath } from 'node:url'
 import type { ImageEntry } from '../src/schema/board.ts'
 import { BoardSchema, SCHEMA_VERSION } from '../src/schema/board.ts'
 import type { BoardMeta } from '../src/schema/boardMeta.ts'
-import { ROOT_BOARD_ID } from '../src/schema/boardMeta.ts'
 import type { Edge } from '../src/schema/edge.ts'
 import type { Node } from '../src/schema/node.ts'
 
 const OUT_PATH = fileURLToPath(new URL('./db.json', import.meta.url))
 const NOW = '2026-09-23T12:00:00.000Z'
+// The root board is designated by `isRoot`, not by its id (schema v6,
+// ctx/notes/261006-root-board-isroot.md) — this is just a fixed id in
+// the shape `generateId()` produces (12 chars, lowercase alphanumeric),
+// so regenerations stay deterministic and diffable.
+const ROOT_BOARD_ID = 'h0me0b0ard00'
 const SAMPLE_BOARD_ID = 'b1'
 
 // A 1x1 transparent PNG — small, real, decodable (not just a placeholder
@@ -42,6 +46,7 @@ const boards: BoardMeta[] = [
     id: ROOT_BOARD_ID,
     title: 'Home',
     status: 'active',
+    isRoot: true,
     createdAt: NOW,
     updatedAt: NOW,
   },
@@ -49,6 +54,7 @@ const boards: BoardMeta[] = [
     id: SAMPLE_BOARD_ID,
     title: 'Sample board',
     status: 'active',
+    isRoot: false,
     createdAt: NOW,
     updatedAt: NOW,
   },

@@ -25,6 +25,7 @@ function boardMeta(
     id,
     title: 'Board',
     status,
+    isRoot: id === 'h0me0b0ard00',
     createdAt: updatedAt,
     updatedAt,
   }
@@ -32,7 +33,9 @@ function boardMeta(
 
 describe('reapableBoardIds', () => {
   it('is empty when nothing is trashed', () => {
-    const boards = [boardMeta('root', 'active', new Date(T0).toISOString())]
+    const boards = [
+      boardMeta('h0me0b0ard00', 'active', new Date(T0).toISOString()),
+    ]
     expect(reapableBoardIds(boards, T0)).toEqual([])
   })
 
@@ -56,7 +59,7 @@ describe('reapableBoardIds', () => {
 
   it('never includes an active board regardless of age', () => {
     const longAgo = new Date(T0 - REAP_AGE_MS - 1000).toISOString()
-    const boards = [boardMeta('root', 'active', longAgo)]
+    const boards = [boardMeta('h0me0b0ard00', 'active', longAgo)]
     expect(reapableBoardIds(boards, T0)).toEqual([])
   })
 
@@ -64,7 +67,7 @@ describe('reapableBoardIds', () => {
     const longAgo = new Date(T0 - REAP_AGE_MS - 1000).toISOString()
     const recent = new Date(T0 - 1000).toISOString()
     const boards = [
-      boardMeta('root', 'active', longAgo),
+      boardMeta('h0me0b0ard00', 'active', longAgo),
       boardMeta('old-trash', 'trashed', longAgo),
       boardMeta('new-trash', 'trashed', recent),
     ]
@@ -119,25 +122,27 @@ function edge(
 
 describe('reapableNodeIds', () => {
   it('is empty when nothing is trashed', () => {
-    const nodes = [textNode('n1', 'root', 'active', new Date(T0).toISOString())]
+    const nodes = [
+      textNode('n1', 'h0me0b0ard00', 'active', new Date(T0).toISOString()),
+    ]
     expect(reapableNodeIds(nodes, T0)).toEqual([])
   })
 
   it('excludes a trashed node younger than NODE_REAP_AGE_MS', () => {
     const recentlyTrashed = new Date(T0 - 1000).toISOString()
-    const nodes = [textNode('n1', 'root', 'trashed', recentlyTrashed)]
+    const nodes = [textNode('n1', 'h0me0b0ard00', 'trashed', recentlyTrashed)]
     expect(reapableNodeIds(nodes, T0)).toEqual([])
   })
 
   it('includes a trashed node older than NODE_REAP_AGE_MS', () => {
     const longAgo = new Date(T0 - NODE_REAP_AGE_MS - 1000).toISOString()
-    const nodes = [textNode('n1', 'root', 'trashed', longAgo)]
+    const nodes = [textNode('n1', 'h0me0b0ard00', 'trashed', longAgo)]
     expect(reapableNodeIds(nodes, T0)).toEqual(['n1'])
   })
 
   it('never includes an active node regardless of age', () => {
     const longAgo = new Date(T0 - NODE_REAP_AGE_MS - 1000).toISOString()
-    const nodes = [textNode('n1', 'root', 'active', longAgo)]
+    const nodes = [textNode('n1', 'h0me0b0ard00', 'active', longAgo)]
     expect(reapableNodeIds(nodes, T0)).toEqual([])
   })
 })
@@ -147,9 +152,9 @@ describe('reapableEdgeIds', () => {
     const longAgo = new Date(T0 - NODE_REAP_AGE_MS - 1000).toISOString()
     const recent = new Date(T0 - 1000).toISOString()
     const edges = [
-      edge('e-old', 'root', 'trashed', longAgo),
-      edge('e-new', 'root', 'trashed', recent),
-      edge('e-active', 'root', 'active', longAgo),
+      edge('e-old', 'h0me0b0ard00', 'trashed', longAgo),
+      edge('e-new', 'h0me0b0ard00', 'trashed', recent),
+      edge('e-active', 'h0me0b0ard00', 'active', longAgo),
     ]
     expect(reapableEdgeIds(edges, T0)).toEqual(['e-old'])
   })
@@ -161,7 +166,7 @@ function board(overrides: Partial<Board> = {}): Board {
     version: SCHEMA_VERSION,
     nodes: [],
     edges: [],
-    boards: [boardMeta('root', 'active', now)],
+    boards: [boardMeta('h0me0b0ard00', 'active', now)],
     images: [],
     ...overrides,
   }
@@ -177,13 +182,13 @@ describe('reapBoards', () => {
     const now = new Date(T0).toISOString()
     const b = board({
       boards: [
-        boardMeta('root', 'active', now),
+        boardMeta('h0me0b0ard00', 'active', now),
         boardMeta('child-1', 'trashed', now),
       ],
       nodes: [
         {
           id: 'root-card',
-          boardId: 'root',
+          boardId: 'h0me0b0ard00',
           type: 'card',
           kind: 'text',
           size: 'regular',
@@ -235,7 +240,7 @@ describe('reapBoards', () => {
 
     const result = reapBoards(b, ['child-1'])
 
-    expect(result.boards.map((meta) => meta.id)).toEqual(['root'])
+    expect(result.boards.map((meta) => meta.id)).toEqual(['h0me0b0ard00'])
     expect(result.nodes.map((n) => n.id)).toEqual(['root-card'])
     expect(result.edges).toEqual([])
     expect(result.images).toEqual([])
@@ -245,7 +250,7 @@ describe('reapBoards', () => {
     const now = new Date(T0).toISOString()
     const b = board({
       boards: [
-        boardMeta('root', 'active', now),
+        boardMeta('h0me0b0ard00', 'active', now),
         boardMeta('child-1', 'trashed', now),
         boardMeta('child-2', 'active', now),
       ],
@@ -272,7 +277,10 @@ describe('reapBoards', () => {
 
     const result = reapBoards(b, ['child-1'])
 
-    expect(result.boards.map((meta) => meta.id)).toEqual(['root', 'child-2'])
+    expect(result.boards.map((meta) => meta.id)).toEqual([
+      'h0me0b0ard00',
+      'child-2',
+    ])
     expect(result.nodes).toHaveLength(1)
   })
 })
@@ -288,12 +296,12 @@ describe('reapEntities', () => {
     const recent = new Date(T0 - 1000).toISOString()
     const b = board({
       nodes: [
-        textNode('old-trashed', 'root', 'trashed', longAgo),
-        textNode('new-trashed', 'root', 'trashed', recent),
-        textNode('active-node', 'root', 'active', longAgo),
+        textNode('old-trashed', 'h0me0b0ard00', 'trashed', longAgo),
+        textNode('new-trashed', 'h0me0b0ard00', 'trashed', recent),
+        textNode('active-node', 'h0me0b0ard00', 'active', longAgo),
         {
           id: 'old-image',
-          boardId: 'root',
+          boardId: 'h0me0b0ard00',
           type: 'card',
           kind: 'image',
           imageId: 'img1',
@@ -310,8 +318,8 @@ describe('reapEntities', () => {
         },
       ],
       edges: [
-        edge('old-edge', 'root', 'trashed', longAgo),
-        edge('new-edge', 'root', 'trashed', recent),
+        edge('old-edge', 'h0me0b0ard00', 'trashed', longAgo),
+        edge('new-edge', 'h0me0b0ard00', 'trashed', recent),
       ],
       images: [{ id: 'img1', dataUri: 'data:image/png;base64,abc' }],
     })
@@ -329,7 +337,7 @@ describe('reapEntities', () => {
     const longAgo = new Date(T0 - REAP_AGE_MS - 1000).toISOString()
     const b = board({
       boards: [
-        boardMeta('root', 'active', longAgo),
+        boardMeta('h0me0b0ard00', 'active', longAgo),
         boardMeta('child-1', 'trashed', longAgo),
       ],
       nodes: [textNode('child-card', 'child-1', 'active', longAgo)],
@@ -337,7 +345,7 @@ describe('reapEntities', () => {
 
     const result = reapEntities(b, T0)
 
-    expect(result.boards.map((meta) => meta.id)).toEqual(['root'])
+    expect(result.boards.map((meta) => meta.id)).toEqual(['h0me0b0ard00'])
     expect(result.nodes).toEqual([])
   })
 })

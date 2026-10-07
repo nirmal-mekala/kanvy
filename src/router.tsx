@@ -5,12 +5,16 @@
 // (no `/board` prefix). The `/$boardId` route's `beforeLoad` resolves the
 // board id via `resolveBoardAccess` (state/boardAccessResolver.ts, checks
 // both access modes, switching into whichever one actually has the board)
-// and redirects to `/` for the root board id itself (it has its own route
+// and redirects to `/` for the root board's own id (it has its own route
 // already) or for a board id unknown/trashed in both modes — a stale/
 // hand-edited URL shouldn't hard-crash the router. `/` itself is
-// never redirected for that "self" case, even if (through some broken
-// invariant) root were somehow missing from `boards` — redirecting it to
-// itself on a failed check would infinite-loop. It *is* redirected exactly
+// never redirected for that "self" case — redirecting it to itself on a
+// failed check would infinite-loop.
+//
+// Schema v6 (ctx/notes/261006-root-board-isroot.md): the root board has no
+// fixed id, so `/` doesn't name one — it means "whichever board is
+// `isRoot` in the live document" (`rootBoardIdAtom`), which differs
+// between Local and Network mode. It *is* redirected exactly
 // once, away from itself, on a brand-new user's first visit: see
 // `freshBoardIdAtom`'s doc comment (state/history/boardHistoryAtom.ts) —
 // a first-time visit lands on a new non-home board instead of home itself.
@@ -30,9 +34,8 @@ import { NetworkErrorNotice } from './components/notifications/NetworkErrorNotic
 import { RecoveryNotice } from './components/notifications/RecoveryNotice'
 import { ToastStack } from './components/notifications/ToastStack'
 import { Toolbar } from './components/toolbar/Toolbar'
-import { ROOT_BOARD_ID } from './schema/boardMeta'
 import { boardsAtom } from './state/atoms/boards'
-import { currentBoardIdAtom } from './state/atoms/currentBoard'
+import { currentBoardIdAtom, rootBoardIdAtom } from './state/atoms/currentBoard'
 import { resolveBoardAccess } from './state/boardAccessResolver'
 import { freshBoardIdAtom } from './state/history/boardHistoryAtom'
 import { ensureBoardLoaded } from './state/networkBoardLoader'
@@ -53,22 +56,25 @@ import { registerBoardNavigator } from './state/networkReconcile'
  */
 function useBoardExistenceGuard(boardId: string) {
   const boards = useAtomValue(boardsAtom)
+  const rootId = useAtomValue(rootBoardIdAtom)
   useEffect(() => {
-    if (boardId === ROOT_BOARD_ID) return
+    if (boardId === rootId) return
     const exists = boards.some(
       (board) => board.id === boardId && board.status !== 'trashed',
     )
     if (!exists) {
       void router.navigate({ to: '/', replace: true })
     }
-  }, [boardId, boards])
+  }, [boardId, boards, rootId])
 }
 
 function RootLayout() {
   // Rendered above the route Outlet for every route, so `boardId` isn't a
   // route param here directly — `strict: false` reads it from whichever
   // matched route has it, falling back to the root board on `/`.
-  const { boardId = ROOT_BOARD_ID } = useParams({ strict: false })
+  const { boardId: routeBoardId } = useParams({ strict: false })
+  const rootId = useAtomValue(rootBoardIdAtom)
+  const boardId = routeBoardId ?? rootId
   useBoardExistenceGuard(boardId)
   return (
     <div className="app">
@@ -101,10 +107,16 @@ const homeRoute = createRoute({
     // everything Canvas derives from it) stale for a whole extra render.
     // `beforeLoad` runs before the new route's component ever mounts, so
     // setting it here keeps it correct from that component's first render.
-    store.set(currentBoardIdAtom, ROOT_BOARD_ID)
+    // `undefined` = "the home board", resolved against the live document's
+    // root on every read rather than pinned to today's root id here.
+    store.set(currentBoardIdAtom, undefined)
   },
-  component: () => <BoardPage boardId={ROOT_BOARD_ID} />,
+  component: HomeRouteComponent,
 })
+
+function HomeRouteComponent() {
+  return <BoardPage boardId={useAtomValue(rootBoardIdAtom)} />
+}
 
 function BoardRouteComponent() {
   const { boardId } = boardRoute.useParams()
@@ -127,10 +139,13 @@ export const boardRoute = createRoute({
   // home, so a bookmarked/linked board id from either mode's storage
   // works regardless of which mode the app happens to currently be in.
   beforeLoad: async ({ params }) => {
-    if (params.boardId === ROOT_BOARD_ID) {
+    if ((await resolveBoardAccess(params.boardId)) === 'not-found') {
       throw redirect({ to: '/' })
     }
-    if ((await resolveBoardAccess(params.boardId)) === 'not-found') {
+    // Checked *after* access resolution, not before: the id may be the
+    // other mode's root, which only becomes "the root" once
+    // `resolveBoardAccess` has switched into that mode.
+    if (params.boardId === getDefaultStore().get(rootBoardIdAtom)) {
       throw redirect({ to: '/' })
     }
     // See homeRoute's `beforeLoad` comment: set pre-mount, not via a

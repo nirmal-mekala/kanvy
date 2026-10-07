@@ -4,8 +4,10 @@
 // backend could eventually sit behind the same client, per the design
 // doc's explicit ask.
 
+import type { z } from 'zod'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import { fetchAllPages } from './fetchAllPages'
+import { validateEntries } from './validateEntries'
 
 function collectionUrl(config: NetworkConfig, path: string): URL {
   return new URL(
@@ -48,22 +50,30 @@ export async function testConnection(
   await throwIfNotOk(response, 'Connection test')
 }
 
-/** Fetches every entry of `collection` (paginated in full, design doc §6a), optionally narrowed by a server-side query param (e.g. `{ boardId: 'root' }`). */
-export async function fetchCollection<T>(
+/**
+ * Fetches every entry of `collection` (paginated in full, design doc §6a),
+ * optionally narrowed by a server-side query param (e.g. `{ boardId }`),
+ * and validates each one against `schema` — a response that doesn't match
+ * throws a `ResponseValidationError` (api/validateEntries.ts) naming the
+ * offending entries rather than letting them into app state.
+ */
+export async function fetchCollection<S extends z.ZodType>(
   config: NetworkConfig,
   collection: string,
+  schema: S,
   query?: Record<string, string>,
   fetchImpl: typeof fetch = fetch,
-): Promise<T[]> {
+): Promise<z.infer<S>[]> {
   const url = collectionUrl(config, collection)
   for (const [key, value] of Object.entries(query ?? {})) {
     url.searchParams.set(key, value)
   }
-  return fetchAllPages<T>(
+  const entries = await fetchAllPages<unknown>(
     url.toString(),
     { headers: authHeaders(config) },
     fetchImpl,
   )
+  return validateEntries(schema, entries, `GET /${collection}`)
 }
 
 /**

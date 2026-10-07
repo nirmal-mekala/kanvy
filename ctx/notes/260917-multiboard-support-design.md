@@ -20,6 +20,10 @@ explicitly stated.
 
 **In scope:**
 - A `boards` collection; a reserved home board (`id === 'root'`).
+  **Superseded by schema v6 (261006):** the home board is the one with
+  `isRoot: true` and has an ordinary generated id — see
+  `261006-root-board-isroot.md`. Read every `'root'`/"root" below as
+  "the `isRoot` board".
 - A new `board` card kind, usable only on the home board.
 - Navigate into/out of boards; rename, duplicate, delete, multi-select boards
   from the home board.
@@ -42,7 +46,9 @@ explicitly stated.
 
 - New top-level collection: `boards: { id, title, createdAt, updatedAt }[]`.
   Content (nodes/edges) does **not** live here — `boards` is metadata only.
-- `id === 'root'` is reserved, always present, never deletable. Its title is
+- `id === 'root'` is reserved, always present, never deletable. *(Schema v6:
+  now `isRoot: true` on exactly one active board — see
+  `261006-root-board-isroot.md`.)* Its title is
   fixed (e.g. "Home"), not user-renamable — it has no board-node representing it
   (it's the canvas you land on, not an item within itself).
 - `nodes` and `edges` become **shared flat arrays across all boards**: every

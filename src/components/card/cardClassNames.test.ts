@@ -12,7 +12,7 @@ const baseOpts = {
 
 const textNode: CardNode = {
   id: 'n1',
-  boardId: 'root',
+  boardId: 'h0me0b0ard00',
   type: 'card',
   kind: 'text',
   size: 'regular',
