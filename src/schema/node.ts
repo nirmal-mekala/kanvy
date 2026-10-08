@@ -53,6 +53,21 @@ export const TaskStatusSchema = z.enum([
 ])
 export type TaskStatus = z.infer<typeof TaskStatusSchema>
 
+// A node's `task` field: one of the four real statuses, or `'none'` for
+// "not a task" (schema v7). Kept separate from `TaskStatus` so status-only
+// consumers (the glyph, task-view accents) can't be handed `'none'` —
+// narrow with `isTask` first.
+// fallow-ignore-next-line unused-export
+export const TaskFieldSchema = z.enum(['none', ...TaskStatusSchema.options])
+export type TaskField = z.infer<typeof TaskFieldSchema>
+
+/** True when `node` is a task (its `task` is a real status, not `'none'`). */
+export function isTask<N extends { task: TaskField }>(
+  node: N,
+): node is N & { task: TaskStatus } {
+  return node.task !== 'none'
+}
+
 export const SideSchema = z.enum(['top', 'right', 'bottom', 'left'])
 // fallow-ignore-next-line unused-type
 export type Side = z.infer<typeof SideSchema>
@@ -66,31 +81,40 @@ export type NodeId = z.infer<typeof NodeIdSchema>
 // `boardId` before rendering is what gives each board its own content and
 // preserves that board's own relative z-order (array order among its own
 // entries), regardless of how other boards' entries are interleaved.
-// `status`/`index` added in schema v4 (action-based undo/tombstoning,
+// `status`/`position` added in schema v4 (`position` was named `index` until
+// schema v7 — `INDEX` is a SQL keyword (reserved in MySQL and SQLite); see
+// ctx/notes/261008-position-rename.md) (action-based undo/tombstoning,
 // ctx/notes/260921-action-based-undo-and-tombstoning.md). `status` mirrors
 // `BoardMeta`'s tombstone field (schema/boardMeta.ts) — delete is a
 // `status: 'trashed'` update, not removal from the array, so a node keeps
 // its array position (and so its z-order, still array-order-derived) until
-// the reaper permanently purges it. `index` is an explicit per-board
+// the reaper permanently purges it. `position` is an explicit per-board
 // ordinal backfilled from each node's current array position at migration
 // time — array order stays the live render/paint source of truth
-// (unchanged), `index` exists purely so a future non-JSON backend has
+// (unchanged), `position` exists purely so a future non-JSON backend has
 // something explicit to sort by.
 //
-// `index` is deliberately a float (fractional-indexing/"LexoRank" style),
+// `position` is deliberately a float (fractional-indexing/"LexoRank" style),
 // not a dense integer, even though today's only writer
-// (state/liveEntities.ts's `nextNodeIndex`) happens to assign consecutive
+// (state/liveEntities.ts's `nextNodePosition`) happens to assign consecutive
 // integers and nothing currently re-sorts an existing node (see
 // ctx/notes/260921-action-based-undo-and-tombstoning.md's 260923 addendum
 // under Q4 — the reorder atom/op that once existed for this was removed as
 // unreachable from the UI). The float is future-proofing for if/when
 // reordering ships: inserting a node between two existing ones (`A`, `B`)
-// should be able to assign it `(A.index + B.index) / 2` — one field write —
+// should be able to assign it `(A.position + B.position) / 2` — one field write —
 // rather than renumbering every node after it. `z.number()` already
 // accepts this; no runtime change follows from this comment. The one
 // place it matters is a
-// future SQL schema derived from this shape: that `index` column needs to
+// future SQL schema derived from this shape: that `position` column needs to
 // be `DOUBLE PRECISION`/`REAL`, not `INTEGER`/`SERIAL`.
+//
+// `task` (schema v7, ctx/notes/261008-flat-task-status.md) is a required,
+// bare `TaskField` enum value, not v6's optional `{ status }` wrapper
+// object — it maps 1:1 onto a `NOT NULL DEFAULT 'none'` Postgres enum
+// column (`CREATE TYPE task_status AS ENUM ('none', ...)`). "Not a task"
+// is the explicit value `'none'`, never `null` or an absent key, so every
+// write — including an undo — carries a concrete value in its PATCH body.
 const NodeBaseSchema = z.object({
   id: NodeIdSchema,
   boardId: BoardIdSchema,
@@ -99,15 +123,20 @@ const NodeBaseSchema = z.object({
   w: z.number(),
   h: z.number(),
   color: ColorKeySchema,
-  task: z.object({ status: TaskStatusSchema }).optional(),
+  task: TaskFieldSchema,
   status: z.enum(['active', 'trashed']),
-  index: z.number(),
+  position: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
 
+// The node discriminator is `nodeType` ('card' | 'container') and a card's
+// sub-discriminator is `cardType` ('text' | 'image' | 'link' | 'board') —
+// named `type`/`kind` before schema v7, renamed so the two don't read as
+// synonyms and neither shares its name with a SQL keyword (`TYPE`) —
+// ctx/notes/261008-node-type-card-type-rename.md.
 const CardBaseSchema = NodeBaseSchema.extend({
-  type: z.literal('card'),
+  nodeType: z.literal('card'),
   content: z.string(),
 })
 
@@ -120,7 +149,7 @@ export type TextSize = z.infer<typeof TextSizeSchema>
 
 // fallow-ignore-next-line unused-export
 export const TextCardSchema = CardBaseSchema.extend({
-  kind: z.literal('text'),
+  cardType: z.literal('text'),
   size: TextSizeSchema,
 })
 // fallow-ignore-next-line unused-type
@@ -128,14 +157,14 @@ export type TextCard = z.infer<typeof TextCardSchema>
 
 // fallow-ignore-next-line unused-export
 export const ImageCardSchema = CardBaseSchema.extend({
-  kind: z.literal('image'),
+  cardType: z.literal('image'),
   imageId: z.string(),
 })
 export type ImageCard = z.infer<typeof ImageCardSchema>
 
 // fallow-ignore-next-line unused-export
 export const LinkCardSchema = CardBaseSchema.extend({
-  kind: z.literal('link'),
+  cardType: z.literal('link'),
   link: z.object({
     url: z.string(),
     title: z.string().optional(),
@@ -156,20 +185,20 @@ export type LinkCard = z.infer<typeof LinkCardSchema>
 // but kept for shape uniformity with the other CardNode variants.
 // fallow-ignore-next-line unused-export
 export const BoardCardSchema = CardBaseSchema.extend({
-  kind: z.literal('board'),
+  cardType: z.literal('board'),
   boardRef: BoardIdSchema,
 })
 // fallow-ignore-next-line unused-type
 export type BoardCard = z.infer<typeof BoardCardSchema>
 
-// Nested discriminated union: every CardNode variant shares `type: 'card'`
-// and is further discriminated on `kind`. zod v4's discriminatedUnion does
+// Nested discriminated union: every CardNode variant shares `nodeType: 'card'`
+// and is further discriminated on `cardType`. zod v4's discriminatedUnion does
 // not flatten a nested discriminated union member's own literal options
 // into the outer discriminator's lookup table, so the outer Node union
 // below uses z.union([...]) instead — see board.ts smoke test for coverage
 // confirming both valid and invalid documents behave correctly under it.
 // fallow-ignore-next-line unused-export
-export const CardNodeSchema = z.discriminatedUnion('kind', [
+export const CardNodeSchema = z.discriminatedUnion('cardType', [
   TextCardSchema,
   ImageCardSchema,
   LinkCardSchema,
@@ -180,7 +209,7 @@ export type CardNode = z.infer<typeof CardNodeSchema>
 
 // fallow-ignore-next-line unused-export
 export const ContainerNodeSchema = NodeBaseSchema.extend({
-  type: z.literal('container'),
+  nodeType: z.literal('container'),
   pattern: PatternKeySchema,
 })
 // fallow-ignore-next-line unused-type

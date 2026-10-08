@@ -35,9 +35,9 @@ describe('resolveValueReferences', () => {
   it("rewrites a node's imageId when the image was already remapped", () => {
     const table = createIdRemapTable()
     recordRemap(table, 'image', 'client-img', 'server-img')
-    const value = { kind: 'image', imageId: 'client-img' }
+    const value = { cardType: 'image', imageId: 'client-img' }
     expect(resolveValueReferences(table, value)).toEqual({
-      kind: 'image',
+      cardType: 'image',
       imageId: 'server-img',
     })
   })
@@ -45,9 +45,9 @@ describe('resolveValueReferences', () => {
   it("rewrites a node's boardRef when the board was already remapped", () => {
     const table = createIdRemapTable()
     recordRemap(table, 'board', 'client-board', 'server-board')
-    const value = { kind: 'board', boardRef: 'client-board' }
+    const value = { cardType: 'board', boardRef: 'client-board' }
     expect(resolveValueReferences(table, value)).toEqual({
-      kind: 'board',
+      cardType: 'board',
       boardRef: 'server-board',
     })
   })

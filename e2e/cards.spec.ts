@@ -38,8 +38,8 @@ import { makeImageDataUri } from './fixtures/testImage'
 function textCard(id: string, x: number, y: number, content = '') {
   return {
     id,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
@@ -55,7 +55,7 @@ function textCard(id: string, x: number, y: number, content = '') {
 function containerNode(id: string, x: number, y: number, w: number, h: number) {
   return {
     id,
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
     x,
@@ -76,11 +76,11 @@ async function seed(page: import('@playwright/test').Page, board: unknown) {
 // right after a gesture needs to wait past it.
 async function readBoardNodes(
   page: import('@playwright/test').Page,
-): Promise<{ id: string; type: string }[]> {
+): Promise<{ id: string; nodeType: string }[]> {
   await page.waitForTimeout(600)
   const raw = await page.evaluate(() => localStorage.getItem('kanvy.board'))
   const board = JSON.parse(raw ?? '{"nodes":[]}') as {
-    nodes: { id: string; type: string }[]
+    nodes: { id: string; nodeType: string }[]
   }
   return board.nodes
 }
@@ -808,7 +808,7 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
     // Proves this is an actual text card, not a board card (design doc §3).
     await expect(page.locator('.card--board')).toHaveCount(0)
     const nodes = await readBoardNodes(page)
-    const card = nodes.find((n) => n.type === 'card')
+    const card = nodes.find((n) => n.nodeType === 'card')
 
     // Carried along when the container is dragged — the only observable
     // proof of spatial containment there is, with no stored parentId.

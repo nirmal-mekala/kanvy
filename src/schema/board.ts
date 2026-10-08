@@ -21,7 +21,7 @@ import { NodeSchema } from './node'
  * `edges` are now shared flat arrays across all boards, not one board's
  * worth of content. v4 adds tombstoning + explicit ordering to nodes/edges
  * (ctx/notes/260921-action-based-undo-and-tombstoning.md): `status` on
- * both, `index` on nodes only — see schema/node.ts and schema/edge.ts.
+ * both, `position` (`index` before v7) on nodes only — see schema/node.ts and schema/edge.ts.
  */
 // v5 (ctx/notes/260923-network-mode-backend-integration-design.md §4)
 // array-ifies `images` from a `{ [id]: dataUri }` record into an
@@ -30,7 +30,10 @@ import { NodeSchema } from './node'
 // v6 (ctx/notes/261006-root-board-isroot.md) replaces the reserved
 // `id: 'root'` home board with a required `isRoot` flag on every `boards`
 // entry; the root board's id is an ordinary generated one.
-export const SCHEMA_VERSION = 6
+// v7 (ctx/notes/261008-flat-task-status.md) flattens a node's `task` from
+// an optional `{ status: TaskStatus }` object to a required bare enum,
+// with `'none'` for "not a task".
+export const SCHEMA_VERSION = 7
 
 export const ImageEntrySchema = z.object({
   id: z.string(),

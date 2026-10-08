@@ -59,7 +59,7 @@ function boardContentQueryKey(boardId: string) {
   return ['network', 'board-content', boardId] as const
 }
 
-/** All images referenced by any `kind: 'image'` node in `nodes` — json-server's `id:in` filter fetches exactly these, never the whole `images` collection. */
+/** All images referenced by any `cardType: 'image'` node in `nodes` — json-server's `id:in` filter fetches exactly these, never the whole `images` collection. */
 async function fetchReferencedImages(
   config: NetworkConfig,
   nodes: readonly Node[],
@@ -69,7 +69,7 @@ async function fetchReferencedImages(
       nodes
         .filter(
           (node): node is ImageCard =>
-            node.type === 'card' && node.kind === 'image',
+            node.nodeType === 'card' && node.cardType === 'image',
         )
         .map((node) => node.imageId),
     ),

@@ -9,7 +9,7 @@ import type { ContainerNode } from '../schema/node'
 // matching note: `addNodeAtom` always overwrites both with the real
 // current board and the real next index.
 
-/** A freshly created container at the given world-space rect (default color/pattern, no task). */
+/** A freshly created container at the given world-space rect (default color/pattern, task `'none'`). */
 export function createContainer(rect: {
   x: number
   y: number
@@ -21,10 +21,11 @@ export function createContainer(rect: {
     id: generateId(),
     boardId: UNASSIGNED_BOARD_ID,
     status: 'active',
-    index: 0,
-    type: 'container',
+    position: 0,
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
+    task: 'none',
     x: rect.x,
     y: rect.y,
     w: rect.w,

@@ -27,19 +27,21 @@ import {
   type HeadingSize,
 } from '../../geometry/constants'
 import type { Board } from '../../schema/board'
-import type {
-  ColorKey,
-  ContainerNode,
-  LinkCard,
-  Node,
-  NodeId,
-  PatternKey,
-  TaskStatus,
-  TextCard,
-  TextSize,
+import {
+  type ColorKey,
+  type ContainerNode,
+  isTask,
+  type LinkCard,
+  type Node,
+  type NodeId,
+  type PatternKey,
+  type TaskField,
+  type TaskStatus,
+  type TextCard,
+  type TextSize,
 } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
-import { getLiveNodes, nextNodeIndex } from '../liveEntities'
+import { getLiveNodes, nextNodePosition } from '../liveEntities'
 import { resolveReconciledNodeId } from '../networkReconcile'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
@@ -62,7 +64,7 @@ interface NodeCommonPatch {
   w?: number
   h?: number
   color?: ColorKey
-  task?: { status: TaskStatus }
+  task?: TaskField
 }
 
 export const nodeIdsAtom = atom((get) => {
@@ -78,12 +80,6 @@ function nowISO(): string {
   return new Date().toISOString()
 }
 
-/** Returns `node` with `task` removed entirely (not set to `undefined` — exactOptionalPropertyTypes). */
-function withoutTask(node: Node): Node {
-  const { task: _task, ...rest } = node
-  return rest as Node
-}
-
 /**
  * Appends a new, already fully constructed node (spec §5.1/§5.3/§5.4's
  * card factories, or §4.5's `createContainer`). `newImage`, when given,
@@ -96,7 +92,11 @@ export const addNodeAtom = atom(
   (get, set, node: Node, newImage?: { id: string; dataUri: string }) => {
     const boardId = get(currentBoardIdAtom)
     const board = get(boardAtom)
-    const stamped = { ...node, boardId, index: nextNodeIndex(board, boardId) }
+    const stamped = {
+      ...node,
+      boardId,
+      position: nextNodePosition(board, boardId),
+    }
     // The image op goes *before* the node's own create op — network mode's
     // write path (api/networkOps.ts) resolves cross-entity id references
     // (a node's `imageId`) against whatever's already been created earlier
@@ -127,11 +127,11 @@ export const addNodesAtom = atom(null, (get, set, nodes: readonly Node[]) => {
   if (nodes.length === 0) return
   const boardId = get(currentBoardIdAtom)
   const board = get(boardAtom)
-  let index = nextNodeIndex(board, boardId)
+  let position = nextNodePosition(board, boardId)
   const ops: Op[] = nodes.map((node) => ({
     kind: 'create',
     entity: 'node',
-    value: { ...node, boardId, index: index++ },
+    value: { ...node, boardId, position: position++ },
   }))
   set(updateBoardAtom, boardId, ops)
 })
@@ -141,8 +141,8 @@ export const addNodesAtom = atom(null, (get, set, nodes: readonly Node[]) => {
  * text↔image↔link is a full object replacement, not a field patch, per
  * phase2 schema §2's notes). `newImage`, when given, adds the corresponding
  * blob to `images` in the same history step before pruning orphans, so a
- * conversion *to* `kind: 'image'` doesn't have its own fresh blob pruned as
- * unreferenced, and a conversion *away from* `kind: 'image'` correctly
+ * conversion *to* `cardType: 'image'` doesn't have its own fresh blob pruned as
+ * unreferenced, and a conversion *away from* `cardType: 'image'` correctly
  * frees the old one (spec §2.6).
  */
 export const replaceNodeAtom = atom(
@@ -168,7 +168,7 @@ export const replaceNodeAtom = atom(
     if (newImage) {
       // No eager prune here (schema v4 Q3, ctx/notes/260921-action-based-
       // undo-and-tombstoning.md) — an orphaned image blob (e.g. from
-      // converting a node away from `kind: 'image'`) is cleaned up by the
+      // converting a node away from `cardType: 'image'`) is cleaned up by the
       // reaper's deferred sweep (state/reaper.ts) instead of per-mutation.
       ops.push({
         kind: 'image',
@@ -192,14 +192,14 @@ export const replaceNodeAtom = atom(
  * Patches a card's caption text (spec §5's per-kind content editing) — kept
  * separate from `updateNodeAtom`'s common-field patch since `content` isn't
  * part of `NodeCommonPatch` (see its comment) and only ever applies to a
- * `type: 'card'` node.
+ * `nodeType: 'card'` node.
  */
 export const updateCardContentAtom = atom(
   null,
   (get, set, id: NodeId, content: string) => {
     const board = get(boardAtom)
     const node = board.nodes.find((n) => n.id === id)
-    if (node?.type !== 'card') return
+    if (node?.nodeType !== 'card') return
     const now = nowISO()
     set(updateBoardAtom, get(currentBoardIdAtom), [
       {
@@ -300,7 +300,7 @@ export const moveNodesAtom = atom(
 /**
  * Patches a link card's fetched-metadata fields once a `fetchLinkMetadata`
  * call (spec §5.4) resolves or fails — a no-op if the card was converted
- * away from `kind: 'link'` (or deleted) before the fetch settled. `id` is
+ * away from `cardType: 'link'` (or deleted) before the fetch settled. `id` is
  * resolved through `resolveReconciledNodeId` first since the caller
  * (`applyLinkMetadata`) captured it before the fetch started, and in
  * Network mode the node's local id can have been reconciled to a
@@ -313,7 +313,7 @@ export const updateLinkAtom = atom(
     const resolvedId = resolveReconciledNodeId(id)
     const board = get(boardAtom)
     const node = board.nodes.find((n) => n.id === resolvedId)
-    if (node?.type !== 'card' || node.kind !== 'link') return
+    if (node?.nodeType !== 'card' || node.cardType !== 'link') return
     const now = nowISO()
     set(updateBoardAtom, get(currentBoardIdAtom), [
       {
@@ -344,7 +344,7 @@ export const updateLinkAtom = atom(
  * array as a tombstone. Records the removed ids as the undo step's
  * `restoreSelection` (spec §8/Q11).
  *
- * Multiboard support (design doc §2/§4): any `kind: 'board'` node among
+ * Multiboard support (design doc §2/§4): any `cardType: 'board'` node among
  * `ids` is a tombstone, not a real removal, for the board it references —
  * its own node still gets tombstoned here like any other (it's just a
  * stand-in on the home board), but the *board* it points to is flipped to
@@ -390,8 +390,10 @@ export const removeEntitiesAtom = atom(
     const trashedBoardIds = new Set(
       board.nodes
         .filter(
-          (node): node is Node & { kind: 'board'; boardRef: string } =>
-            idSet.has(node.id) && node.type === 'card' && node.kind === 'board',
+          (node): node is Node & { cardType: 'board'; boardRef: string } =>
+            idSet.has(node.id) &&
+            node.nodeType === 'card' &&
+            node.cardType === 'board',
         )
         .map((node) => node.boardRef),
     )
@@ -443,7 +445,7 @@ function patchSelectedNodes(
     const patched = patch(node, now) as unknown as Record<string, unknown>
     const nodeRecord = node as unknown as Record<string, unknown>
     // The union of both sides' keys — not just `patched`'s — so a patch
-    // that *removes* a key entirely (e.g. `withoutTask`) is still detected
+    // that *removes* a key entirely is still detected
     // as a change (see `applyPatch` in ops.ts for how `after[key] ===
     // undefined` is interpreted as "delete this key").
     const keys = new Set([...Object.keys(nodeRecord), ...Object.keys(patched)])
@@ -485,7 +487,7 @@ export const setPatternAtom = atom(
       set,
       get(boardAtom),
       ids,
-      (node) => node.type !== 'container' || node.pattern === pattern,
+      (node) => node.nodeType !== 'container' || node.pattern === pattern,
       // `skip` already guarantees `type === 'container'` here.
       (node, now) => ({ ...(node as ContainerNode), pattern, updatedAt: now }),
     )
@@ -493,7 +495,7 @@ export const setPatternAtom = atom(
 )
 
 /**
- * Sets `size` on every selected `kind: 'text'` card (spec §5.2) — any
+ * Sets `size` on every selected `cardType: 'text'` card (spec §5.2) — any
  * image/link card in `ids` is left untouched (they never carry a `size`
  * at all). Three transition shapes:
  * - `'regular'` → a heading level (h1/h2/h3): seeds a fixed default box —
@@ -515,7 +517,9 @@ export const setTextSizeAtom = atom(
       get(boardAtom),
       ids,
       (node) =>
-        node.type !== 'card' || node.kind !== 'text' || node.size === size,
+        node.nodeType !== 'card' ||
+        node.cardType !== 'text' ||
+        node.size === size,
       (node, now) => {
         // `skip` already guarantees `type === 'card', kind === 'text'` here.
         const card = node as TextCard
@@ -552,12 +556,11 @@ export const setTaskKindAtom = atom(
       set,
       get(boardAtom),
       ids,
-      (node) =>
-        kind === 'task' ? node.task !== undefined : node.task === undefined,
+      (node) => (kind === 'task' ? isTask(node) : !isTask(node)),
       (node, now) =>
         kind === 'task'
-          ? { ...node, task: { status: 'todo' as const }, updatedAt: now }
-          : { ...withoutTask(node), updatedAt: now },
+          ? { ...node, task: 'todo' as const, updatedAt: now }
+          : { ...node, task: 'none' as const, updatedAt: now },
     )
   },
 )
@@ -571,8 +574,8 @@ export const setTaskStatusAtom = atom(
       set,
       get(boardAtom),
       ids,
-      (node) => !node.task || node.task.status === status,
-      (node, now) => ({ ...node, task: { status }, updatedAt: now }),
+      (node) => !isTask(node) || node.task === status,
+      (node, now) => ({ ...node, task: status, updatedAt: now }),
     )
   },
 )

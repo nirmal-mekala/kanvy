@@ -17,7 +17,7 @@ type CommonFields = Pick<
   | 'h'
   | 'color'
   | 'status'
-  | 'index'
+  | 'position'
   | 'task'
   | 'content'
   | 'createdAt'
@@ -34,7 +34,7 @@ function commonFields(card: CardNode): CommonFields {
     h,
     color,
     status,
-    index,
+    position,
     task,
     content,
     createdAt,
@@ -49,8 +49,8 @@ function commonFields(card: CardNode): CommonFields {
     h,
     color,
     status,
-    index,
-    ...(task !== undefined ? { task } : {}),
+    position,
+    task,
     content,
     createdAt,
     updatedAt,
@@ -61,8 +61,8 @@ function commonFields(card: CardNode): CommonFields {
 export function convertToTextCard(card: CardNode, content?: string): CardNode {
   return {
     ...commonFields(card),
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     ...(content !== undefined ? { content } : {}),
   }
@@ -72,8 +72,8 @@ export function convertToTextCard(card: CardNode, content?: string): CardNode {
 export function convertToImageCard(card: CardNode, imageId: string): CardNode {
   return {
     ...commonFields(card),
-    type: 'card',
-    kind: 'image',
+    nodeType: 'card',
+    cardType: 'image',
     imageId,
   }
 }
@@ -82,13 +82,17 @@ export function convertToImageCard(card: CardNode, imageId: string): CardNode {
 export function convertToLinkCard(card: CardNode, url: string): CardNode {
   return {
     ...commonFields(card),
-    type: 'card',
-    kind: 'link',
+    nodeType: 'card',
+    cardType: 'link',
     link: { url, status: 'loading' },
   }
 }
 
 /** True for a card that isn't already `image`/`link`/`board` — the only kind of card spec §5.3/§5.4 allow converting in place. A board card is never convertible (multiboard support design doc §3): converting it would destroy the board reference with no way to recover the board it pointed to. */
 export function isConvertibleCard(card: CardNode): boolean {
-  return card.kind !== 'image' && card.kind !== 'link' && card.kind !== 'board'
+  return (
+    card.cardType !== 'image' &&
+    card.cardType !== 'link' &&
+    card.cardType !== 'board'
+  )
 }

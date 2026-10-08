@@ -105,7 +105,7 @@ export function useCardCreation({
     )?.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId
     if (!focusedId) return undefined
     const node = nodesById.get(focusedId)
-    return node?.type === 'card' ? { id: focusedId, node } : undefined
+    return node?.nodeType === 'card' ? { id: focusedId, node } : undefined
   }
 
   // The card a paste should convert in place, per spec §5.3/§5.4: whichever
@@ -119,7 +119,7 @@ export function useCardCreation({
     if (selection.size === 1) {
       const [id] = selection
       const node = id !== undefined ? nodesById.get(id) : undefined
-      if (id !== undefined && node?.type === 'card') return { id, node }
+      if (id !== undefined && node?.nodeType === 'card') return { id, node }
     }
     return undefined
   }

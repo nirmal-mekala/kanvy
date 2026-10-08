@@ -42,6 +42,7 @@ import type {
   ColorKey,
   Node,
   PatternKey,
+  TaskField,
   TaskStatus,
 } from '../src/schema/node.ts'
 
@@ -117,19 +118,26 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
 // the board builder below assigns those.
 type Draft = DistributiveOmit<
   Node,
-  'id' | 'boardId' | 'index' | 'status' | 'createdAt' | 'updatedAt' | 'x' | 'y'
+  | 'id'
+  | 'boardId'
+  | 'position'
+  | 'status'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'x'
+  | 'y'
 > & { age?: number }
 
 interface Common {
   color?: ColorKey
-  task?: TaskStatus
+  task?: TaskField
   age?: number
 }
 
-function common({ color = 'gray', task, age }: Common) {
+function common({ color = 'gray', task = 'none', age }: Common) {
   return {
     color,
-    ...(task ? { task: { status: task } } : {}),
+    task,
     ...(age === undefined ? {} : { age }),
   }
 }
@@ -147,8 +155,8 @@ function captionHeight(content: string): number {
 
 function text(content: string, opts: Common = {}): Draft {
   return {
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     content,
     w: 224,
@@ -169,8 +177,8 @@ function heading(
   opts: Common & { w?: number; h?: number } = {},
 ): Draft {
   return {
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size,
     content,
     w: opts.w ?? HEADING_BOX[size].w,
@@ -185,8 +193,8 @@ function image(
   opts: Common = {},
 ): Draft {
   return {
-    type: 'card',
-    kind: 'image',
+    nodeType: 'card',
+    cardType: 'image',
     imageId: `img-${which}`,
     content: caption,
     w: 224,
@@ -216,8 +224,8 @@ function linkMeta({ status = 'ready', title, withImage, url }: LinkOpts) {
 
 function link(opts: LinkOpts = {}): Draft {
   return {
-    type: 'card',
-    kind: 'link',
+    nodeType: 'card',
+    cardType: 'link',
     link: linkMeta(opts),
     content: opts.caption ?? '',
     w: 224,
@@ -231,7 +239,7 @@ function container(
   opts: Common & { w?: number; h?: number } = {},
 ): Draft {
   return {
-    type: 'container',
+    nodeType: 'container',
     pattern,
     w: opts.w ?? 320,
     h: opts.h ?? 224,
@@ -241,8 +249,8 @@ function container(
 
 function boardCard(boardRef: string, opts: Common = {}): Draft {
   return {
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef,
     content: '',
     w: 224,
@@ -325,7 +333,7 @@ function makeNodeFactory(boardId: string) {
       x,
       y,
       status: 'active',
-      index: index++,
+      position: index++,
       createdAt: ago(age + DAY),
       updatedAt: ago(age),
     } as Node)

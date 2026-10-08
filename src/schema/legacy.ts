@@ -31,6 +31,14 @@
 // document is never given this treatment — its `isRoot` flags and
 // `boardId`s pass through untouched, and anything missing is left for
 // `BoardSchema` to reject rather than guessed at.
+//
+// Flat task status (schema v7, ctx/notes/261008-flat-task-status.md): a
+// pre-v7 node's optional `task: { status }` becomes a required bare
+// `task: status`, or `task: 'none'` when it wasn't a task.
+// Renames (schema v7, ctx/notes/261008-position-rename.md and
+// 261008-node-type-card-type-rename.md): a pre-v7 node's `index`, `type` and
+// `kind` become `position`, `nodeType` and `cardType`.
+// Same rule as above — a v7+ node's fields pass through untouched.
 
 import { customAlphabet } from 'nanoid'
 import { SCHEMA_VERSION } from './board'
@@ -43,6 +51,9 @@ const LEGACY_ROOT_BOARD_ID = 'root'
 
 /** The first schema version that designates the root board with `isRoot` instead of `LEGACY_ROOT_BOARD_ID`. */
 const IS_ROOT_SCHEMA_VERSION = 6
+
+/** The first schema version with v7's node field changes: a required bare `task` enum (`'none'` or a `TaskStatus`) instead of an optional `{ status }` object, `position` instead of `index`, and `nodeType`/`cardType` instead of `type`/`kind`. */
+const V7_SCHEMA_VERSION = 7
 
 // The prototype never stored a card's height (purely DOM-derived) — this
 // mirrors its NEW_CARD_HEIGHT_ESTIMATE fallback, used here only to backfill
@@ -88,12 +99,9 @@ function backfillTimestamps(
   }
 }
 
-/** True for a document from before schema v6's `isRoot` flag — anything not explicitly stamped v6 or later, including every unversioned/pre-v0 document. */
-function predatesIsRoot(parsed: Record<string, unknown>): boolean {
-  return !(
-    typeof parsed.version === 'number' &&
-    parsed.version >= IS_ROOT_SCHEMA_VERSION
-  )
+/** True for a document from before schema `version` — anything not explicitly stamped `version` or later, including every unversioned/pre-v0 document. */
+function predates(parsed: Record<string, unknown>, version: number): boolean {
+  return !(typeof parsed.version === 'number' && parsed.version >= version)
 }
 
 /** Maps a pre-v6 board reference (`boardId`/`boardRef`) onto the migrated root board's fresh id when it was the reserved `'root'`; any other value passes through. */
@@ -182,14 +190,15 @@ function normalizeBoardsCollection(
 }
 
 /**
- * Backfills `status`/`index` (schema v4) onto a nodes array that already
- * has `boardId` resolved on every entry. `index` is assigned densely per
+ * Backfills `status`/`position` (schema v4; `position` was `index` before
+ * v7) onto a nodes array that already has `boardId` resolved on every
+ * entry. `position` is assigned densely per
  * `boardId`, in the array's existing order — today's implicit
  * array-order-as-z-index becomes each node's explicit value, so migration
  * is behavior-preserving. Non-record entries pass through unchanged and
  * are left for `NodeSchema` to reject.
  */
-function assignNodeStatusAndIndex(nodes: unknown[]): unknown[] {
+function assignNodeStatusAndPosition(nodes: unknown[]): unknown[] {
   const counters = new Map<string, number>()
   return nodes.map((node) => {
     if (!isRecord(node)) return node
@@ -199,12 +208,12 @@ function assignNodeStatusAndIndex(nodes: unknown[]): unknown[] {
     return {
       ...node,
       status: node.status === 'trashed' ? 'trashed' : 'active',
-      index: typeof node.index === 'number' ? node.index : next,
+      position: typeof node.position === 'number' ? node.position : next,
     }
   })
 }
 
-/** Backfills `status` (schema v4) onto an edges array. See `assignNodeStatusAndIndex`. */
+/** Backfills `status` (schema v4) onto an edges array. See `assignNodeStatusAndPosition`. */
 function backfillEdgeStatuses(edges: unknown[]): unknown[] {
   return edges.map((edge) =>
     isRecord(edge)
@@ -230,27 +239,56 @@ function normalizeImages(images: unknown): unknown[] {
   return []
 }
 
-function normalizeTask(
-  entity: Record<string, unknown>,
-): { status: string } | undefined {
+/**
+ * A pre-v7 entity's task as schema v7's required bare value
+ * (ctx/notes/261008-flat-task-status.md): v0–v6's `task: { status }`
+ * wrapper or the prototype's flat `taskStatus` string yields its status;
+ * anything else — absent, `null`, a `{ status }`-less wrapper — is
+ * `'none'` ("not a task"). An unrecognized status string passes through
+ * for `NodeSchema` to reject.
+ */
+function normalizeTask(entity: Record<string, unknown>): string {
   if (isRecord(entity.task) && typeof entity.task.status === 'string') {
-    return { status: entity.task.status }
+    return entity.task.status
   }
-  if (typeof entity.taskStatus === 'string') {
-    return { status: entity.taskStatus }
+  if (typeof entity.task === 'string') return entity.task
+  if (typeof entity.taskStatus === 'string') return entity.taskStatus
+  return 'none'
+}
+
+/**
+ * Pre-v7 only: applies schema v7's node field changes — `task` becomes
+ * `normalizeTask`'s required value (ctx/notes/261008-flat-task-status.md),
+ * `index` is renamed `position` (ctx/notes/261008-position-rename.md), and
+ * `type`/`kind` are renamed `nodeType`/`cardType`
+ * (ctx/notes/261008-node-type-card-type-rename.md). A v7+ node is never
+ * touched — a missing/old-format `task` or a leftover `index`/`type`/`kind`
+ * there is left for `NodeSchema` to reject or strip.
+ */
+function migrateToV7Node(
+  node: Record<string, unknown>,
+  predatesV7: boolean,
+): Record<string, unknown> {
+  if (!predatesV7) return node
+  const { index, type, kind, ...rest } = node
+  return {
+    ...rest,
+    ...(type !== undefined ? { nodeType: type } : {}),
+    ...(kind !== undefined ? { cardType: kind } : {}),
+    task: normalizeTask(node),
+    ...(index !== undefined ? { position: index } : {}),
   }
-  return undefined
 }
 
 function legacyCardKindFields(
   card: Record<string, unknown>,
 ): Record<string, unknown> {
   if (typeof card.imageId === 'string') {
-    return { kind: 'image', imageId: card.imageId }
+    return { cardType: 'image', imageId: card.imageId }
   }
   if (typeof card.linkUrl === 'string') {
     return {
-      kind: 'link',
+      cardType: 'link',
       link: {
         url: card.linkUrl,
         title: typeof card.linkTitle === 'string' ? card.linkTitle : undefined,
@@ -261,7 +299,10 @@ function legacyCardKindFields(
     }
   }
   const legacySize = card.textSize ?? card.size
-  return { kind: 'text', size: TEXT_SIZE_MAP[String(legacySize)] ?? 'regular' }
+  return {
+    cardType: 'text',
+    size: TEXT_SIZE_MAP[String(legacySize)] ?? 'regular',
+  }
 }
 
 function normalizeLegacyCard(
@@ -281,10 +322,10 @@ function normalizeLegacyCard(
     w: base.w,
     h,
     color: base.color ?? 'gray',
-    ...(task !== undefined ? { task } : {}),
+    task,
     createdAt: base.createdAt,
     updatedAt: base.updatedAt,
-    type: 'card' as const,
+    nodeType: 'card' as const,
     content: typeof base.content === 'string' ? base.content : '',
     ...legacyCardKindFields(card),
   }
@@ -310,10 +351,10 @@ function normalizeLegacyGroup(
     w: base.w,
     h: base.h,
     color: base.color ?? 'gray',
-    ...(task !== undefined ? { task } : {}),
+    task,
     createdAt: base.createdAt,
     updatedAt: base.updatedAt,
-    type: 'container' as const,
+    nodeType: 'container' as const,
     pattern: legacyPattern,
   }
 }
@@ -363,7 +404,7 @@ function normalizePreV0Board(
     version: SCHEMA_VERSION,
     // Containers first so array-order-as-z-index (phase 2 schema §1) keeps
     // them beneath cards on first render of a migrated board.
-    nodes: assignNodeStatusAndIndex([
+    nodes: assignNodeStatusAndPosition([
       ...groups
         .filter(isRecord)
         .map((group) => normalizeLegacyGroup(group, now, rootId)),
@@ -405,16 +446,22 @@ function backfillV0Board(
 ): unknown {
   const nodes = Array.isArray(parsed.nodes) ? parsed.nodes : []
   const edges = Array.isArray(parsed.edges) ? parsed.edges : []
-  const rootId = predatesIsRoot(parsed) ? generateId() : undefined
+  const rootId = predates(parsed, IS_ROOT_SCHEMA_VERSION)
+    ? generateId()
+    : undefined
+  const predatesV7 = predates(parsed, V7_SCHEMA_VERSION)
   return {
     // Always stamp the current version — a v1 document migrating here has
     // just had `parentId` stripped, so it's no longer meaningfully "v1".
     version: SCHEMA_VERSION,
-    nodes: assignNodeStatusAndIndex(
+    nodes: assignNodeStatusAndPosition(
       nodes.map((node) =>
         isRecord(node)
           ? migrateBoardRefs(
-              migrateTextSize(stripParentId(backfillTimestamps(node, now))),
+              migrateToV7Node(
+                migrateTextSize(stripParentId(backfillTimestamps(node, now))),
+                predatesV7,
+              ),
               rootId,
             )
           : node,

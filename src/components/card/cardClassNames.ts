@@ -18,7 +18,7 @@ const HEADING_CLASS: Record<TextSize, string | false> = {
 export function cardClassNames(
   node: CardNode,
   opts: {
-    /** The card's text size when it's `kind: 'text'`, else `null` (image/link cards never carry one). */
+    /** The card's text size when it's `cardType: 'text'`, else `null` (image/link cards never carry one). */
     headingSize: TextSize | null
     isDone: boolean
     isDimmed: boolean
@@ -29,9 +29,9 @@ export function cardClassNames(
   return [
     'card',
     opts.headingSize && HEADING_CLASS[opts.headingSize],
-    node.kind === 'image' && 'card--image',
-    node.kind === 'link' && 'card--link',
-    node.kind === 'board' && 'card--board',
+    node.cardType === 'image' && 'card--image',
+    node.cardType === 'link' && 'card--link',
+    node.cardType === 'board' && 'card--board',
     opts.isDone && 'card--done',
     opts.isDimmed && 'card--dimmed',
     opts.selected && 'card--selected',

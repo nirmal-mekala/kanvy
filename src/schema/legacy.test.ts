@@ -181,6 +181,145 @@ describe('normalizeLegacyBoard — big → h1 text-size rename', () => {
   })
 })
 
+describe('normalizeLegacyBoard — flat task status (schema v7)', () => {
+  function taskNode(id: string, task: unknown) {
+    return { id, boardId: 'b', type: 'container', task }
+  }
+
+  function migratedTasks(version: number, nodes: unknown[]): unknown[] {
+    const result = normalizeLegacyBoard({
+      version,
+      nodes,
+      edges: [],
+      boards: [],
+      images: [],
+    }) as { nodes: Record<string, unknown>[] }
+    return result.nodes.map((node) => ('task' in node ? node.task : '<absent>'))
+  }
+
+  it('flattens a v6 node’s { status } wrapper to a bare status', () => {
+    expect(
+      migratedTasks(6, [
+        taskNode('a', { status: 'in_progress' }),
+        taskNode('b', { status: 'done' }),
+      ]),
+    ).toEqual(['in_progress', 'done'])
+  })
+
+  it("backfills 'none' for a v6 non-task: absent, null, or a { status }-less wrapper", () => {
+    expect(
+      migratedTasks(6, [
+        taskNode('a', {}),
+        taskNode('b', null),
+        { id: 'c', boardId: 'b', type: 'container' },
+      ]),
+    ).toEqual(['none', 'none', 'none'])
+  })
+
+  it('never rewrites a v7 node’s task, even an old-format or missing one (left for NodeSchema to reject)', () => {
+    expect(
+      migratedTasks(SCHEMA_VERSION, [
+        taskNode('a', { status: 'done' }),
+        { id: 'b', boardId: 'b', type: 'container' },
+      ]),
+    ).toEqual([{ status: 'done' }, '<absent>'])
+  })
+})
+
+describe('normalizeLegacyBoard — type/kind → nodeType/cardType rename (schema v7)', () => {
+  function migratedNodes(version: number, nodes: unknown[]) {
+    return (
+      normalizeLegacyBoard({
+        version,
+        nodes,
+        edges: [],
+        boards: [],
+        images: [],
+      }) as { nodes: Record<string, unknown>[] }
+    ).nodes
+  }
+
+  it('renames a v6 node’s type/kind to nodeType/cardType, dropping the old keys', () => {
+    const [card, container] = migratedNodes(6, [
+      { id: 'a', boardId: 'b', type: 'card', kind: 'link' },
+      { id: 'b', boardId: 'b', type: 'container' },
+    ])
+    expect(card).toMatchObject({ nodeType: 'card', cardType: 'link' })
+    expect(container).toMatchObject({ nodeType: 'container' })
+    expect(container).not.toHaveProperty('cardType')
+    for (const node of [card, container]) {
+      expect(node).not.toHaveProperty('type')
+      expect(node).not.toHaveProperty('kind')
+    }
+  })
+
+  it('emits nodeType/cardType for a pre-v0 (prototype-shaped) document', () => {
+    const result = normalizeLegacyBoard({
+      cards: [{ id: 'c1', x: 0, y: 0, w: 224, content: 'hi' }],
+      groups: [{ id: 'g1', x: 0, y: 0, w: 128, h: 96 }],
+    }) as { nodes: Record<string, unknown>[] }
+    expect(result.nodes).toEqual([
+      expect.objectContaining({ id: 'g1', nodeType: 'container' }),
+      expect.objectContaining({
+        id: 'c1',
+        nodeType: 'card',
+        cardType: 'text',
+      }),
+    ])
+  })
+
+  it('never renames a v7 node’s leftover type/kind', () => {
+    const [node] = migratedNodes(SCHEMA_VERSION, [
+      { id: 'a', boardId: 'b', type: 'card', kind: 'text' },
+    ])
+    expect(node).toMatchObject({ type: 'card', kind: 'text' })
+    expect(node).not.toHaveProperty('nodeType')
+  })
+})
+
+describe('normalizeLegacyBoard — index → position rename (schema v7)', () => {
+  function migratedNodes(
+    version: number,
+    nodes: unknown[],
+  ): Record<string, unknown>[] {
+    const result = normalizeLegacyBoard({
+      version,
+      nodes,
+      edges: [],
+      boards: [],
+      images: [],
+    }) as { nodes: Record<string, unknown>[] }
+    return result.nodes
+  }
+
+  it('renames a v6 node’s index to position, keeping its value and dropping index', () => {
+    const [a, b] = migratedNodes(6, [
+      { id: 'a', boardId: 'b', type: 'container', index: 4 },
+      { id: 'b', boardId: 'b', type: 'container', index: 1.5 },
+    ])
+    expect(a).toMatchObject({ position: 4 })
+    expect(b).toMatchObject({ position: 1.5 })
+    expect(a).not.toHaveProperty('index')
+    expect(b).not.toHaveProperty('index')
+  })
+
+  it('backfills position from per-board array order when a pre-v4 node has neither', () => {
+    const nodes = migratedNodes(3, [
+      { id: 'a', boardId: 'b1', type: 'container' },
+      { id: 'b', boardId: 'b2', type: 'container' },
+      { id: 'c', boardId: 'b1', type: 'container' },
+    ])
+    expect(nodes.map((node) => node.position)).toEqual([0, 0, 1])
+  })
+
+  it('never renames a v7 node’s leftover index (it is ignored, not treated as position)', () => {
+    const [a] = migratedNodes(SCHEMA_VERSION, [
+      { id: 'a', boardId: 'b', type: 'container', index: 9, position: 2 },
+    ])
+    expect(a).toMatchObject({ index: 9, position: 2 })
+  })
+})
+
 describe('normalizeLegacyBoard — images array-ification (schema v5)', () => {
   it('converts a pre-v5 { [id]: dataUri } images record into an array of {id, dataUri} entries', () => {
     const legacyDoc = {

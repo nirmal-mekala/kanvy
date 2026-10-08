@@ -198,7 +198,7 @@ describe('createBoardAtom', () => {
     const newNode = board.nodes.at(-1)
     expect(newBoardMeta?.title).toBe('Untitled board')
     expect(newBoardMeta?.isRoot).toBe(false)
-    if (newNode?.type !== 'card' || newNode.kind !== 'board') {
+    if (newNode?.nodeType !== 'card' || newNode.cardType !== 'board') {
       throw new Error('expected the new node to be a board card')
     }
     expect(newNode.boardRef).toBe(newBoardMeta?.id)
@@ -252,7 +252,7 @@ describe('duplicateBoardNodesAtom', () => {
     store.set(createBoardAtom, 100, 100)
     const board = store.get(boardAtom)
     const boardCard = board.nodes.at(-1)
-    if (boardCard?.type !== 'card' || boardCard.kind !== 'board') {
+    if (boardCard?.nodeType !== 'card' || boardCard.cardType !== 'board') {
       throw new Error('expected a board card')
     }
     const boardsBefore = board.boards.length
@@ -289,7 +289,7 @@ describe('duplicateBoardNodesAtom', () => {
     } = await freshState()
     store.set(createBoardAtom, 100, 100)
     const boardCard = store.get(boardAtom).nodes.at(-1)
-    if (boardCard?.type !== 'card' || boardCard.kind !== 'board') {
+    if (boardCard?.nodeType !== 'card' || boardCard.cardType !== 'board') {
       throw new Error('expected a board card')
     }
     vi.advanceTimersByTime(1000)

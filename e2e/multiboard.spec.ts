@@ -16,14 +16,15 @@ const NOW = '2026-01-01T00:00:00.000Z'
 const ROOT_CARD = {
   id: 'root-card',
   boardId: ROOT_BOARD_ID,
-  type: 'card',
-  kind: 'text',
+  nodeType: 'card',
+  cardType: 'text',
   size: 'regular',
   x: 100,
   y: 100,
   w: 224,
   h: 90,
   color: 'gray',
+  task: 'none',
   content: 'Root content',
   createdAt: NOW,
   updatedAt: NOW,
@@ -37,7 +38,7 @@ const CHILD_CARD = {
 }
 
 const TWO_BOARD_DOCUMENT = {
-  version: 6,
+  version: 7,
   nodes: [ROOT_CARD, CHILD_CARD],
   edges: [],
   boards: [
@@ -272,7 +273,7 @@ test('breadcrumb rename also commits on blur, not just Enter/checkmark', async (
 // "Welcome to Kanvy" text card on root — these scenarios need a genuinely
 // empty root to make single-card assertions meaningful.
 const EMPTY_ROOT_DOCUMENT = {
-  version: 6,
+  version: 7,
   nodes: [],
   edges: [],
   boards: [
@@ -498,10 +499,10 @@ test.describe('confirm modal + board delete/duplicate/paste (Sub-phase 5)', () =
           window.localStorage.getItem('kanvy.board'),
         )
         const parsed = JSON.parse(raw ?? '{}') as {
-          nodes: { boardId: string; kind?: string; boardRef?: string }[]
+          nodes: { boardId: string; cardType?: string; boardRef?: string }[]
         }
         const boardRefs = parsed.nodes
-          .filter((n) => n.kind === 'board')
+          .filter((n) => n.cardType === 'board')
           .map((n) => n.boardRef)
         const contentCounts = boardRefs.map(
           (ref) => parsed.nodes.filter((n) => n.boardId === ref).length,
@@ -541,10 +542,10 @@ test.describe('confirm modal + board delete/duplicate/paste (Sub-phase 5)', () =
           window.localStorage.getItem('kanvy.board'),
         )
         const parsed = JSON.parse(raw ?? '{}') as {
-          nodes: { kind?: string; boardRef?: string }[]
+          nodes: { cardType?: string; boardRef?: string }[]
         }
         const boardRefs = parsed.nodes
-          .filter((n) => n.kind === 'board')
+          .filter((n) => n.cardType === 'board')
           .map((n) => n.boardRef)
         return new Set(boardRefs).size
       })

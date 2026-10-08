@@ -10,16 +10,17 @@ function textNode(id: string, x: number, y: number): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -30,11 +31,12 @@ function containerNode(id: string, x: number, y: number): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     x,
     y,
     w: 200,
@@ -48,16 +50,17 @@ function boardCard(id: string, boardRef: string, x = 100, y = 100): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef,
     x,
     y,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -95,8 +98,8 @@ describe('node clipboard paste preserves relative spatial arrangement within the
     store.set(copyToNodeClipboardAtom, [container, child])
 
     const pasted = store.set(pasteFromNodeClipboardAtom, []).pastedNodes
-    const pastedContainer = pasted.find((n) => n.type === 'container')
-    const pastedChild = pasted.find((n) => n.type === 'card')
+    const pastedContainer = pasted.find((n) => n.nodeType === 'container')
+    const pastedChild = pasted.find((n) => n.nodeType === 'card')
     if (!pastedContainer || !pastedChild) throw new Error('missing node')
 
     expect(pastedContainer.id).not.toBe('c1')

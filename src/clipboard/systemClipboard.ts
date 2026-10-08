@@ -10,8 +10,8 @@ export function selectionTextForSystemClipboard(
   nodes: readonly Node[],
 ): string | undefined {
   const text = nodes
-    .filter((node): node is Extract<Node, { type: 'card' }> => {
-      return node.type === 'card' && node.content.trim().length > 0
+    .filter((node): node is Extract<Node, { nodeType: 'card' }> => {
+      return node.nodeType === 'card' && node.content.trim().length > 0
     })
     .map((node) => node.content)
     .join('\n')

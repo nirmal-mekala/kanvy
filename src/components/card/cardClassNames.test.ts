@@ -13,16 +13,17 @@ const baseOpts = {
 const textNode: CardNode = {
   id: 'n1',
   boardId: 'h0me0b0ard00',
-  type: 'card',
-  kind: 'text',
+  nodeType: 'card',
+  cardType: 'text',
   size: 'regular',
   x: 0,
   y: 0,
   w: 224,
   h: 90,
   color: 'gray',
+  task: 'none',
   status: 'active',
-  index: 0,
+  position: 0,
   content: '',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -30,7 +31,7 @@ const textNode: CardNode = {
 
 const imageNode: CardNode = {
   ...textNode,
-  kind: 'image',
+  cardType: 'image',
   imageId: 'img1',
 }
 
@@ -63,7 +64,7 @@ describe('cardClassNames', () => {
   it('adds card--link for a link card', () => {
     const linkNode: CardNode = {
       ...textNode,
-      kind: 'link',
+      cardType: 'link',
       link: { url: 'https://example.com', status: 'ready' },
     }
     expect(cardClassNames(linkNode, baseOpts)).toContain('card--link')
@@ -72,7 +73,7 @@ describe('cardClassNames', () => {
   it('adds card--board for a board card', () => {
     const boardNode: CardNode = {
       ...textNode,
-      kind: 'board',
+      cardType: 'board',
       boardRef: 'child-1',
     }
     expect(cardClassNames(boardNode, baseOpts)).toContain('card--board')

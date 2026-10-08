@@ -253,7 +253,7 @@ describe('applyOpsToNetwork', () => {
           entity: 'node',
           value: {
             id: 'client-node',
-            kind: 'image',
+            cardType: 'image',
             imageId: 'client-img',
           } as never,
         },
@@ -281,7 +281,7 @@ describe('applyOpsToNetwork', () => {
           entity: 'node',
           value: {
             id: 'client-node',
-            kind: 'board',
+            cardType: 'board',
             boardRef: 'client-board',
           } as never,
         },

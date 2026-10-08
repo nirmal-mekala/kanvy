@@ -28,12 +28,13 @@ export function getLiveEdges(board: Board, boardId: string): Edge[] {
 }
 
 /**
- * The `index` (schema v4 Q4) a newly-appended live node on `boardId`
- * should get — one past the board's current live count. `index` is typed
+ * The `position` (schema v4 Q4; `index` before v7) a newly-appended live
+ * node on `boardId` should get — one past the board's current live count.
+ * `position` is typed
  * as a float for future fractional-indexing inserts (see schema/node.ts),
  * but appending to the end never needs a fraction — this always returns
  * a whole number.
  */
-export function nextNodeIndex(board: Board, boardId: string): number {
+export function nextNodePosition(board: Board, boardId: string): number {
   return getLiveNodes(board, boardId).length
 }

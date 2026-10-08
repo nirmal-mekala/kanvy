@@ -303,6 +303,11 @@ whether anything currently reorders by it; a future single-node reorder
 would reintroduce it as an ordinary `UpdateOp` per this addendum's own
 note above, not a dedicated op type.
 
+-> 261008 addendum: the `index` field is renamed `position` in schema v7
+(`INDEX` is a SQL keyword, reserved in MySQL and SQLite). Same
+semantics, same float typing — everything above about `index` now applies
+to `position`. See `ctx/notes/261008-position-rename.md`.
+
 - **Q5 — export/import scope for trashed content.** Presumably trashed
   entities travel with JSON export/import until reaped, same as boards
   today — but this wasn't asked explicitly when boards got tombstoned

@@ -248,7 +248,7 @@ export function useBoardInteraction({
   // the prototype's `getContainedOrigins`/`Group.jsx` exactly).
   function beginNodeDrag(id: NodeId, node: Node, nextSelection: Set<NodeId>) {
     const spatialCarryIds =
-      node.type === 'container'
+      node.nodeType === 'container'
         ? new Set(
             computeCarryIds(
               { x: node.x, y: node.y, w: node.w, h: node.h },
@@ -296,7 +296,7 @@ export function useBoardInteraction({
     const carryOrigins = beginNodeDrag(id, node, nextSelection)
     dragRef.current = {
       grabId: id,
-      isContainer: node.type === 'container',
+      isContainer: node.nodeType === 'container',
       startX: e.clientX,
       startY: e.clientY,
       originX: node.x,
@@ -316,7 +316,7 @@ export function useBoardInteraction({
   function clampCardOutOfEveryNoFlyZone(candidate: Rect): number {
     let y = candidate.y
     for (const container of nodes) {
-      if (container.type !== 'container') continue
+      if (container.nodeType !== 'container') continue
       const probe = { ...candidate, y }
       if (isInNoFlyZone(probe, container, CONTAINER_HANDLE_HEIGHT)) {
         y = clampOutOfNoFlyZone(probe, container, CONTAINER_HANDLE_HEIGHT).y
@@ -338,7 +338,7 @@ export function useBoardInteraction({
     const siblings: Rect[] = nodes
       .filter(
         (node): node is CardNode =>
-          node.type === 'card' && !excludeIds.has(node.id),
+          node.nodeType === 'card' && !excludeIds.has(node.id),
       )
       .map((node) => ({ x: node.x, y: node.y, w: node.w, h: node.h }))
     const gutterY = snapY(
@@ -418,7 +418,7 @@ export function useBoardInteraction({
     const node = nodesById.get(id)
     if (!node) return
     const headingSize =
-      kind === 'heading' && node.type === 'card' && node.kind === 'text'
+      kind === 'heading' && node.nodeType === 'card' && node.cardType === 'text'
         ? (node.size as HeadingSize)
         : undefined
     resizeRef.current = {
@@ -552,7 +552,7 @@ export function useBoardInteraction({
       // A marquee starting inside a container's body never selects that
       // container or any container enclosing it (spec §4.3) — every
       // container the drag started inside of, not just the innermost.
-      if (node.type === 'container' && state.clickContainerIds.has(node.id))
+      if (node.nodeType === 'container' && state.clickContainerIds.has(node.id))
         continue
       const overlaps =
         node.x < worldX2 &&

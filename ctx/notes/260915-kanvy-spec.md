@@ -53,12 +53,16 @@ with convention-enforced mutual exclusion) is a wart to fix. v0 should model
 a card's kind explicitly:
 
 ```
-kind: 'text' | 'image' | 'link'
-size: 'regular' | 'h1' | 'h2' | 'h3'   // valid only when kind === 'text'
+cardType: 'text' | 'image' | 'link' | 'board'
+size: 'regular' | 'h1' | 'h2' | 'h3'   // valid only when cardType === 'text'
 ```
 
+The card discriminator is `cardType` and the node discriminator
+(card / container) is `nodeType` (schema v7; `kind`/`type` before —
+`ctx/notes/261008-node-type-card-type-rename.md`).
+
 Rules to preserve from current behavior:
-- A heading size (`h1`/`h2`/`h3`) is only ever valid for `kind: 'text'`.
+- A heading size (`h1`/`h2`/`h3`) is only ever valid for `cardType: 'text'`.
   Converting a heading-sized card to `image` or `link` drops the heading
   sizing and returns it to the regular text card's fixed width /
   content-driven height.
@@ -487,6 +491,9 @@ respect.
   directly).
 - Toggling "Default" → "Task" on an already-task item is idempotent — it
   never resets an existing status back to `todo`.
+- Stored as a single required enum field, `task: 'none' | TaskStatus`
+  (schema v7, `ctx/notes/261008-flat-task-status.md`). `'none'` means "not
+  a task"; new nodes start as `'none'` and un-tasking writes `'none'`.
 - A small non-interactive status glyph renders in the card/container's drag
   bar, colored per §3's task-status palette (drawn in the node's own ink
   instead on a tinted node, §3).
@@ -631,7 +638,8 @@ concrete decisions (Q12–Q15):
   `normalizeBoard`/timestamp-backfill behavior — this leniency is a feature
   to keep, not a wart. This applies to *local* documents only: network-mode
   reads are validated strictly and never repaired (schema v6,
-  `ctx/notes/261006-root-board-isroot.md`).
+  `ctx/notes/261006-root-board-isroot.md`; schema v7,
+  `ctx/notes/261008-flat-task-status.md`).
 
 ## 10. Third-party integrations
 

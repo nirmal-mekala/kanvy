@@ -20,7 +20,7 @@ test.describe.configure({ mode: 'serial' })
 // chance to open the settings modal. Every other e2e spec that
 // navigates to `/` follows this same seed-first convention.
 const EMPTY_LOCAL_DOCUMENT = {
-  version: 6,
+  version: 7,
   nodes: [],
   edges: [],
   boards: [
@@ -83,16 +83,17 @@ function sampleDb() {
       {
         id: 'n0',
         boardId: NETWORK_ROOT_ID,
-        type: 'card',
-        kind: 'board',
+        nodeType: 'card',
+        cardType: 'board',
         boardRef: 'b1',
         x: 88,
         y: 104,
         w: 224,
         h: 90,
         color: 'gray',
+        task: 'none',
         status: 'active',
-        index: 0,
+        position: 0,
         content: '',
         createdAt: NOW,
         updatedAt: NOW,
@@ -100,16 +101,17 @@ function sampleDb() {
       {
         id: 'n1',
         boardId: 'b1',
-        type: 'card',
-        kind: 'text',
+        nodeType: 'card',
+        cardType: 'text',
         size: 'regular',
         x: 80,
         y: 100,
         w: 224,
         h: 90,
         color: 'amber',
+        task: 'none',
         status: 'active',
-        index: 0,
+        position: 0,
         content: 'From the network',
         createdAt: NOW,
         updatedAt: NOW,
@@ -202,6 +204,82 @@ test.describe('settings modal (network mode design doc §2)', () => {
         page.getByText(/doesn't match this app's schema.*isRoot/),
       ).toBeVisible({ timeout: 10_000 })
       await expect(page.getByPlaceholder('http://localhost:1996')).toBeVisible()
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('Confirm against a reachable backend whose home-board node uses the pre-v7 task { status } shape keeps the modal open and names the node (ctx/notes/261008-flat-task-status.md)', async ({
+    page,
+  }) => {
+    const db = sampleDb()
+    const legacyDb = {
+      ...db,
+      nodes: db.nodes.map((node) =>
+        node.id === 'n0' ? { ...node, task: { status: 'done' } } : node,
+      ),
+    }
+    const server = await startJsonServer(legacyDb, JSON_SERVER_PORT)
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+
+      await page.getByTitle('Settings').click()
+      await page
+        .getByPlaceholder('http://localhost:1996')
+        .fill(`http://localhost:${server.port}`)
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
+
+      await expect(
+        page.getByText(
+          /doesn't match this app's schema.*GET \/nodes returned 1 invalid entry: id "n0"/,
+        ),
+      ).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByPlaceholder('http://localhost:1996')).toBeVisible()
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('Confirm against a reachable backend with a status task and a "none" task connects and renders each correctly', async ({
+    page,
+  }) => {
+    const db = sampleDb()
+    const [boardNode, ...rest] = db.nodes
+    const server = await startJsonServer(
+      {
+        ...db,
+        nodes: [
+          { ...boardNode, task: 'blocked' },
+          { ...boardNode, id: 'n-none', boardRef: 'b1', y: 300, task: 'none' },
+          ...rest,
+        ],
+      },
+      JSON_SERVER_PORT,
+    )
+    try {
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+
+      await page.getByTitle('Settings').click()
+      await page
+        .getByPlaceholder('http://localhost:1996')
+        .fill(`http://localhost:${server.port}`)
+      await page.getByRole('button', { name: 'Save & Connect' }).click()
+
+      await expect(page.getByPlaceholder('http://localhost:1996')).toBeHidden({
+        timeout: 10_000,
+      })
+      await expect(
+        page.locator(
+          '[data-node-id="n0"]:not(.node-connector) .task-status-icon[data-task-status="blocked"]',
+        ),
+      ).toBeVisible()
+      await expect(
+        page.locator(
+          '[data-node-id="n-none"]:not(.node-connector) .task-status-icon',
+        ),
+      ).toHaveCount(0)
     } finally {
       await server.stop()
     }
@@ -421,7 +499,7 @@ test.describe('network mode board load/edit round trip (design doc §8)', () => 
       // router ever evaluates this navigation (bootPhaseAtom's render
       // gate, App.tsx).
       const LOCAL_DOCUMENT_WITH_LOCAL_ONLY_BOARD = {
-        version: 6,
+        version: 7,
         nodes: [],
         edges: [],
         boards: [

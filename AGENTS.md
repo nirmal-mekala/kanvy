@@ -23,6 +23,21 @@ Schema revisions since the initial migration (see spec §2.3):
   its id is an ordinary generated one. Local documents migrate on read;
   network reads are Zod-validated strictly and never repaired. See
   `ctx/notes/261006-root-board-isroot.md`.
+- **v7**: a node's `task` is a required bare enum
+  (`'none' | 'todo' | 'blocked' | 'in_progress' | 'done'`), not an
+  optional `{ status }` object; "not a task" is the explicit `'none'`
+  (never `null`/absent). Check it with `isTask(node)`, never truthiness.
+  Node fields renamed: `index` → `position`, `type` → `nodeType`,
+  `kind` → `cardType` (all SQL-friendlier; fields stay camelCase, with
+  snake_case left to the DB mapping layer). Same migration rule as v6:
+  local migrates, network rejects the old shape. See
+  `ctx/notes/261008-flat-task-status.md`,
+  `ctx/notes/261008-position-rename.md` and
+  `ctx/notes/261008-node-type-card-type-rename.md`.
+  `ctx/support/migrate-v6-to-v7.mjs`
+  converts v6 data outside the app; extend it with every further v7 change
+  (`src/schema/migrateV6ToV7Script.test.ts` fails if it drifts from
+  `schema/legacy.ts`).
 - **Tinted nodes** (visual, not schema): a chromatic accent colors the
   whole card/container (fill + edge + ink), not only its border; gray and
   task-todo stay border-only, and pink is a muted rose, not nord9. See
@@ -70,8 +85,8 @@ of context for agents working in this repo:
 
 - `ctx/notes/` — human- or agent-authored docs, findings, specs. Agents
   may create/edit files here.
-- `ctx/support/` — reference material for the current stack (currently
-  just json-server's docs).
+- `ctx/support/` — reference material for the current stack (json-server's
+  docs) and standalone support scripts (e.g. `migrate-v6-to-v7.mjs`).
 
 Markdown files in `ctx/` follow `YYMMDD-<title>.md`, dated by creation
 date, never last-edited date.

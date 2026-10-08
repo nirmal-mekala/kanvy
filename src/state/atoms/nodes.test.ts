@@ -22,15 +22,16 @@ function linkNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'link',
+    nodeType: 'card',
+    cardType: 'link',
     x: 0,
     y: 0,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     link: { url: 'https://example.com', status: 'loading' },
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -42,16 +43,17 @@ function textNode(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x: 0,
     y: 0,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -155,9 +157,9 @@ describe('nodes atoms', () => {
       store.set(setTextSizeAtom, ['n1'], size)
 
       const node = store.get(nodeFamily('n1'))
-      expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
-        size,
-      )
+      expect(
+        node?.nodeType === 'card' && node.cardType === 'text' && node.size,
+      ).toBe(size)
       expect(node?.w).toBe(256) // HEADING_DEFAULT_W (GRID_SIZE * 16) — shared across levels
       expect(node?.h).toBe(expectedH)
     },
@@ -171,9 +173,9 @@ describe('nodes atoms', () => {
     store.set(setTextSizeAtom, ['n1'], 'h2')
 
     const node = store.get(nodeFamily('n1'))
-    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
-      'h2',
-    )
+    expect(
+      node?.nodeType === 'card' && node.cardType === 'text' && node.size,
+    ).toBe('h2')
     expect(node?.w).toBe(500)
     expect(node?.h).toBe(400)
   })
@@ -186,9 +188,9 @@ describe('nodes atoms', () => {
     store.set(setTextSizeAtom, ['n1'], 'regular')
 
     const node = store.get(nodeFamily('n1'))
-    expect(node?.type === 'card' && node.kind === 'text' && node.size).toBe(
-      'regular',
-    )
+    expect(
+      node?.nodeType === 'card' && node.cardType === 'text' && node.size,
+    ).toBe('regular')
     expect(node?.w).toBe(224) // CARD_WIDTH (GRID_SIZE * 14)
     expect(node?.h).toBe(400) // untouched — auto-grow corrects it on next render
   })
@@ -207,7 +209,10 @@ describe('nodes atoms', () => {
   it('setTextSizeAtom leaves an image/link card untouched', async () => {
     const { store, addNodeAtom, setTextSizeAtom, boardAtom } =
       await freshState()
-    store.set(addNodeAtom, textNode('n1', { kind: 'image', imageId: 'img1' }))
+    store.set(
+      addNodeAtom,
+      textNode('n1', { cardType: 'image', imageId: 'img1' }),
+    )
     const before = store.get(boardAtom)
 
     store.set(setTextSizeAtom, ['n1'], 'h1')
@@ -222,15 +227,16 @@ describe('nodes atoms', () => {
     const container: Node = {
       id: 'container1',
       boardId: 'h0me0b0ard00',
-      type: 'container',
+      nodeType: 'container',
       pattern: 'none',
       x: 0,
       y: 0,
       w: 128,
       h: 96,
       color: 'gray',
+      task: 'none',
       status: 'active',
-      index: 0,
+      position: 0,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     }
@@ -258,6 +264,78 @@ describe('nodes atoms', () => {
     )
     expect(board.nodes.find((n) => n.id === 'child1')?.status).toBe('active')
     expect(board.edges.every((e) => e.status === 'trashed')).toBe(true)
+  })
+
+  it("setTaskKindAtom makes a node a task (todo), then un-tasks it back to 'none'", async () => {
+    const { store, addNodeAtom, setTaskKindAtom, nodeFamily } =
+      await freshState()
+    store.set(addNodeAtom, textNode('n1'))
+
+    store.set(setTaskKindAtom, ['n1'], 'task')
+    expect(store.get(nodeFamily('n1'))?.task).toBe('todo')
+
+    store.set(setTaskKindAtom, ['n1'], 'default')
+    expect(store.get(nodeFamily('n1'))?.task).toBe('none')
+  })
+
+  it('treats task \'none\' as "not a task" in both task atoms', async () => {
+    const {
+      store,
+      addNodeAtom,
+      setTaskKindAtom,
+      setTaskStatusAtom,
+      boardAtom,
+    } = await freshState()
+    store.set(addNodeAtom, textNode('n1'))
+    const before = store.get(boardAtom)
+
+    store.set(setTaskStatusAtom, ['n1'], 'done')
+    store.set(setTaskKindAtom, ['n1'], 'default')
+
+    expect(store.get(boardAtom)).toBe(before)
+  })
+
+  it("records a concrete before/after task value (never a missing key), so undo restores 'none' via a real PATCH value", async () => {
+    const {
+      store,
+      addNodeAtom,
+      setTaskKindAtom,
+      undoBoardAtom,
+      boardHistoryAtom,
+      nodeFamily,
+    } = await freshState()
+    store.set(addNodeAtom, textNode('n1'))
+    vi.advanceTimersByTime(10_000) // past the history coalescing window
+
+    store.set(setTaskKindAtom, ['n1'], 'task')
+    const ops = store.get(boardHistoryAtom).present.state.ops
+    expect(ops).toContainEqual(
+      expect.objectContaining({
+        kind: 'update',
+        id: 'n1',
+        before: expect.objectContaining({ task: 'none' }),
+        after: expect.objectContaining({ task: 'todo' }),
+      }),
+    )
+
+    store.set(undoBoardAtom)
+    expect(store.get(nodeFamily('n1'))?.task).toBe('none')
+  })
+
+  it('setTaskStatusAtom sets a bare status, leaving an already-task node idempotent under setTaskKindAtom', async () => {
+    const {
+      store,
+      addNodeAtom,
+      setTaskKindAtom,
+      setTaskStatusAtom,
+      nodeFamily,
+    } = await freshState()
+    store.set(addNodeAtom, textNode('n1', { task: 'todo' }))
+
+    store.set(setTaskStatusAtom, ['n1'], 'blocked')
+    store.set(setTaskKindAtom, ['n1'], 'task')
+
+    expect(store.get(nodeFamily('n1'))?.task).toBe('blocked')
   })
 
   it('undo restores the prior board and redo re-applies the change', async () => {
@@ -455,8 +533,8 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
   function boardCard(id: string, boardRef: string): Node {
     return {
       ...textNode(id),
-      type: 'card',
-      kind: 'board',
+      nodeType: 'card',
+      cardType: 'board',
       boardRef,
       content: '',
     } as Node
@@ -570,7 +648,9 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     store.set(addNodeAtom, linkNode('link-1'))
     store.set(updateLinkAtom, 'link-1', { status: 'ready', title: 'Example' })
     const node = store.get(boardAtom).nodes.find((n) => n.id === 'link-1')
-    expect(node?.type === 'card' && node.kind === 'link' && node.link).toEqual({
+    expect(
+      node?.nodeType === 'card' && node.cardType === 'link' && node.link,
+    ).toEqual({
       url: 'https://example.com',
       status: 'ready',
       title: 'Example',
@@ -598,7 +678,9 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     store.set(updateLinkAtom, 'local-1', { status: 'ready', title: 'Example' })
 
     const node = store.get(boardAtom).nodes.find((n) => n.id === 'server-1')
-    expect(node?.type === 'card' && node.kind === 'link' && node.link).toEqual({
+    expect(
+      node?.nodeType === 'card' && node.cardType === 'link' && node.link,
+    ).toEqual({
       url: 'https://example.com',
       status: 'ready',
       title: 'Example',

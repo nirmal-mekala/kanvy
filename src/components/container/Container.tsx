@@ -7,7 +7,7 @@ import { resolveNodeAccent, type ViewMode } from '../../colors/borderColor'
 import { resolveColorHex, type Theme } from '../../colors/colorKey'
 import { patternBackgroundImage } from '../../colors/patterns'
 import type { Side } from '../../geometry/anchor'
-import type { ContainerNode } from '../../schema/node'
+import { type ContainerNode, isTask } from '../../schema/node'
 import { NodeConnectors } from '../canvas/NodeConnectors'
 import { ResizeHandles } from '../canvas/ResizeHandles'
 import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
@@ -120,11 +120,11 @@ export function Container({
             className="recency-indicator"
           />
         )}
-        {node.task && (
+        {isTask(node) && (
           <TaskStatusIcon
-            status={node.task.status}
+            status={node.task}
             className="task-status-icon"
-            ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
+            ariaLabel={`Status: ${node.task.replace('_', ' ')}`}
           />
         )}
       </div>

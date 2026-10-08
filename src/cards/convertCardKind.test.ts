@@ -10,16 +10,17 @@ import {
 const headingText: CardNode = {
   id: 'c1',
   boardId: 'h0me0b0ard00',
-  type: 'card',
-  kind: 'text',
+  nodeType: 'card',
+  cardType: 'text',
   size: 'h1',
   x: 0,
   y: 0,
   w: 200,
   h: 200,
   color: 'gray',
+  task: 'none',
   status: 'active',
-  index: 0,
+  position: 0,
   content: 'hello',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -28,7 +29,7 @@ const headingText: CardNode = {
 describe('convertToImageCard', () => {
   it('resets size to regular and drops heading sizing', () => {
     const image = convertToImageCard(headingText, 'img-1')
-    expect(image.kind).toBe('image')
+    expect(image.cardType).toBe('image')
     expect(image).not.toHaveProperty('size')
     expect((image as CardNode & { imageId: string }).imageId).toBe('img-1')
   })
@@ -50,9 +51,9 @@ describe('convertToImageCard', () => {
 describe('convertToLinkCard', () => {
   it('resets size to regular and sets a loading link', () => {
     const link = convertToLinkCard(headingText, 'https://example.com')
-    expect(link.kind).toBe('link')
+    expect(link.cardType).toBe('link')
     expect(link).not.toHaveProperty('size')
-    expect(link.kind === 'link' && link.link).toEqual({
+    expect(link.cardType === 'link' && link.link).toEqual({
       url: 'https://example.com',
       status: 'loading',
     })
@@ -63,8 +64,8 @@ describe('convertToTextCard', () => {
   it('always produces a regular (never a heading size) text card', () => {
     const image = convertToImageCard(headingText, 'img-1')
     const text = convertToTextCard(image)
-    expect(text.kind).toBe('text')
-    expect(text.kind === 'text' && text.size).toBe('regular')
+    expect(text.cardType).toBe('text')
+    expect(text.cardType === 'text' && text.size).toBe('regular')
   })
 
   it('drops stale image data', () => {
@@ -93,7 +94,7 @@ describe('isConvertibleCard', () => {
   it('is false for a board card (multiboard support design doc §3 — converting it would orphan the board it references)', () => {
     const boardCard: CardNode = {
       ...headingText,
-      kind: 'board',
+      cardType: 'board',
       boardRef: 'child-1',
     }
     expect(isConvertibleCard(boardCard)).toBe(false)

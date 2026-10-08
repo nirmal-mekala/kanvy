@@ -9,7 +9,7 @@ import { duplicateBoardNodes } from '../../clipboard/duplicateBoardNodes'
 import { generateId } from '../../schema/legacy'
 import type { BoardCard } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
-import { nextNodeIndex } from '../liveEntities'
+import { nextNodePosition } from '../liveEntities'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom, rootBoardIdAtom } from './currentBoard'
@@ -87,7 +87,7 @@ export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
       value: {
         ...newBoardCard(x, y, newBoardId),
         boardId: currentBoardId,
-        index: nextNodeIndex(board, currentBoardId),
+        position: nextNodePosition(board, currentBoardId),
       },
     },
   ]
@@ -118,17 +118,17 @@ export const duplicateBoardNodesAtom = atom(
     const result = duplicateBoardNodes(boardNodes, board, offset)
     const currentBoardId = get(currentBoardIdAtom)
     // Deep-copied content for each newly-minted child board already
-    // carries correct, dense `index` values (a 1:1 copy of its live
+    // carries correct, dense `position` values (a 1:1 copy of its live
     // source board, same relative order) — only the new board-node cards
     // themselves need fresh indices, since they're being appended to the
     // *current* board's own live node set.
-    let nextIndex = nextNodeIndex(board, currentBoardId)
+    let nextPosition = nextNodePosition(board, currentBoardId)
     const nodeOps: Op[] = result.nodes.map((value) => ({
       kind: 'create',
       entity: 'node',
       value:
         value.boardId === currentBoardId
-          ? { ...value, index: nextIndex++ }
+          ? { ...value, position: nextPosition++ }
           : value,
     }))
     const ops: Op[] = [

@@ -25,8 +25,8 @@ function reconcileNodeBoardFields(
   let result = node
   if (result.boardId === oldId) result = { ...result, boardId: newId }
   if (
-    result.type === 'card' &&
-    result.kind === 'board' &&
+    result.nodeType === 'card' &&
+    result.cardType === 'board' &&
     result.boardRef === oldId
   ) {
     result = { ...result, boardRef: newId }
@@ -43,8 +43,8 @@ function reconcileNode(
   if (kind === 'board') return reconcileNodeBoardFields(node, oldId, newId)
   if (
     kind === 'image' &&
-    node.type === 'card' &&
-    node.kind === 'image' &&
+    node.nodeType === 'card' &&
+    node.cardType === 'image' &&
     node.imageId === oldId
   ) {
     return { ...node, imageId: newId }

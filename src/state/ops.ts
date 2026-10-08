@@ -90,9 +90,9 @@ export interface AttributedOps {
  * Merges `patch` onto `entity` — a key whose patch value is `undefined`
  * *deletes* that key rather than setting it to `undefined` (matches this
  * codebase's own exactOptionalPropertyTypes-aware convention for dropping
- * an optional field, e.g. `state/atoms/nodes.ts`'s `withoutTask`, so a
- * patch built from a before/after diff against such a helper's output
- * round-trips correctly).
+ * an optional field, so a patch built from a before/after diff that
+ * added or removed a key round-trips correctly — e.g. undoing
+ * `setTaskKindAtom` on a node that had no `task` key at all).
  */
 function applyPatch<E extends object>(
   entity: E,

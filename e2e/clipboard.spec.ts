@@ -68,8 +68,8 @@ import { dispatchPaste } from './fixtures/clipboard'
 function textCard(id: string, x: number, y: number, content = id) {
   return {
     id,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
@@ -85,7 +85,7 @@ function textCard(id: string, x: number, y: number, content = id) {
 function containerNode(id: string, x: number, y: number, w: number, h: number) {
   return {
     id,
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
     x,
@@ -106,11 +106,11 @@ async function seed(page: import('@playwright/test').Page, board: unknown) {
 // right after a gesture needs to wait past it.
 async function readBoardNodes(
   page: import('@playwright/test').Page,
-): Promise<{ id: string; type: string; x: number; y: number }[]> {
+): Promise<{ id: string; nodeType: string; x: number; y: number }[]> {
   await page.waitForTimeout(600)
   const raw = await page.evaluate(() => localStorage.getItem('kanvy.board'))
   const board = JSON.parse(raw ?? '{"nodes":[]}') as {
-    nodes: { id: string; type: string; x: number; y: number }[]
+    nodes: { id: string; nodeType: string; x: number; y: number }[]
   }
   return board.nodes
 }
@@ -288,9 +288,11 @@ test.describe('in-app clipboard (spec §7)', () => {
 
       const nodes = await readBoardNodes(page)
       const pastedContainer = nodes.find(
-        (n) => n.type === 'container' && n.id !== 'c1',
+        (n) => n.nodeType === 'container' && n.id !== 'c1',
       )
-      const pastedChild = nodes.find((n) => n.type === 'card' && n.id !== 'k1')
+      const pastedChild = nodes.find(
+        (n) => n.nodeType === 'card' && n.id !== 'k1',
+      )
       return { nodes, pastedContainer, pastedChild }
     }
 
@@ -479,9 +481,9 @@ test.describe('keyboard shortcuts (spec §4.2)', () => {
 
       const nodes = await readBoardNodes(page)
       const dupContainer = nodes.find(
-        (n) => n.type === 'container' && n.id !== 'c1',
+        (n) => n.nodeType === 'container' && n.id !== 'c1',
       )
-      const dupChild = nodes.find((n) => n.type === 'card' && n.id !== 'k1')
+      const dupChild = nodes.find((n) => n.nodeType === 'card' && n.id !== 'k1')
       return { nodes, dupContainer, dupChild }
     }
 
