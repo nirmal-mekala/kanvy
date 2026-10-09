@@ -91,6 +91,12 @@ function recordAndReconcile(
  * — a plain status PATCH either way, never a DELETE or a second POST (a
  * second POST would mint a new server id). Every entity kind with a
  * `create` op (node, edge, board) has a `status` field.
+ *
+ * `updatedAt` travels with the status: undo stamps the tombstone time (the
+ * network reaper ages trashed entities by `updatedAt` —
+ * ctx/notes/261009-network-reaper-and-image-lifecycle.md), and redo
+ * restores the create's original `updatedAt`, matching local redo, which
+ * re-appends `op.value` unchanged.
  */
 async function applyReplayedCreate(
   config: NetworkConfig,
@@ -104,7 +110,9 @@ async function applyReplayedCreate(
     config,
     COLLECTION_BY_ENTITY[op.entity],
     id,
-    { status: replay === 'undo' ? 'trashed' : 'active' },
+    replay === 'undo'
+      ? { status: 'trashed', updatedAt: new Date().toISOString() }
+      : { status: 'active', updatedAt: op.value.updatedAt },
     fetchImpl,
   )
 }
@@ -165,10 +173,17 @@ async function applyOp(
 /**
  * An image op, in either direction. `from`/`to` are the image's server-side
  * value before/after this replay (`undefined` = no such image): no target
- * → DELETE, no source → POST, otherwise PATCH. Images have no `status`, so
- * unlike nodes/edges/boards an undone image create really is deleted, and
- * its redo re-POSTs (and reconciles the new server id, same as a first
- * create).
+ * → DELETE, no source → POST, otherwise PATCH.
+ *
+ * Replaying an image *create* is the exception: neither undo nor redo
+ * sends anything. The row stays on the server through undo, because the
+ * now-trashed node still references it (a `RESTRICT` foreign key would
+ * reject the DELETE). So redo has nothing to re-create, and the row's
+ * server id was already reconciled into app state and history by the
+ * original POST. The network reaper deletes the image once its last
+ * referencing node is reaped
+ * (ctx/notes/261009-network-reaper-and-image-lifecycle.md). Locally, undo
+ * still drops the entry and redo re-adds it (state/ops.ts).
  */
 async function applyImageOp(
   config: NetworkConfig,
@@ -177,6 +192,7 @@ async function applyImageOp(
   replay: OpReplay,
   fetchImpl: typeof fetch,
 ): Promise<void> {
+  if (replay !== 'do' && op.before === undefined) return
   const [from, to] =
     replay === 'undo' ? [op.after, op.before] : [op.before, op.after]
   const id = resolveId(idRemapTable, 'image', op.id)
