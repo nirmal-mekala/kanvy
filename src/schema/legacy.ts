@@ -38,6 +38,9 @@
 // Renames (schema v7, ctx/notes/261008-position-rename.md and
 // 261008-node-type-card-type-rename.md): a pre-v7 node's `index`, `type` and
 // `kind` become `position`, `nodeType` and `cardType`.
+// Flat link fields (schema v7, ctx/notes/261008-flat-link-fields.md): a
+// pre-v7 link card's nested `link` becomes `linkUrl`/`linkTitle`/
+// `linkImageUrl` (missing title/image → `null`); its `status` is dropped.
 // Same rule as above — a v7+ node's fields pass through untouched.
 
 import { customAlphabet } from 'nanoid'
@@ -52,7 +55,7 @@ const LEGACY_ROOT_BOARD_ID = 'root'
 /** The first schema version that designates the root board with `isRoot` instead of `LEGACY_ROOT_BOARD_ID`. */
 const IS_ROOT_SCHEMA_VERSION = 6
 
-/** The first schema version with v7's node field changes: a required bare `task` enum (`'none'` or a `TaskStatus`) instead of an optional `{ status }` object, `position` instead of `index`, and `nodeType`/`cardType` instead of `type`/`kind`. */
+/** The first schema version with v7's node field changes: a required bare `task` enum (`'none'` or a `TaskStatus`) instead of an optional `{ status }` object, `position` instead of `index`, `nodeType`/`cardType` instead of `type`/`kind`, and flat `linkUrl`/`linkTitle`/`linkImageUrl` instead of a nested `link`. */
 const V7_SCHEMA_VERSION = 7
 
 // The prototype never stored a card's height (purely DOM-derived) — this
@@ -261,8 +264,9 @@ function normalizeTask(entity: Record<string, unknown>): string {
  * `normalizeTask`'s required value (ctx/notes/261008-flat-task-status.md),
  * `index` is renamed `position` (ctx/notes/261008-position-rename.md), and
  * `type`/`kind` are renamed `nodeType`/`cardType`
- * (ctx/notes/261008-node-type-card-type-rename.md). A v7+ node is never
- * touched — a missing/old-format `task` or a leftover `index`/`type`/`kind`
+ * (ctx/notes/261008-node-type-card-type-rename.md), and a link card's
+ * nested `link` is flattened (`flattenLegacyLink`). A v7+ node is never
+ * touched — a missing/old-format `task` or a leftover `index`/`type`/`kind`/`link`
  * there is left for `NodeSchema` to reject or strip.
  */
 function migrateToV7Node(
@@ -270,13 +274,35 @@ function migrateToV7Node(
   predatesV7: boolean,
 ): Record<string, unknown> {
   if (!predatesV7) return node
-  const { index, type, kind, ...rest } = node
+  const { index, type, kind, link, ...rest } = node
   return {
     ...rest,
+    ...(isRecord(link) ? flattenLegacyLink(link) : {}),
     ...(type !== undefined ? { nodeType: type } : {}),
     ...(kind !== undefined ? { cardType: kind } : {}),
     task: normalizeTask(node),
     ...(index !== undefined ? { position: index } : {}),
+  }
+}
+
+/** `value` if it's a string, else `null` — v7's explicit "no value" for a link card's optional metadata. */
+function stringOrNull(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+/**
+ * v6's nested `link: { url, title?, imageUrl?, status }` as v7's flat
+ * fields (ctx/notes/261008-flat-link-fields.md). A missing title/image
+ * becomes `null`; `status` is dropped (in-memory only since v7). A
+ * non-string `url` passes through for `NodeSchema` to reject.
+ */
+function flattenLegacyLink(
+  link: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    linkUrl: link.url,
+    linkTitle: stringOrNull(link.title),
+    linkImageUrl: stringOrNull(link.imageUrl),
   }
 }
 
@@ -287,15 +313,13 @@ function legacyCardKindFields(
     return { cardType: 'image', imageId: card.imageId }
   }
   if (typeof card.linkUrl === 'string') {
+    // Already flat in the prototype — kept flat (schema v7); `linkStatus`
+    // is dropped, since fetch state is no longer persisted.
     return {
       cardType: 'link',
-      link: {
-        url: card.linkUrl,
-        title: typeof card.linkTitle === 'string' ? card.linkTitle : undefined,
-        imageUrl:
-          typeof card.linkImageUrl === 'string' ? card.linkImageUrl : undefined,
-        status: typeof card.linkStatus === 'string' ? card.linkStatus : 'error',
-      },
+      linkUrl: card.linkUrl,
+      linkTitle: stringOrNull(card.linkTitle),
+      linkImageUrl: stringOrNull(card.linkImageUrl),
     }
   }
   const legacySize = card.textSize ?? card.size

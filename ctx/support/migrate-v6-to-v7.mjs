@@ -2,11 +2,13 @@
 // Migrates a schema v6 Kanvy board document to schema v7.
 //
 // Usage:
-//   node ctx/support/migrate-v6-to-v7.mjs '<v6 document JSON>'
-//   node ctx/support/migrate-v6-to-v7.mjs "$(cat board-v6.json)" > board-v7.json
+//   node ctx/support/migrate-v6-to-v7.mjs board-v6.json > board-v7.json
 //
-// Prints the v7 document to stdout (2-space JSON). Exits 1 with a message on
-// stderr if the argument is missing, isn't JSON, or isn't a v6 document.
+// Reads the v6 document from the given file — a path, not inline JSON: a
+// real board easily exceeds the OS argument-length limit ("argument list
+// too long") — and prints the v7 document to stdout (2-space JSON). Exits 1
+// with a message on stderr if the path is missing or unreadable, or the
+// file isn't JSON or isn't a v6 document.
 //
 // Dependency-free and standalone (no imports from src/) on purpose: it's a
 // one-shot data fixture for migrating exported/server data outside the app.
@@ -22,6 +24,12 @@
 //     (ctx/notes/261008-position-rename.md).
 //   - type → nodeType and kind → cardType, same values, same key order
 //     (ctx/notes/261008-node-type-card-type-rename.md).
+//   - link (link cards): v6's nested `{ url, title?, imageUrl?, status }`
+//     becomes flat `linkUrl`, `linkTitle`, `linkImageUrl` in its place;
+//     a missing title/image → `null`; `status` is dropped (in-memory only
+//     in v7) (ctx/notes/261008-flat-link-fields.md).
+
+import { readFileSync } from 'node:fs'
 
 // v6 node key → v7 node key. Values carry over unchanged.
 const NODE_KEY_RENAMES = new Map([
@@ -37,6 +45,18 @@ function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function stringOrNull(value) {
+  return typeof value === 'string' ? value : null
+}
+
+function flattenLink(link) {
+  return {
+    linkUrl: link.url,
+    linkTitle: stringOrNull(link.title),
+    linkImageUrl: stringOrNull(link.imageUrl),
+  }
+}
+
 function migrateTask(task) {
   if (isRecord(task) && typeof task.status === 'string') return task.status
   if (typeof task === 'string') return task
@@ -49,7 +69,9 @@ function migrateNode(node) {
   const migrated = {}
   for (const [key, value] of Object.entries(node)) {
     if (key === 'task') migrated.task = migrateTask(value)
-    else migrated[NODE_KEY_RENAMES.get(key) ?? key] = value
+    else if (key === 'link' && isRecord(value)) {
+      Object.assign(migrated, flattenLink(value))
+    } else migrated[NODE_KEY_RENAMES.get(key) ?? key] = value
   }
   if (!('task' in migrated)) migrated.task = 'none'
   return migrated
@@ -71,15 +93,15 @@ function migrateV6ToV7(document) {
 }
 
 function main(argv) {
-  const [raw] = argv
-  if (raw === undefined) {
+  const [path] = argv
+  if (path === undefined) {
     process.stderr.write(
-      'usage: node ctx/support/migrate-v6-to-v7.mjs \'<v6 document JSON>\'\n',
+      'usage: node ctx/support/migrate-v6-to-v7.mjs <v6-document.json>\n',
     )
     return 1
   }
   try {
-    const migrated = migrateV6ToV7(JSON.parse(raw))
+    const migrated = migrateV6ToV7(JSON.parse(readFileSync(path, 'utf8')))
     process.stdout.write(`${JSON.stringify(migrated, null, 2)}\n`)
     return 0
   } catch (error) {

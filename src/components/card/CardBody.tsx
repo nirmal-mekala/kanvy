@@ -130,21 +130,21 @@ export function CardBody({
       {node.cardType === 'link' && (
         <a
           className="card__link-body no-drag"
-          href={node.link.url}
+          href={node.linkUrl}
           target="_blank"
           rel="noreferrer noopener"
           draggable={false}
         >
-          {node.link.imageUrl && (
+          {node.linkImageUrl && (
             <CardMedia
-              src={node.link.imageUrl}
-              alt={node.link.title || 'Link preview image'}
+              src={node.linkImageUrl}
+              alt={node.linkTitle || 'Link preview image'}
               divided={false}
               tinted={tinted}
               className="card__link-image"
             />
           )}
-          <CardLinkMeta link={node.link} />
+          <CardLinkMeta node={node} />
         </a>
       )}
 

@@ -16,7 +16,7 @@
 //
 // The document is a *design-review fixture*: it lays out every persisted
 // node state the app can render — every kind, heading size, accent color,
-// task status, recency band, link status, container pattern, edge
+// task status, recency band, link metadata, container pattern, edge
 // direction — as labeled rows on one showcase board per topic, linked from
 // the home board. Load it, then flip theme (light/dark) and view mode
 // (standard/task/recency) to see each state under every lens. Transient
@@ -206,19 +206,17 @@ function image(
 }
 
 interface LinkOpts extends Common {
-  status?: 'loading' | 'ready' | 'error'
   title?: string
   withImage?: boolean
   url?: string
   caption?: string
 }
 
-function linkMeta({ status = 'ready', title, withImage, url }: LinkOpts) {
+function linkMeta({ title, withImage, url }: LinkOpts) {
   return {
-    url: url ?? 'https://example.com/some/article',
-    status,
-    ...(title === undefined ? {} : { title }),
-    ...(withImage ? { imageUrl: LANDSCAPE } : {}),
+    linkUrl: url ?? 'https://example.com/some/article',
+    linkTitle: title ?? null,
+    linkImageUrl: withImage ? LANDSCAPE : null,
   }
 }
 
@@ -226,7 +224,7 @@ function link(opts: LinkOpts = {}): Draft {
   return {
     nodeType: 'card',
     cardType: 'link',
-    link: linkMeta(opts),
+    ...linkMeta(opts),
     content: opts.caption ?? '',
     w: 224,
     h: (opts.withImage ? 200 : 90) + captionHeight(opts.caption ?? ''),
@@ -597,13 +595,14 @@ function imageRows(): Row[] {
 function linkRows(): Row[] {
   return [
     {
-      label: 'status',
+      // No loading/error rows: fetch state is in-memory only (schema v7,
+      // ctx/notes/261008-flat-link-fields.md) — paste a URL to see "Loading…".
+      label: 'metadata',
       cells: [
-        link({ status: 'loading' }),
-        link({ status: 'error' }),
-        link({ title: 'Ready, title only' }),
-        link({}), // ready, no title → shows the URL
-        link({ title: 'Ready, title + image', withImage: true }),
+        link({ title: 'Title only' }),
+        link({}), // no title → shows the URL
+        link({ title: 'Title + image', withImage: true }),
+        link({ withImage: true }), // image, no title → shows the URL
       ],
     },
     {
@@ -627,8 +626,8 @@ function linkRows(): Row[] {
       label: 'tinted',
       cells: [
         link({ color: 'coral', title: 'coral', withImage: true }),
-        link({ color: 'teal', status: 'loading' }),
-        link({ color: 'amber', status: 'error' }),
+        link({ color: 'teal' }),
+        link({ color: 'amber', title: 'amber', withImage: true }),
         link({ color: 'violet', title: 'violet', caption: 'caption' }),
       ],
     },

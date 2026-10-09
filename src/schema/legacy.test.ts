@@ -277,6 +277,66 @@ describe('normalizeLegacyBoard — type/kind → nodeType/cardType rename (schem
   })
 })
 
+describe('normalizeLegacyBoard — flat link fields (schema v7)', () => {
+  function migratedNodes(version: number, nodes: unknown[]) {
+    return (
+      normalizeLegacyBoard({
+        version,
+        nodes,
+        edges: [],
+        boards: [],
+        images: [],
+      }) as { nodes: Record<string, unknown>[] }
+    ).nodes
+  }
+
+  function v6Link(id: string, link: Record<string, unknown>) {
+    return { id, boardId: 'b', type: 'card', kind: 'link', link }
+  }
+
+  it('flattens a v6 link card’s nested link, null-filling missing title/image and dropping status', () => {
+    const [full, bare, stuck] = migratedNodes(6, [
+      v6Link('full', {
+        url: 'https://a.example',
+        title: 'A',
+        imageUrl: 'https://a.example/og.png',
+        status: 'ready',
+      }),
+      v6Link('bare', { url: 'https://b.example', status: 'error' }),
+      v6Link('stuck', { url: 'https://c.example', status: 'loading' }),
+    ])
+    expect(full).toMatchObject({
+      linkUrl: 'https://a.example',
+      linkTitle: 'A',
+      linkImageUrl: 'https://a.example/og.png',
+    })
+    expect(bare).toMatchObject({
+      linkUrl: 'https://b.example',
+      linkTitle: null,
+      linkImageUrl: null,
+    })
+    expect(stuck).toMatchObject({ linkUrl: 'https://c.example' })
+    for (const node of [full, bare, stuck]) {
+      expect(node).not.toHaveProperty('link')
+      expect(node).not.toHaveProperty('linkStatus')
+    }
+  })
+
+  it('never flattens a v7 node’s leftover nested link (left for NodeSchema to reject)', () => {
+    const [node] = migratedNodes(SCHEMA_VERSION, [
+      {
+        id: 'a',
+        boardId: 'b',
+        nodeType: 'card',
+        cardType: 'link',
+        link: { url: 'https://a.example', status: 'ready' },
+      },
+    ])
+    expect(node).toHaveProperty('link')
+    expect(node).not.toHaveProperty('linkUrl')
+  })
+})
+
 describe('normalizeLegacyBoard — index → position rename (schema v7)', () => {
   function migratedNodes(
     version: number,

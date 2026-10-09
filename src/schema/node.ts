@@ -114,7 +114,7 @@ export type NodeId = z.infer<typeof NodeIdSchema>
 // object — it maps 1:1 onto a `NOT NULL DEFAULT 'none'` Postgres enum
 // column (`CREATE TYPE task_status AS ENUM ('none', ...)`). "Not a task"
 // is the explicit value `'none'`, never `null` or an absent key, so every
-// write — including an undo — carries a concrete value in its PATCH body.
+// update op records a concrete value for it (never a dropped key).
 const NodeBaseSchema = z.object({
   id: NodeIdSchema,
   boardId: BoardIdSchema,
@@ -162,15 +162,20 @@ export const ImageCardSchema = CardBaseSchema.extend({
 })
 export type ImageCard = z.infer<typeof ImageCardSchema>
 
+// Link metadata is flat on the card (schema v7, ctx/notes/
+// 261008-flat-link-fields.md), not v6's nested `link: { url, title?,
+// imageUrl?, status }` object. `linkTitle`/`linkImageUrl` are `null` until
+// a metadata fetch fills them, or when the page has none — never absent.
+// The old `status` ('loading' | 'ready' | 'error') is not persisted at all:
+// whether a fetch is in flight is in-memory app state
+// (state/atoms/linkFetch.ts), so a card can't get stuck "Loading…" across
+// a reload.
 // fallow-ignore-next-line unused-export
 export const LinkCardSchema = CardBaseSchema.extend({
   cardType: z.literal('link'),
-  link: z.object({
-    url: z.string(),
-    title: z.string().optional(),
-    imageUrl: z.string().optional(),
-    status: z.enum(['loading', 'ready', 'error']),
-  }),
+  linkUrl: z.string(),
+  linkTitle: z.string().nullable(),
+  linkImageUrl: z.string().nullable(),
 })
 // fallow-ignore-next-line unused-type
 export type LinkCard = z.infer<typeof LinkCardSchema>

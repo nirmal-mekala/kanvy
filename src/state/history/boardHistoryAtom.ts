@@ -53,9 +53,9 @@ import { registerReconcileTargets } from '../networkReconcile'
 import {
   type AttributedOps,
   applyOps,
-  type Direction,
   mergeOpLists,
   type Op,
+  type OpReplay,
   type ReplaceBoardOp,
 } from '../ops'
 import { createDebouncedSaver, type LoadResult } from '../persistence/storage'
@@ -76,7 +76,7 @@ function mergeAttributedOps(
 }
 
 /**
- * The debounced saver's payload — `ops`/`direction`/`boardId` describe
+ * The debounced saver's payload — `ops`/`replay`/`boardId` describe
  * *what happened*, so the TanStack Query mutation's `variables` (visible
  * in its Devtools Mutations tab) show a real action, not just the
  * resulting board. `board` is still the thing actually persisted (rather
@@ -87,15 +87,16 @@ function mergeAttributedOps(
  */
 interface PendingSave {
   ops: Op[]
-  direction: Direction
+  /** Whether `ops` are being done, undone or redone — network mode maps each differently (api/networkOps.ts); local mode only persists `board`. */
+  replay: OpReplay
   boardId: string
   board: Board
 }
 
 /**
- * Only ever called with same-`direction`/same-`boardId` pending saves in
+ * Only ever called with same-`replay`/same-`boardId` pending saves in
  * practice: `updateBoardAtom` is the only caller that can accumulate
- * across calls (always `direction: 'after'`, and it flushes first itself
+ * across calls (always `replay: 'do'`, and it flushes first itself
  * — see its own comment — whenever `boardId` would otherwise change
  * mid-batch), and every other caller (undo/redo/recovery-ack)
  * flushes before its own `save`, so `pending` is always empty by the time
@@ -104,7 +105,7 @@ interface PendingSave {
 function mergePendingSave(prev: PendingSave, next: PendingSave): PendingSave {
   return {
     ops: mergeOpLists(prev.ops, next.ops),
-    direction: next.direction,
+    replay: next.replay,
     boardId: next.boardId,
     board: next.board,
   }
@@ -147,7 +148,11 @@ const saveMutation = new MutationObserver(queryClient, {
   mutationFn: (pending: PendingSave) => {
     const store = getDefaultStore()
     if (store.get(accessModeAtom) === 'network') {
-      return saveBoardOverNetwork(store.get(networkConfigAtom), pending.ops)
+      return saveBoardOverNetwork(
+        store.get(networkConfigAtom),
+        pending.ops,
+        pending.replay,
+      )
     }
     return saveBoard(pending.board)
   },
@@ -255,7 +260,7 @@ export const updateBoardAtom = atom(
     set(boardHistoryAtom, nextHistory)
     autosaveIfAcknowledged(get, {
       ops,
-      direction: 'after',
+      replay: 'do',
       boardId,
       board: nextBoard,
     })
@@ -273,7 +278,7 @@ export const acknowledgeRecoveryAtom = atom(null, (get, set) => {
   }
   saver.save({
     ops: [op],
-    direction: 'after',
+    replay: 'do',
     boardId: get(currentBoardIdAtom),
     board,
   })
@@ -300,7 +305,7 @@ export const undoBoardAtom = atom(null, (get, set) => {
   saver.flush()
   autosaveIfAcknowledged(get, {
     ops,
-    direction: 'before',
+    replay: 'undo',
     boardId,
     board: prevBoard,
   })
@@ -320,7 +325,7 @@ export const redoBoardAtom = atom(null, (get, set) => {
   saver.flush()
   autosaveIfAcknowledged(get, {
     ops,
-    direction: 'after',
+    replay: 'redo',
     boardId,
     board: nextBoard,
   })

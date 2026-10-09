@@ -32,7 +32,9 @@ function linkNode(id: string, overrides: Partial<Node> = {}): Node {
     task: 'none',
     status: 'active',
     position: 0,
-    link: { url: 'https://example.com', status: 'loading' },
+    linkUrl: 'https://example.com',
+    linkTitle: null,
+    linkImageUrl: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -295,7 +297,7 @@ describe('nodes atoms', () => {
     expect(store.get(boardAtom)).toBe(before)
   })
 
-  it("records a concrete before/after task value (never a missing key), so undo restores 'none' via a real PATCH value", async () => {
+  it("records a concrete before/after task value (never a missing key), and a local undo restores 'none'", async () => {
     const {
       store,
       addNodeAtom,
@@ -320,6 +322,51 @@ describe('nodes atoms', () => {
 
     store.set(undoBoardAtom)
     expect(store.get(nodeFamily('n1'))?.task).toBe('none')
+  })
+
+  it('replaceNodeAtom records a kind conversion as a field diff: fields the new kind drops are removed locally (and recorded as undefined, sent as null over the network)', async () => {
+    const {
+      store,
+      addNodeAtom,
+      replaceNodeAtom,
+      nodeFamily,
+      boardHistoryAtom,
+      undoBoardAtom,
+    } = await freshState()
+    const text = textNode('n1', { content: 'see' })
+    store.set(addNodeAtom, text)
+    vi.advanceTimersByTime(10_000) // past the history coalescing window
+
+    const stored = store.get(nodeFamily('n1')) as Extract<
+      Node,
+      { cardType: 'text' }
+    >
+    const { size: _size, ...rest } = stored
+    store.set(replaceNodeAtom, 'n1', {
+      ...rest,
+      cardType: 'link',
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
+    } as Node)
+
+    expect(store.get(nodeFamily('n1'))).not.toHaveProperty('size')
+    const [op] = store.get(boardHistoryAtom).present.state.ops
+    expect(op).toMatchObject({ kind: 'update', id: 'n1' })
+    if (op?.kind !== 'update') throw new Error('expected an update op')
+    expect(op.after).toEqual({
+      cardType: 'link',
+      size: undefined,
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
+    })
+    expect(Object.keys(op.after)).not.toContain('content') // unchanged → not in the diff
+
+    store.set(undoBoardAtom)
+    const restored = store.get(nodeFamily('n1'))
+    expect(restored).toMatchObject({ cardType: 'text', size: 'regular' })
+    expect(restored).not.toHaveProperty('linkUrl')
   })
 
   it('setTaskStatusAtom sets a bare status, leaving an already-task node idempotent under setTaskKindAtom', async () => {
@@ -643,27 +690,28 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     )
   })
 
-  it('updateLinkAtom patches the link card matching the given id', async () => {
+  it('updateLinkAtom applies fetched metadata to the link card matching the given id', async () => {
     const { store, addNodeAtom, updateLinkAtom, boardAtom } = await freshState()
     store.set(addNodeAtom, linkNode('link-1'))
-    store.set(updateLinkAtom, 'link-1', { status: 'ready', title: 'Example' })
+    store.set(updateLinkAtom, 'link-1', {
+      linkTitle: 'Example',
+      linkImageUrl: null,
+    })
     const node = store.get(boardAtom).nodes.find((n) => n.id === 'link-1')
-    expect(
-      node?.nodeType === 'card' && node.cardType === 'link' && node.link,
-    ).toEqual({
-      url: 'https://example.com',
-      status: 'ready',
-      title: 'Example',
+    expect(node).toMatchObject({
+      linkUrl: 'https://example.com',
+      linkTitle: 'Example',
+      linkImageUrl: null,
     })
   })
 
-  // Regression test: a link card's metadata fetch (src/cards/
-  // applyLinkMetadata.ts) captures the node's id in a closure before the
-  // fetch settles. In Network mode, that local id can be reconciled to a
+  // Regression test: a link card's metadata fetch (state/atoms/
+  // linkFetch.ts) captures the node's id in a closure before the fetch
+  // settles. In Network mode, that local id can be reconciled to a
   // server-assigned one in the meantime (ctx/notes/
   // 260925-network-id-reconciliation.md) — updateLinkAtom used to look the
-  // node up by the stale id and silently no-op, leaving the card stuck on
-  // `status: 'loading'` forever.
+  // node up by the stale id and silently no-op, so the fetched metadata
+  // never landed.
   it('updateLinkAtom resolves a since-reconciled node id', async () => {
     const {
       store,
@@ -675,15 +723,15 @@ describe("removeEntitiesAtom tombstones a board node's referenced board (multibo
     store.set(addNodeAtom, linkNode('server-1'))
     reconcileNetworkEntityIdAtom('node', 'local-1', 'server-1')
 
-    store.set(updateLinkAtom, 'local-1', { status: 'ready', title: 'Example' })
+    store.set(updateLinkAtom, 'local-1', {
+      linkTitle: 'Example',
+      linkImageUrl: 'https://example.com/og.png',
+    })
 
     const node = store.get(boardAtom).nodes.find((n) => n.id === 'server-1')
-    expect(
-      node?.nodeType === 'card' && node.cardType === 'link' && node.link,
-    ).toEqual({
-      url: 'https://example.com',
-      status: 'ready',
-      title: 'Example',
+    expect(node).toMatchObject({
+      linkTitle: 'Example',
+      linkImageUrl: 'https://example.com/og.png',
     })
   })
 })

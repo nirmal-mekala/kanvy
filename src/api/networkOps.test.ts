@@ -27,7 +27,7 @@ describe('applyOpsToNetwork', () => {
       entity: 'node',
       value: { id: 'client-n1', x: 1 } as never,
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:1996/nodes')
     expect(init.method).toBe('POST')
@@ -43,11 +43,29 @@ describe('applyOpsToNetwork', () => {
       before: { title: 'old' },
       after: { title: 'new' },
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:1996/boards/b1')
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(init.body as string)).toEqual({ title: 'new' })
+  })
+
+  it('sends a field the patch removes (`undefined`) as an explicit null, so the server blanks it out (schema v7)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+    const op: Op = {
+      kind: 'update',
+      entity: 'node',
+      id: 'n1',
+      before: { cardType: 'link', linkUrl: 'https://x', size: undefined },
+      after: { cardType: 'text', linkUrl: undefined, size: 'regular' },
+    }
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({
+      cardType: 'text',
+      linkUrl: null,
+      size: 'regular',
+    })
   })
 
   it('maps an ImageOp with no `before` to a POST /images create, without an id', async () => {
@@ -60,7 +78,7 @@ describe('applyOpsToNetwork', () => {
       before: undefined,
       after: 'data:x',
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:1996/images')
     expect(init.method).toBe('POST')
@@ -75,7 +93,7 @@ describe('applyOpsToNetwork', () => {
       before: 'data:old',
       after: 'data:new',
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:1996/images/img1')
     expect(init.method).toBe('PATCH')
@@ -90,7 +108,7 @@ describe('applyOpsToNetwork', () => {
       before: 'data:old',
       after: undefined,
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://localhost:1996/images/img1')
     expect(init.method).toBe('DELETE')
@@ -105,7 +123,7 @@ describe('applyOpsToNetwork', () => {
         after: {} as never,
       },
     ]
-    await applyOpsToNetwork(config, ops, fetchImpl)
+    await applyOpsToNetwork(config, ops, 'do', fetchImpl)
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
@@ -119,7 +137,7 @@ describe('applyOpsToNetwork', () => {
       { kind: 'create', entity: 'node', value: { id: 'n1' } as never },
       { kind: 'create', entity: 'edge', value: { id: 'e1' } as never },
     ]
-    await applyOpsToNetwork(config, ops, fetchImpl)
+    await applyOpsToNetwork(config, ops, 'do', fetchImpl)
     expect(calls).toEqual([
       'http://localhost:1996/nodes',
       'http://localhost:1996/edges',
@@ -139,7 +157,7 @@ describe('applyOpsToNetwork', () => {
       before: undefined,
       after: 'data:big',
     }
-    await applyOpsToNetwork(config, [op], fetchImpl)
+    await applyOpsToNetwork(config, [op], 'do', fetchImpl)
     expect(spy).toHaveBeenCalledWith('data:big', expect.any(Number))
     const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(init.body as string)).toEqual({
@@ -157,9 +175,9 @@ describe('applyOpsToNetwork', () => {
       entity: 'node',
       value: { id: 'n1' } as never,
     }
-    await expect(applyOpsToNetwork(config, [op], fetchImpl)).rejects.toThrow(
-      /500/,
-    )
+    await expect(
+      applyOpsToNetwork(config, [op], 'do', fetchImpl),
+    ).rejects.toThrow(/500/)
   })
 
   describe('id remap (json-server assigns its own id on create — networkIdRemap.ts, batch-scoped)', () => {
@@ -178,7 +196,7 @@ describe('applyOpsToNetwork', () => {
           after: { x: 5 },
         },
       ]
-      await applyOpsToNetwork(config, ops, fetchImpl)
+      await applyOpsToNetwork(config, ops, 'do', fetchImpl)
       const [patchUrl] = fetchImpl.mock.calls[1] as [string, RequestInit]
       expect(patchUrl).toBe('http://localhost:1996/nodes/server-n1')
     })
@@ -196,6 +214,7 @@ describe('applyOpsToNetwork', () => {
             value: { id: 'client-b1' } as never,
           },
         ],
+        'do',
         createFetch,
       )
 
@@ -211,6 +230,7 @@ describe('applyOpsToNetwork', () => {
             after: { title: 'new' },
           },
         ],
+        'do',
         patchFetch,
       )
       const [patchUrl] = patchFetch.mock.calls[0] as [string, RequestInit]
@@ -234,7 +254,7 @@ describe('applyOpsToNetwork', () => {
           value: { id: 'client-node', boardId: 'client-board' } as never,
         },
       ]
-      await applyOpsToNetwork(config, ops, fetchImpl)
+      await applyOpsToNetwork(config, ops, 'do', fetchImpl)
       const [, nodeInit] = fetchImpl.mock.calls[1] as [string, RequestInit]
       expect(JSON.parse(nodeInit.body as string)).toMatchObject({
         boardId: 'server-board',
@@ -258,7 +278,7 @@ describe('applyOpsToNetwork', () => {
           } as never,
         },
       ]
-      await applyOpsToNetwork(config, ops, fetchImpl)
+      await applyOpsToNetwork(config, ops, 'do', fetchImpl)
       const [, nodeInit] = fetchImpl.mock.calls[1] as [string, RequestInit]
       expect(JSON.parse(nodeInit.body as string)).toMatchObject({
         imageId: 'server-img',
@@ -286,7 +306,7 @@ describe('applyOpsToNetwork', () => {
           } as never,
         },
       ]
-      await applyOpsToNetwork(config, ops, fetchImpl)
+      await applyOpsToNetwork(config, ops, 'do', fetchImpl)
       const [, nodeInit] = fetchImpl.mock.calls[1] as [string, RequestInit]
       expect(JSON.parse(nodeInit.body as string)).toMatchObject({
         boardRef: 'server-board',
@@ -312,12 +332,152 @@ describe('applyOpsToNetwork', () => {
           } as never,
         },
       ]
-      await applyOpsToNetwork(config, ops, fetchImpl)
+      await applyOpsToNetwork(config, ops, 'do', fetchImpl)
       const [, edgeInit] = fetchImpl.mock.calls[2] as [string, RequestInit]
       expect(JSON.parse(edgeInit.body as string)).toMatchObject({
         fromNodeId: 'server-a',
         toNodeId: 'server-b',
       })
+    })
+  })
+})
+
+describe('applyOpsToNetwork — undo/redo replay (ctx/notes/261008-network-undo-redo.md)', () => {
+  function requests(fetchImpl: ReturnType<typeof vi.fn>) {
+    return fetchImpl.mock.calls.map(([url, init]) => {
+      const { method, body } = init as RequestInit
+      return {
+        method,
+        url: url as string,
+        body: body === undefined ? undefined : JSON.parse(body as string),
+      }
+    })
+  }
+
+  const createNode: Op = {
+    kind: 'create',
+    entity: 'node',
+    value: { id: 'n1', x: 1, status: 'active' } as never,
+  }
+
+  it('undoes an update by PATCHing its `before`, blanking fields the original update added with an explicit null', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+    const op: Op = {
+      kind: 'update',
+      entity: 'node',
+      id: 'n1',
+      before: { cardType: 'text', size: 'regular', linkUrl: undefined },
+      after: { cardType: 'link', size: undefined, linkUrl: 'https://x' },
+    }
+    await applyOpsToNetwork(config, [op], 'undo', fetchImpl)
+    expect(requests(fetchImpl)).toEqual([
+      {
+        method: 'PATCH',
+        url: 'http://localhost:1996/nodes/n1',
+        body: { cardType: 'text', size: 'regular', linkUrl: null },
+      },
+    ])
+  })
+
+  it('redoes an update by PATCHing its `after`', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+    const op: Op = {
+      kind: 'update',
+      entity: 'board',
+      id: 'b1',
+      before: { title: 'old' },
+      after: { title: 'new' },
+    }
+    await applyOpsToNetwork(config, [op], 'redo', fetchImpl)
+    expect(requests(fetchImpl)[0]?.body).toEqual({ title: 'new' })
+  })
+
+  it.each([
+    ['undo', 'trashed'],
+    ['redo', 'active'],
+  ] as const)(
+    'replays a create on %s as a status PATCH (%s) against the existing entity — never a POST or DELETE',
+    async (replay, status) => {
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+      await applyOpsToNetwork(config, [createNode], replay, fetchImpl)
+      expect(requests(fetchImpl)).toEqual([
+        {
+          method: 'PATCH',
+          url: 'http://localhost:1996/nodes/n1',
+          body: { status },
+        },
+      ])
+    },
+  )
+
+  it('undoes a batch in reverse order (like applyOps(…, "before") locally)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+    const ops: Op[] = [
+      { kind: 'create', entity: 'board', value: { id: 'b1' } as never },
+      createNode,
+    ]
+    await applyOpsToNetwork(config, ops, 'undo', fetchImpl)
+    expect(requests(fetchImpl).map((r) => r.url)).toEqual([
+      'http://localhost:1996/nodes/n1',
+      'http://localhost:1996/boards/b1',
+    ])
+  })
+
+  describe('image ops (no status field — undone creates are really deleted)', () => {
+    it('undoes an image create with a DELETE', async () => {
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+      const op: Op = {
+        kind: 'image',
+        id: 'img1',
+        before: undefined,
+        after: 'data:x',
+      }
+      await applyOpsToNetwork(config, [op], 'undo', fetchImpl)
+      expect(requests(fetchImpl)).toEqual([
+        {
+          method: 'DELETE',
+          url: 'http://localhost:1996/images/img1',
+          body: undefined,
+        },
+      ])
+    })
+
+    it('undoes an image update by PATCHing back its `before`', async () => {
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+      const op: Op = {
+        kind: 'image',
+        id: 'img1',
+        before: 'data:old',
+        after: 'data:new',
+      }
+      await applyOpsToNetwork(config, [op], 'undo', fetchImpl)
+      expect(requests(fetchImpl)).toEqual([
+        {
+          method: 'PATCH',
+          url: 'http://localhost:1996/images/img1',
+          body: { dataUri: 'data:old' },
+        },
+      ])
+    })
+
+    it('redoes an image create with a fresh POST', async () => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ id: 'server-img' }))
+      const op: Op = {
+        kind: 'image',
+        id: 'img1',
+        before: undefined,
+        after: 'data:x',
+      }
+      await applyOpsToNetwork(config, [op], 'redo', fetchImpl)
+      expect(requests(fetchImpl)).toEqual([
+        {
+          method: 'POST',
+          url: 'http://localhost:1996/images',
+          body: { dataUri: 'data:x' },
+        },
+      ])
     })
   })
 })

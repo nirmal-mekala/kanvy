@@ -26,7 +26,11 @@ was dropped in favor of an explicit `'none'` value because:
   network-mode PATCH body, so the server never clears it. That broke
   un-tasking and undoing "Default → Task" on a node with no `task` key.
   With a required field, an update op's `before`/`after` always hold a
-  concrete value, so undo/redo PATCHes always reach the server.
+  concrete value, so a forward PATCH always carries it. (Since
+  `261008-flat-link-fields.md`, a field a patch *removes* is also sent as
+  an explicit `null`.) Network undo/redo only round-trips since
+  `261008-network-undo-redo.md` (before that, network saves ignored the
+  undo direction); with it, undo PATCHes the concrete `before` value.
 - **The compiler finds every creation site.** A required field can't be
   silently left out by a card factory, `createContainer`, paste/duplicate,
   or the seed.

@@ -156,6 +156,22 @@ describe('mergeOpLists', () => {
     })
   })
 
+  it('drops a field the folded update removes from the created value, rather than keeping an undefined key', () => {
+    const created = node('a', { x: 0 })
+    const prev: Op[] = [{ kind: 'create', entity: 'node', value: created }]
+    const next: Op[] = [
+      {
+        kind: 'update',
+        entity: 'node',
+        id: 'a',
+        before: { size: 'regular' },
+        after: { size: undefined },
+      },
+    ]
+    const [merged] = mergeOpLists(prev, next)
+    expect(merged?.kind === 'create' && merged.value).not.toHaveProperty('size')
+  })
+
   it('merges two image ops on the same id, keeping the earliest before', () => {
     const prev: Op[] = [
       { kind: 'image', id: 'img1', before: undefined, after: 'a' },

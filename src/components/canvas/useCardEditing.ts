@@ -5,15 +5,11 @@
 // §5.3: an image card's caption never triggers it).
 
 import { useSetAtom } from 'jotai'
-import { applyLinkMetadata } from '../../cards/applyLinkMetadata'
 import { convertToLinkCard } from '../../cards/convertCardKind'
 import { detectSlurpOnBlur, detectSlurpOnType } from '../../cards/urlSlurp'
 import type { Node, NodeId } from '../../schema/node'
-import {
-  replaceNodeAtom,
-  updateCardContentAtom,
-  updateLinkAtom,
-} from '../../state/atoms/nodes'
+import { fetchLinkMetadataAtom } from '../../state/atoms/linkFetch'
+import { replaceNodeAtom, updateCardContentAtom } from '../../state/atoms/nodes'
 
 export function useCardEditing({
   nodesById,
@@ -22,7 +18,7 @@ export function useCardEditing({
 }) {
   const updateCardContent = useSetAtom(updateCardContentAtom)
   const replaceNode = useSetAtom(replaceNodeAtom)
-  const updateLink = useSetAtom(updateLinkAtom)
+  const fetchLinkMetadataFor = useSetAtom(fetchLinkMetadataAtom)
 
   // CRAP scoring penalizes these handlers for 0% coverage —
   // component/interaction tests aren't a required tier for v0 (spec §13);
@@ -46,7 +42,7 @@ export function useCardEditing({
       id,
       convertToLinkCard({ ...node, content: slurp.remainingText }, slurp.url),
     )
-    applyLinkMetadata(id, slurp.url, updateLink)
+    fetchLinkMetadataFor(id, slurp.url)
   }
 
   // fallow-ignore-next-line complexity
@@ -59,7 +55,7 @@ export function useCardEditing({
       id,
       convertToLinkCard({ ...node, content: slurp.remainingText }, slurp.url),
     )
-    applyLinkMetadata(id, slurp.url, updateLink)
+    fetchLinkMetadataFor(id, slurp.url)
   }
 
   return { handleContentChange, handleContentBlur }

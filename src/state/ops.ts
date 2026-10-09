@@ -72,6 +72,17 @@ export type Op = CreateOp | UpdateOp | ImageOp | ReplaceBoardOp
 export type Direction = 'after' | 'before'
 
 /**
+ * Why a batch of ops is being persisted — locally only `Direction` matters
+ * (`'do'`/`'redo'` apply `'after'`, `'undo'` applies `'before'`), but a
+ * network backend also needs to know whether a `create` is happening for
+ * the first time (`'do'`: POST) or being re-applied after an undo
+ * (`'redo'`: the entity already exists server-side, tombstoned by that
+ * undo — reactivate it, never POST again). See api/networkOps.ts and
+ * ctx/notes/261008-network-undo-redo.md.
+ */
+export type OpReplay = 'do' | 'undo' | 'redo'
+
+/**
  * The ops a step applied plus which board's action produced it — the unit
  * `history/reducer.ts`'s generic history stack is instantiated over in
  * `history/boardHistoryAtom.ts` (schema v4). Kept here rather than in
@@ -194,10 +205,12 @@ function mergeOp(existing: Op, incoming: Op): Op {
     // The entity was created and then patched again within the same
     // coalesce window (e.g. create-then-immediately-resize) — fold the
     // patch straight into the create's own value rather than keeping two
-    // ops, so undoing this entry is still a single "remove by id."
+    // ops, so undoing this entry is still a single "remove by id." Same
+    // merge rule as `applyPatch` — a field the patch removed is dropped
+    // from the created value, not kept as an `undefined` key.
     return {
       ...existing,
-      value: { ...existing.value, ...incoming.after } as CreateOp['value'],
+      value: applyPatch(existing.value, incoming.after),
     }
   }
   if (existing.kind === 'image' && incoming.kind === 'image') {

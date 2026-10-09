@@ -65,7 +65,7 @@ export function newImageCard(
   }
 }
 
-/** A fresh loading link card for `url`, centered on `(x, y)` (spec §5.4) — metadata fetch is a separate step. */
+/** A fresh link card for `url`, no metadata yet (`linkTitle`/`linkImageUrl` null), centered on `(x, y)` (spec §5.4) — metadata fetch is a separate step. */
 export function newLinkCard(x: number, y: number, url: string): CardNode {
   const now = new Date().toISOString()
   return {
@@ -82,7 +82,9 @@ export function newLinkCard(x: number, y: number, url: string): CardNode {
     color: 'gray',
     task: 'none',
     content: '',
-    link: { url, status: 'loading' },
+    linkUrl: url,
+    linkTitle: null,
+    linkImageUrl: null,
     createdAt: now,
     updatedAt: now,
   }

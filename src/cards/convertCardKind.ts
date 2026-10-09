@@ -78,13 +78,15 @@ export function convertToImageCard(card: CardNode, imageId: string): CardNode {
   }
 }
 
-/** Converts `card` to a loading link card for `url` — always resets `size` to `'regular'` (spec §2.2). */
+/** Converts `card` to a link card for `url` with no metadata yet (`linkTitle`/`linkImageUrl` null until a fetch fills them) — drops `size` (spec §2.2). */
 export function convertToLinkCard(card: CardNode, url: string): CardNode {
   return {
     ...commonFields(card),
     nodeType: 'card',
     cardType: 'link',
-    link: { url, status: 'loading' },
+    linkUrl: url,
+    linkTitle: null,
+    linkImageUrl: null,
   }
 }
 

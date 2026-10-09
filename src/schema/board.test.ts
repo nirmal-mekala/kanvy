@@ -154,6 +154,59 @@ describe('BoardSchema', () => {
     expect(JSON.stringify(result.error?.issues)).toContain('"path":["task"]')
   })
 
+  describe('link cards (flat link fields, schema v7)', () => {
+    function linkCard(fields: Record<string, unknown>) {
+      const { size: _size, ...text } = validTextCard()
+      return { ...text, cardType: 'link', ...fields }
+    }
+    function parse(node: unknown) {
+      return BoardSchema.safeParse({
+        version: SCHEMA_VERSION,
+        nodes: [node],
+        edges: [],
+        boards: [validBoardMeta()],
+        images: [],
+      })
+    }
+    const flat = {
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
+    }
+
+    it.each([
+      ['null title/image (not fetched yet, or the page has none)', flat],
+      [
+        'a fetched title and image',
+        { ...flat, linkTitle: 'T', linkImageUrl: 'https://example.com/i.png' },
+      ],
+    ])('accepts %s', (_label, fields) => {
+      expect(parse(linkCard(fields)).error?.issues).toBeUndefined()
+    })
+
+    it.each([
+      [
+        'the pre-v7 nested link object',
+        { link: { url: 'https://example.com', status: 'ready' } },
+      ],
+      [
+        'an absent (rather than null) linkTitle',
+        { ...flat, linkTitle: undefined },
+      ],
+    ])('rejects %s', (_label, fields) => {
+      const node = linkCard(fields)
+      if ('linkTitle' in fields && fields.linkTitle === undefined) {
+        delete (node as Record<string, unknown>).linkTitle
+      }
+      expect(parse(node).success).toBe(false)
+    })
+
+    it('strips a persisted linkStatus — fetch state is in-memory only', () => {
+      const result = parse(linkCard({ ...flat, linkStatus: 'loading' }))
+      expect(result.data?.nodes[0]).not.toHaveProperty('linkStatus')
+    })
+  })
+
   it('rejects a node that still carries the pre-v7 index instead of position', () => {
     const { position, ...container } = validContainer()
     const result = BoardSchema.safeParse({
@@ -395,15 +448,18 @@ describe('normalizeLegacyBoard', () => {
     })
   })
 
-  it('converts a flat linkUrl card into a nested link payload, preserving legacy taskStatus', () => {
+  it('keeps a prototype flat linkUrl card flat (schema v7), dropping linkStatus and preserving legacy taskStatus', () => {
     const linkCard = normalizedLegacyFixture().nodes.find(
       (n) => n.nodeType === 'card' && n.cardType === 'link',
     )
     expect(linkCard).toMatchObject({
       cardType: 'link',
-      link: { url: 'https://example.com' },
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
       task: 'done',
     })
+    expect(linkCard).not.toHaveProperty('linkStatus')
   })
 
   it('renames fromId/toId to fromNodeId/toNodeId on edges', () => {

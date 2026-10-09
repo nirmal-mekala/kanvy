@@ -466,8 +466,11 @@ respect.
   (nothing typed after it yet). Only the *first* URL in the text is ever
   slurped; any subsequent URL is left as plain text.
 - Fetches title + preview image from a link-metadata service (currently
-  microlink.io) asynchronously; card shows `linkStatus`: `loading` → `ready`
-  (title/image populated, either may still be absent) or `error`.
+  metadata.party) asynchronously; the card shows "Loading…" while the fetch
+  is in flight, then the title (or the URL if there's none). Fetch state is
+  in-memory only, never persisted (schema v7,
+  `ctx/notes/261008-flat-link-fields.md`): a reload mid-fetch shows the URL.
+  Stored fields are flat `linkUrl` plus nullable `linkTitle`/`linkImageUrl`.
   - **v0 improvement (per Q18):** add a timeout and basic retry to this
     fetch — today a failure is permanent with no retry. Exact retry
     count/backoff is an implementation detail, not user-facing.

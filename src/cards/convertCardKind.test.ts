@@ -49,14 +49,16 @@ describe('convertToImageCard', () => {
 })
 
 describe('convertToLinkCard', () => {
-  it('resets size to regular and sets a loading link', () => {
+  it('drops size and sets a link with null metadata (fetch state is in-memory)', () => {
     const link = convertToLinkCard(headingText, 'https://example.com')
     expect(link.cardType).toBe('link')
     expect(link).not.toHaveProperty('size')
-    expect(link.cardType === 'link' && link.link).toEqual({
-      url: 'https://example.com',
-      status: 'loading',
+    expect(link).toMatchObject({
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
     })
+    expect(link).not.toHaveProperty('link')
   })
 })
 

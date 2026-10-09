@@ -142,6 +142,46 @@ test.describe('card-kind behavior (spec §5)', () => {
     )
   })
 
+  test('a v6 link card persisted mid-fetch (link.status "loading") migrates to flat fields and shows its URL, not a stuck "Loading…" (schema v7)', async ({
+    page,
+  }) => {
+    const now = '2026-01-01T00:00:00.000Z'
+    await seed(page, {
+      ...(childBoardDocument([]) as Record<string, unknown>),
+      version: 6,
+      nodes: [
+        {
+          id: 'l1',
+          boardId: CHILD_BOARD_ID,
+          type: 'card',
+          kind: 'link',
+          link: { url: 'https://stuck.example', status: 'loading' },
+          content: '',
+          x: 100,
+          y: 100,
+          w: 224,
+          h: 90,
+          color: 'gray',
+          status: 'active',
+          index: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      images: [],
+    })
+    await page.goto(`/${CHILD_BOARD_ID}`)
+    const card = page.locator('[data-node-id="l1"]:not(.node-connector)')
+    await expect(card).toHaveClass(/card--link/)
+    await expect(card.locator('.card__link-title-text')).toHaveText(
+      'https://stuck.example',
+    )
+    await expect(card.locator('.card__link-body')).toHaveAttribute(
+      'href',
+      'https://stuck.example',
+    )
+  })
+
   test('typing a URL then a space slurps it into a link card', async ({
     page,
   }) => {

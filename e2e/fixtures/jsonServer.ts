@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -37,13 +37,33 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function spawnAndWait(
+  dir: string,
   dbPath: string,
   port: number,
 ): Promise<ChildProcess> {
+  // NODE_ENV=production disables json-server's dev-mode file watcher
+  // (json-server 1.0.0-beta.15, lib/bin.js) — the only behavior it changes
+  // besides view-template caching. That watcher reloads db.json into
+  // memory on every change event it doesn't attribute to its own write,
+  // but its `writing` guard only spans the write itself: a change event
+  // for write A that lands after A finishes, while the next PATCH (B) is
+  // applied in memory but not yet flushed, re-reads the file as of A and
+  // silently reverts B — despite B having already returned 200. Under load
+  // this dropped back-to-back PATCHes (e.g. a board-card delete's node +
+  // board tombstones). Each test's db.json is a throwaway nothing else
+  // edits, so there's nothing for the watcher to pick up anyway.
+  // Production mode also makes json-server's static middleware (sirv)
+  // scan `./public` eagerly and throw if it's missing, hence `cwd: dir`
+  // with an empty `public/` created next to the throwaway db.json (which
+  // also keeps it from serving this repo's working directory).
   const child: ChildProcess = spawn(
     JSON_SERVER_BIN,
     [dbPath, '--port', String(port)],
-    { stdio: 'pipe' },
+    {
+      stdio: 'pipe',
+      cwd: dir,
+      env: { ...process.env, NODE_ENV: 'production' },
+    },
   )
 
   try {
@@ -84,6 +104,7 @@ export async function startJsonServer(
   const dir = mkdtempSync(join(tmpdir(), 'kanvy-e2e-json-server-'))
   const dbPath = join(dir, 'db.json')
   writeFileSync(dbPath, JSON.stringify(db))
+  mkdirSync(join(dir, 'public'))
 
   // A just-`stop()`ped prior server on this same port (this file's tests
   // are serialized and reuse one port — see settingsNetworkMode.spec.ts)
@@ -93,7 +114,7 @@ export async function startJsonServer(
   let lastError: unknown
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      const child = await spawnAndWait(dbPath, port)
+      const child = await spawnAndWait(dir, dbPath, port)
       return {
         port,
         stop: () =>

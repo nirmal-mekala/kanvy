@@ -65,7 +65,9 @@ describe('cardClassNames', () => {
     const linkNode: CardNode = {
       ...textNode,
       cardType: 'link',
-      link: { url: 'https://example.com', status: 'ready' },
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
     }
     expect(cardClassNames(linkNode, baseOpts)).toContain('card--link')
   })

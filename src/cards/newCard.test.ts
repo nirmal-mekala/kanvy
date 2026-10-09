@@ -27,12 +27,13 @@ describe('newImageCard', () => {
 })
 
 describe('newLinkCard', () => {
-  it('creates a loading link card', () => {
+  it('creates a link card with null metadata (fetch state is in-memory)', () => {
     const card = newLinkCard(100, 100, 'https://example.com')
     expect(card.cardType).toBe('link')
-    expect(card.cardType === 'link' && card.link).toEqual({
-      url: 'https://example.com',
-      status: 'loading',
+    expect(card).toMatchObject({
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
     })
   })
 })

@@ -29,13 +29,17 @@ Schema revisions since the initial migration (see spec §2.3):
   (never `null`/absent). Check it with `isTask(node)`, never truthiness.
   Node fields renamed: `index` → `position`, `type` → `nodeType`,
   `kind` → `cardType` (all SQL-friendlier; fields stay camelCase, with
-  snake_case left to the DB mapping layer). Same migration rule as v6:
-  local migrates, network rejects the old shape. See
-  `ctx/notes/261008-flat-task-status.md`,
-  `ctx/notes/261008-position-rename.md` and
-  `ctx/notes/261008-node-type-card-type-rename.md`.
-  `ctx/support/migrate-v6-to-v7.mjs`
-  converts v6 data outside the app; extend it with every further v7 change
+  snake_case left to the DB mapping layer). Link cards' nested `link` is
+  flattened to `linkUrl` + nullable `linkTitle`/`linkImageUrl`; fetch
+  status is in-memory only (`state/atoms/linkFetch.ts`), never persisted.
+  A field an update removes is sent over the network as an explicit
+  `null`. Same migration rule as v6: local migrates, network rejects the
+  old shape. See `ctx/notes/261008-flat-task-status.md`,
+  `ctx/notes/261008-position-rename.md`,
+  `ctx/notes/261008-node-type-card-type-rename.md` and
+  `ctx/notes/261008-flat-link-fields.md`.
+  `ctx/support/migrate-v6-to-v7.mjs` converts v6 data outside the app;
+  extend it with every further v7 change
   (`src/schema/migrateV6ToV7Script.test.ts` fails if it drifts from
   `schema/legacy.ts`).
 - **Tinted nodes** (visual, not schema): a chromatic accent colors the
@@ -53,6 +57,10 @@ The action-based (ops) undo stack, tombstoning for nodes/edges/boards, and
 TanStack Query as the mutation layer are implemented — see
 `ctx/notes/260921-action-based-undo-and-tombstoning.md` for the design and
 `src/state/ops.ts`/`src/state/history/boardHistoryAtom.ts` for the result.
+In network mode, saves carry an `OpReplay` (`'do' | 'undo' | 'redo'`):
+undo PATCHes each update's `before`, and undoing a create tombstones it
+(redo reactivates it, never re-POSTs) — see
+`ctx/notes/261008-network-undo-redo.md`.
 
 Network mode / backend integration (a REST backend, json-server for now,
 alongside the existing localStorage-backed Local mode) is implemented —
@@ -171,7 +179,14 @@ Full rationale: `ctx/notes/260915-prototype-migration-phase3-tooling.md`.
   containers, edges) covering every persisted node state, for reviewing
   visual changes across theme × view mode. Restart json-server after a
   `--force` regen — it otherwise rewrites the file from its stale
-  in-memory copy on the next write.
+  in-memory copy on the next write. json-server runs with
+  `NODE_ENV=production` (both `dev:server` and the e2e fixture,
+  `e2e/fixtures/jsonServer.ts`): its dev-mode file watcher reloads
+  `db.json` from disk on change and can race its own writes, silently
+  reverting a just-acknowledged PATCH when two land back to back.
+  Production mode turns the watcher off, but makes its static middleware
+  require a `./public` dir, hence `dev:server` running from `server/` with
+  an empty, gitignored `server/public/`.
 - **Linting/formatting**: Biome (`recommended` + cognitive-complexity
   opt-in), also owns formatting — no Prettier. 2-space indentation.
 - **Code health**: `fallow` — complexity/duplication/circular-dependency/

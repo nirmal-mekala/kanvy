@@ -36,3 +36,8 @@ blob-report
 # immediately; regenerate from the app's own schema with `pnpm db:init`
 # (see server/generate-db.ts) instead of hand-editing or committing it.
 server/db.json
+
+# Empty dir `pnpm dev:server` creates so json-server's production-mode
+# static middleware (it scans `./public` eagerly) has something to scan —
+# see the dev:server note in AGENTS.md.
+server/public/

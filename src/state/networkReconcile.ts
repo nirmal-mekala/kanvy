@@ -26,7 +26,7 @@ import type { AttributedOps } from './ops'
 // Tracks node id reconciliations (local id -> server-assigned id) for
 // callers holding an id in a closure across an async gap that can outlive
 // the reconciliation — e.g. a link card's in-flight metadata fetch
-// (src/cards/applyLinkMetadata.ts), captured before the node's own create
+// (state/atoms/linkFetch.ts), captured before the node's own create
 // resolved. Everything already *live in state* gets rewritten in place by
 // `reconcileEntityId`/`reconcileHistoryIds` below; this map exists only for
 // what isn't state, so `resolveReconciledNodeId` can translate such an id

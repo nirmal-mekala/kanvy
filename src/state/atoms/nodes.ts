@@ -157,10 +157,13 @@ export const replaceNodeAtom = atom(
     const board = get(boardAtom)
     const existing = board.nodes.find((node) => node.id === id)
     if (!existing) return
-    // Wholesale replace: `before`/`after` are the entire old/new node —
-    // `applyOps`'s `update` interpreter merges shallowly, but since `next`
-    // already carries every field (kind conversion, phase2 schema §2),
-    // that merge *is* the full replacement. The image op goes first, same
+    // Wholesale replace (kind conversion, phase2 schema §2), recorded as a
+    // field diff (`nodeUpdateOp`) rather than the whole old/new node: a
+    // shallow merge of `next` alone would leave fields only the old kind
+    // had (e.g. a text card's `size` on the new link card) in place, both
+    // locally and on the server. The diff records each one as removed, so
+    // it's deleted locally and sent as `null` in network mode (schema v7,
+    // ctx/notes/261008-flat-link-fields.md). The image op goes first, same
     // reasoning as `addNodeAtom` — network mode resolves `next.imageId`
     // against an id this array already created, so the image's own create
     // must come first.
@@ -177,14 +180,9 @@ export const replaceNodeAtom = atom(
         after: newImage.dataUri,
       })
     }
-    ops.push({
-      kind: 'update',
-      entity: 'node',
-      id,
-      before: existing,
-      after: next,
-    })
-    set(updateBoardAtom, get(currentBoardIdAtom), ops)
+    const update = nodeUpdateOp(existing, next)
+    if (update) ops.push(update)
+    if (ops.length > 0) set(updateBoardAtom, get(currentBoardIdAtom), ops)
   },
 )
 
@@ -298,30 +296,39 @@ export const moveNodesAtom = atom(
 )
 
 /**
- * Patches a link card's fetched-metadata fields once a `fetchLinkMetadata`
- * call (spec §5.4) resolves or fails — a no-op if the card was converted
- * away from `cardType: 'link'` (or deleted) before the fetch settled. `id` is
+ * Applies a link card's fetched metadata once a `fetchLinkMetadata` call
+ * (spec §5.4) resolves — a no-op if the card was converted away from
+ * `cardType: 'link'` (or deleted) before the fetch settled. `id` is
  * resolved through `resolveReconciledNodeId` first since the caller
- * (`applyLinkMetadata`) captured it before the fetch started, and in
- * Network mode the node's local id can have been reconciled to a
- * server-assigned one in the meantime (ctx/notes/
- * 260925-network-id-reconciliation.md).
+ * (state/atoms/linkFetch.ts's `fetchLinkMetadataAtom`) captured it before
+ * the fetch started, and in Network mode the node's local id can have been
+ * reconciled to a server-assigned one in the meantime (ctx/notes/
+ * 260925-network-id-reconciliation.md). A `null` title/image is written
+ * as-is: "the page has none" is an explicit value, not a missing key.
  */
 export const updateLinkAtom = atom(
   null,
-  (get, set, id: NodeId, patch: Partial<LinkCard['link']>) => {
+  (
+    get,
+    set,
+    id: NodeId,
+    metadata: Pick<LinkCard, 'linkTitle' | 'linkImageUrl'>,
+  ) => {
     const resolvedId = resolveReconciledNodeId(id)
     const board = get(boardAtom)
     const node = board.nodes.find((n) => n.id === resolvedId)
     if (node?.nodeType !== 'card' || node.cardType !== 'link') return
-    const now = nowISO()
     set(updateBoardAtom, get(currentBoardIdAtom), [
       {
         kind: 'update',
         entity: 'node',
         id: resolvedId,
-        before: { link: node.link, updatedAt: node.updatedAt },
-        after: { link: { ...node.link, ...patch }, updatedAt: now },
+        before: {
+          linkTitle: node.linkTitle,
+          linkImageUrl: node.linkImageUrl,
+          updatedAt: node.updatedAt,
+        },
+        after: { ...metadata, updatedAt: nowISO() },
       },
     ])
   },
@@ -428,6 +435,31 @@ export const removeEntitiesAtom = atom(
  * (e.g. `setPatternAtom` skips any selected card) so a caller can pass the
  * whole current selection without pre-filtering by node type/kind.
  */
+/**
+ * The `update` op that turns `node` into `next`: only the fields that
+ * differ, over the union of both sides' keys — so a field `next` *drops*
+ * (e.g. a kind conversion leaving `size` behind) is recorded as
+ * `after[key] === undefined`, which `applyPatch` (ops.ts) applies as "delete
+ * this key" locally and network mode sends as an explicit `null`
+ * (api/networkOps.ts), blanking it out server-side. `undefined` when
+ * nothing changed.
+ */
+function nodeUpdateOp(node: Node, next: Node): Op | undefined {
+  const nodeRecord = node as unknown as Record<string, unknown>
+  const nextRecord = next as unknown as Record<string, unknown>
+  const keys = new Set([...Object.keys(nodeRecord), ...Object.keys(nextRecord)])
+  const before: Record<string, unknown> = {}
+  const after: Record<string, unknown> = {}
+  for (const key of keys) {
+    if (nodeRecord[key] !== nextRecord[key]) {
+      before[key] = nodeRecord[key]
+      after[key] = nextRecord[key]
+    }
+  }
+  if (Object.keys(after).length === 0) return undefined
+  return { kind: 'update', entity: 'node', id: node.id, before, after }
+}
+
 function patchSelectedNodes(
   get: (a: typeof currentBoardIdAtom) => string,
   set: (write: typeof updateBoardAtom, boardId: string, ops: Op[]) => void,
@@ -442,24 +474,8 @@ function patchSelectedNodes(
   const ops: Op[] = []
   for (const node of board.nodes) {
     if (!idSet.has(node.id) || skip(node)) continue
-    const patched = patch(node, now) as unknown as Record<string, unknown>
-    const nodeRecord = node as unknown as Record<string, unknown>
-    // The union of both sides' keys — not just `patched`'s — so a patch
-    // that *removes* a key entirely is still detected
-    // as a change (see `applyPatch` in ops.ts for how `after[key] ===
-    // undefined` is interpreted as "delete this key").
-    const keys = new Set([...Object.keys(nodeRecord), ...Object.keys(patched)])
-    const before: Record<string, unknown> = {}
-    const after: Record<string, unknown> = {}
-    for (const key of keys) {
-      if (nodeRecord[key] !== patched[key]) {
-        before[key] = nodeRecord[key]
-        after[key] = patched[key]
-      }
-    }
-    if (Object.keys(after).length > 0) {
-      ops.push({ kind: 'update', entity: 'node', id: node.id, before, after })
-    }
+    const op = nodeUpdateOp(node, patch(node, now))
+    if (op) ops.push(op)
   }
   if (ops.length > 0) set(updateBoardAtom, get(currentBoardIdAtom), ops)
 }

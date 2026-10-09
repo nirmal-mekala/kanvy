@@ -62,12 +62,10 @@ interface ImageCard extends CardBase {
 
 interface LinkCard extends CardBase {
   cardType: 'link'
-  link: {
-    url: string
-    title?: string
-    imageUrl?: string
-    status: 'loading' | 'ready' | 'error'
-  }
+  linkUrl: string            // flat since schema v7 (was nested `link: { url, title?, imageUrl?, status }`)
+  linkTitle: string | null   // null until fetched, or when the page has none
+  linkImageUrl: string | null
+  // fetch status is in-memory only since v7 — ctx/notes/261008-flat-link-fields.md
 }
 
 type CardNode = TextCard | ImageCard | LinkCard
@@ -119,6 +117,9 @@ Notes:
     discarding stale `link`/`imageId` data) rather than fighting it.
 - `link` is nested rather than flat `linkUrl`/`linkTitle`/`linkImageUrl`/
   `linkStatus` — groups the fields that only make sense together.
+  **Superseded in schema v7** (`ctx/notes/261008-flat-link-fields.md`):
+  flat `linkUrl`/`linkTitle`/`linkImageUrl` (one column each), with fetch
+  status in-memory only.
 - `w`/`h`/`x`/`y` keep the prototype's short names rather than JSON Canvas's
   `width`/`height` — no functional reason to rename, noted as a deliberate
   divergence.
