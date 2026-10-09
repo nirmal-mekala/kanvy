@@ -8,7 +8,6 @@
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { RefObject } from 'react'
 import { useEffect } from 'react'
-import { applyLinkMetadata } from '../../cards/applyLinkMetadata'
 import {
   convertToImageCard,
   convertToLinkCard,
@@ -32,11 +31,8 @@ import {
   currentBoardIdAtom,
   rootBoardIdAtom,
 } from '../../state/atoms/currentBoard'
-import {
-  addNodeAtom,
-  replaceNodeAtom,
-  updateLinkAtom,
-} from '../../state/atoms/nodes'
+import { fetchLinkMetadataAtom } from '../../state/atoms/linkFetch'
+import { addNodeAtom, replaceNodeAtom } from '../../state/atoms/nodes'
 import type { View } from './viewportCoords'
 import { worldPoint } from './viewportCoords'
 
@@ -66,7 +62,7 @@ export function useCardCreation({
 }) {
   const addNode = useSetAtom(addNodeAtom)
   const replaceNode = useSetAtom(replaceNodeAtom)
-  const updateLink = useSetAtom(updateLinkAtom)
+  const fetchLinkMetadataFor = useSetAtom(fetchLinkMetadataAtom)
   const createBoard = useSetAtom(createBoardAtom)
   const hasNodeClipboardContent = useAtomValue(hasNodeClipboardContentAtom)
   const currentBoardId = useAtomValue(currentBoardIdAtom)
@@ -105,7 +101,7 @@ export function useCardCreation({
     )?.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId
     if (!focusedId) return undefined
     const node = nodesById.get(focusedId)
-    return node?.type === 'card' ? { id: focusedId, node } : undefined
+    return node?.nodeType === 'card' ? { id: focusedId, node } : undefined
   }
 
   // The card a paste should convert in place, per spec §5.3/§5.4: whichever
@@ -119,7 +115,7 @@ export function useCardCreation({
     if (selection.size === 1) {
       const [id] = selection
       const node = id !== undefined ? nodesById.get(id) : undefined
-      if (id !== undefined && node?.type === 'card') return { id, node }
+      if (id !== undefined && node?.nodeType === 'card') return { id, node }
     }
     return undefined
   }
@@ -187,13 +183,13 @@ export function useCardCreation({
     if (target) {
       if (!isConvertibleCard(target.node)) return // no-op: pasting a URL into an image/link caption
       replaceNode(target.id, convertToLinkCard(target.node, url))
-      applyLinkMetadata(target.id, url, updateLink)
+      fetchLinkMetadataFor(target.id, url)
       return
     }
     const center = viewportCenter()
     const card = newLinkCard(center.x, center.y, url)
     addNode(card)
-    applyLinkMetadata(card.id, url, updateLink)
+    fetchLinkMetadataFor(card.id, url)
   }
 
   useEffect(() => {

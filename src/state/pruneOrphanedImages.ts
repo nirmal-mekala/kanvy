@@ -12,7 +12,7 @@ import type { ImageCard, Node } from '../schema/node'
 /**
  * Drops any `images` entry no remaining node's `imageId` references (spec
  * §2.6) — called after any mutation that could leave one behind (a node
- * deleted, or converted away from `kind: 'image'`). Returns the original
+ * deleted, or converted away from `cardType: 'image'`). Returns the original
  * `images` reference unchanged when nothing was pruned, so callers can
  * still bail out of a board update on an unrelated no-op.
  */
@@ -24,7 +24,7 @@ export function pruneOrphanedImages(
     nodes
       .filter(
         (node): node is ImageCard =>
-          node.type === 'card' && node.kind === 'image',
+          node.nodeType === 'card' && node.cardType === 'image',
       )
       .map((node) => node.imageId),
   )

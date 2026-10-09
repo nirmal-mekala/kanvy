@@ -20,7 +20,7 @@
 import { ensureDataUriUnderBytes } from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import { reconcileNetworkEntityIdAtom } from '../state/networkReconcile'
-import type { EntityKind, ImageOp, Op } from '../state/ops'
+import type { CreateOp, EntityKind, ImageOp, Op, OpReplay } from '../state/ops'
 import {
   createIdRemapTable,
   type IdRemapTable,
@@ -47,6 +47,19 @@ const COLLECTION_BY_ENTITY: Record<EntityKind, string> = {
  */
 const JSON_SERVER_MAX_IMAGE_BYTES = 90_000
 
+/**
+ * A PATCH body for an update op's patch: every field the patch *removes*
+ * (`undefined` — see `applyPatch` in state/ops.ts) is sent as an explicit
+ * `null`, so the server blanks it out. `JSON.stringify` would otherwise
+ * drop the key entirely, leaving the server's old value in place (schema
+ * v7, ctx/notes/261008-flat-link-fields.md).
+ */
+function patchBody(patch: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => [key, value ?? null]),
+  )
+}
+
 /** `value` without its own `id` field — never sent on create (see module comment); the server assigns one and this module learns it from the response instead. */
 function withoutId(value: Record<string, unknown>): Record<string, unknown> {
   const { id: _id, ...rest } = value
@@ -71,62 +84,108 @@ function recordAndReconcile(
   reconcileNetworkEntityIdAtom(kind, originalId, createdId)
 }
 
+/**
+ * A `create` replayed by undo/redo (ctx/notes/261008-network-undo-redo.md).
+ * The entity already exists server-side from its original POST, so undo
+ * tombstones it (`status: 'trashed'`) and redo reactivates it (`'active'`)
+ * — a plain status PATCH either way, never a DELETE or a second POST (a
+ * second POST would mint a new server id). Every entity kind with a
+ * `create` op (node, edge, board) has a `status` field.
+ */
+async function applyReplayedCreate(
+  config: NetworkConfig,
+  idRemapTable: IdRemapTable,
+  op: CreateOp,
+  replay: 'undo' | 'redo',
+  fetchImpl: typeof fetch,
+): Promise<void> {
+  const id = resolveId(idRemapTable, op.entity, op.value.id)
+  await patchEntity(
+    config,
+    COLLECTION_BY_ENTITY[op.entity],
+    id,
+    { status: replay === 'undo' ? 'trashed' : 'active' },
+    fetchImpl,
+  )
+}
+
+async function applyCreate(
+  config: NetworkConfig,
+  idRemapTable: IdRemapTable,
+  op: CreateOp,
+  fetchImpl: typeof fetch,
+): Promise<void> {
+  const value = resolveValueReferences(
+    idRemapTable,
+    op.value as unknown as Record<string, unknown>,
+  )
+  const created = await createEntity<Record<string, unknown>>(
+    config,
+    COLLECTION_BY_ENTITY[op.entity],
+    withoutId(value),
+    fetchImpl,
+  )
+  recordAndReconcile(idRemapTable, op.entity, op.value.id, created.id)
+}
+
 async function applyOp(
   config: NetworkConfig,
   idRemapTable: IdRemapTable,
   op: Op,
+  replay: OpReplay,
   fetchImpl: typeof fetch,
 ): Promise<void> {
   if (op.kind === 'create') {
-    const collection = COLLECTION_BY_ENTITY[op.entity]
-    const value = resolveValueReferences(
-      idRemapTable,
-      op.value as unknown as Record<string, unknown>,
-    )
-    const created = await createEntity<Record<string, unknown>>(
-      config,
-      collection,
-      withoutId(value),
-      fetchImpl,
-    )
-    const originalId = (op.value as { id: string }).id
-    recordAndReconcile(idRemapTable, op.entity, originalId, created.id)
+    if (replay === 'do') {
+      await applyCreate(config, idRemapTable, op, fetchImpl)
+    } else {
+      await applyReplayedCreate(config, idRemapTable, op, replay, fetchImpl)
+    }
     return
   }
   if (op.kind === 'update') {
+    // Undo restores the op's `before`; do/redo apply its `after`.
+    const patch = replay === 'undo' ? op.before : op.after
     const id = resolveId(idRemapTable, op.entity, op.id)
-    const after = resolveValueReferences(idRemapTable, op.after)
     await patchEntity(
       config,
       COLLECTION_BY_ENTITY[op.entity],
       id,
-      after,
+      patchBody(resolveValueReferences(idRemapTable, patch)),
       fetchImpl,
     )
     return
   }
   if (op.kind === 'image') {
-    await applyImageOp(config, idRemapTable, op, fetchImpl)
+    await applyImageOp(config, idRemapTable, op, replay, fetchImpl)
   }
   // 'replace-board': no mapping — see doc comment above.
 }
 
+/**
+ * An image op, in either direction. `from`/`to` are the image's server-side
+ * value before/after this replay (`undefined` = no such image): no target
+ * → DELETE, no source → POST, otherwise PATCH. Images have no `status`, so
+ * unlike nodes/edges/boards an undone image create really is deleted, and
+ * its redo re-POSTs (and reconciles the new server id, same as a first
+ * create).
+ */
 async function applyImageOp(
   config: NetworkConfig,
   idRemapTable: IdRemapTable,
   op: ImageOp,
+  replay: OpReplay,
   fetchImpl: typeof fetch,
 ): Promise<void> {
+  const [from, to] =
+    replay === 'undo' ? [op.after, op.before] : [op.before, op.after]
   const id = resolveId(idRemapTable, 'image', op.id)
-  if (op.after === undefined) {
+  if (to === undefined) {
     await deleteEntity(config, 'images', id, fetchImpl)
     return
   }
-  const dataUri = await ensureDataUriUnderBytes(
-    op.after,
-    JSON_SERVER_MAX_IMAGE_BYTES,
-  )
-  if (op.before !== undefined) {
+  const dataUri = await ensureDataUriUnderBytes(to, JSON_SERVER_MAX_IMAGE_BYTES)
+  if (from !== undefined) {
     await patchEntity(config, 'images', id, { dataUri }, fetchImpl)
     return
   }
@@ -147,15 +206,20 @@ async function applyImageOp(
  * module comment) — one TanStack Query mutation per gesture (design doc
  * §5), even though it's several real HTTP requests underneath. The
  * id-remap table is scoped to this one call (see networkIdRemap.ts) — a
- * fresh, empty one every time, never shared across gestures.
+ * fresh, empty one every time, never shared across gestures. `replay`
+ * says whether this is the gesture itself, its undo, or its redo
+ * (state/ops.ts's `OpReplay`); an undo applies the ops in reverse order,
+ * the same as `applyOps(…, 'before')` does locally.
  */
 export async function applyOpsToNetwork(
   config: NetworkConfig,
   ops: readonly Op[],
+  replay: OpReplay = 'do',
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   const idRemapTable = createIdRemapTable()
-  for (const op of ops) {
-    await applyOp(config, idRemapTable, op, fetchImpl)
+  const ordered = replay === 'undo' ? [...ops].reverse() : ops
+  for (const op of ordered) {
+    await applyOp(config, idRemapTable, op, replay, fetchImpl)
   }
 }

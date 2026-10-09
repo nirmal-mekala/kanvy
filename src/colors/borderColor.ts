@@ -5,6 +5,7 @@
 // the element carries it as `data-accent` and styles/accents.css maps it
 // to the (theme-aware) token.
 
+import { isTask, type TaskField } from '../schema/node'
 import type { ColorKey } from './colorKey'
 import { resolveRecencyColor } from './recency'
 import type { TaskStatus } from './taskStatus'
@@ -15,7 +16,7 @@ export type NodeAccent = ColorKey | `task-${TaskStatus}`
 
 export interface BorderColorInput {
   color: ColorKey
-  task?: { status: TaskStatus } | undefined
+  task: TaskField
   updatedAt: string
 }
 
@@ -32,7 +33,7 @@ export function resolveNodeAccent(
   now: Date,
 ): NodeAccent {
   if (viewMode === 'task') {
-    return node.task ? `task-${node.task.status}` : 'gray'
+    return isTask(node) ? `task-${node.task}` : 'gray'
   }
   if (viewMode === 'recency') return resolveRecencyColor(node.updatedAt, now)
   return node.color

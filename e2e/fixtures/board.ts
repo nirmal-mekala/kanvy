@@ -57,8 +57,12 @@ export function childBoardDocument(
 ): unknown {
   const now = '2026-01-01T00:00:00.000Z'
   return {
-    version: 6,
-    nodes: nodes.map((node) => ({ ...node, boardId: CHILD_BOARD_ID })),
+    version: 7,
+    nodes: nodes.map((node) => ({
+      task: 'none',
+      ...node,
+      boardId: CHILD_BOARD_ID,
+    })),
     edges: edges.map((edge) => ({ ...edge, boardId: CHILD_BOARD_ID })),
     boards: [
       {

@@ -58,8 +58,8 @@ test.describe('baseline a11y (spec §11)', () => {
         nodes: [
           {
             id: 'img-1',
-            type: 'card',
-            kind: 'image',
+            nodeType: 'card',
+            cardType: 'image',
             imageId: 'image-1',
             x: 100,
             y: 100,
@@ -111,8 +111,8 @@ test.describe('basic touch support (spec §12)', () => {
         nodes: [
           {
             id: 'touch-a',
-            type: 'card',
-            kind: 'text',
+            nodeType: 'card',
+            cardType: 'text',
             size: 'regular',
             x: 100,
             y: 100,

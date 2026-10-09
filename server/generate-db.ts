@@ -16,7 +16,7 @@
 //
 // The document is a *design-review fixture*: it lays out every persisted
 // node state the app can render — every kind, heading size, accent color,
-// task status, recency band, link status, container pattern, edge
+// task status, recency band, link metadata, container pattern, edge
 // direction — as labeled rows on one showcase board per topic, linked from
 // the home board. Load it, then flip theme (light/dark) and view mode
 // (standard/task/recency) to see each state under every lens. Transient
@@ -42,6 +42,7 @@ import type {
   ColorKey,
   Node,
   PatternKey,
+  TaskField,
   TaskStatus,
 } from '../src/schema/node.ts'
 
@@ -117,19 +118,26 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
 // the board builder below assigns those.
 type Draft = DistributiveOmit<
   Node,
-  'id' | 'boardId' | 'index' | 'status' | 'createdAt' | 'updatedAt' | 'x' | 'y'
+  | 'id'
+  | 'boardId'
+  | 'position'
+  | 'status'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'x'
+  | 'y'
 > & { age?: number }
 
 interface Common {
   color?: ColorKey
-  task?: TaskStatus
+  task?: TaskField
   age?: number
 }
 
-function common({ color = 'gray', task, age }: Common) {
+function common({ color = 'gray', task = 'none', age }: Common) {
   return {
     color,
-    ...(task ? { task: { status: task } } : {}),
+    task,
     ...(age === undefined ? {} : { age }),
   }
 }
@@ -147,8 +155,8 @@ function captionHeight(content: string): number {
 
 function text(content: string, opts: Common = {}): Draft {
   return {
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     content,
     w: 224,
@@ -169,8 +177,8 @@ function heading(
   opts: Common & { w?: number; h?: number } = {},
 ): Draft {
   return {
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size,
     content,
     w: opts.w ?? HEADING_BOX[size].w,
@@ -185,8 +193,8 @@ function image(
   opts: Common = {},
 ): Draft {
   return {
-    type: 'card',
-    kind: 'image',
+    nodeType: 'card',
+    cardType: 'image',
     imageId: `img-${which}`,
     content: caption,
     w: 224,
@@ -198,27 +206,25 @@ function image(
 }
 
 interface LinkOpts extends Common {
-  status?: 'loading' | 'ready' | 'error'
   title?: string
   withImage?: boolean
   url?: string
   caption?: string
 }
 
-function linkMeta({ status = 'ready', title, withImage, url }: LinkOpts) {
+function linkMeta({ title, withImage, url }: LinkOpts) {
   return {
-    url: url ?? 'https://example.com/some/article',
-    status,
-    ...(title === undefined ? {} : { title }),
-    ...(withImage ? { imageUrl: LANDSCAPE } : {}),
+    linkUrl: url ?? 'https://example.com/some/article',
+    linkTitle: title ?? null,
+    linkImageUrl: withImage ? LANDSCAPE : null,
   }
 }
 
 function link(opts: LinkOpts = {}): Draft {
   return {
-    type: 'card',
-    kind: 'link',
-    link: linkMeta(opts),
+    nodeType: 'card',
+    cardType: 'link',
+    ...linkMeta(opts),
     content: opts.caption ?? '',
     w: 224,
     h: (opts.withImage ? 200 : 90) + captionHeight(opts.caption ?? ''),
@@ -231,7 +237,7 @@ function container(
   opts: Common & { w?: number; h?: number } = {},
 ): Draft {
   return {
-    type: 'container',
+    nodeType: 'container',
     pattern,
     w: opts.w ?? 320,
     h: opts.h ?? 224,
@@ -241,8 +247,8 @@ function container(
 
 function boardCard(boardRef: string, opts: Common = {}): Draft {
   return {
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef,
     content: '',
     w: 224,
@@ -325,7 +331,7 @@ function makeNodeFactory(boardId: string) {
       x,
       y,
       status: 'active',
-      index: index++,
+      position: index++,
       createdAt: ago(age + DAY),
       updatedAt: ago(age),
     } as Node)
@@ -589,13 +595,14 @@ function imageRows(): Row[] {
 function linkRows(): Row[] {
   return [
     {
-      label: 'status',
+      // No loading/error rows: fetch state is in-memory only (schema v7,
+      // ctx/notes/261008-flat-link-fields.md) — paste a URL to see "Loading…".
+      label: 'metadata',
       cells: [
-        link({ status: 'loading' }),
-        link({ status: 'error' }),
-        link({ title: 'Ready, title only' }),
-        link({}), // ready, no title → shows the URL
-        link({ title: 'Ready, title + image', withImage: true }),
+        link({ title: 'Title only' }),
+        link({}), // no title → shows the URL
+        link({ title: 'Title + image', withImage: true }),
+        link({ withImage: true }), // image, no title → shows the URL
       ],
     },
     {
@@ -619,8 +626,8 @@ function linkRows(): Row[] {
       label: 'tinted',
       cells: [
         link({ color: 'coral', title: 'coral', withImage: true }),
-        link({ color: 'teal', status: 'loading' }),
-        link({ color: 'amber', status: 'error' }),
+        link({ color: 'teal' }),
+        link({ color: 'amber', title: 'amber', withImage: true }),
         link({ color: 'violet', title: 'violet', caption: 'caption' }),
       ],
     },

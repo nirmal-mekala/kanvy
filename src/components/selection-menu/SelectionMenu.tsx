@@ -19,6 +19,7 @@ import {
   type ColorKey,
   ColorKeySchema,
   type ContainerNode,
+  isTask,
   type PatternKey,
   PatternKeySchema,
   type TaskStatus,
@@ -77,18 +78,20 @@ export function SelectionMenu({
   const commonPattern = commonValue(selectedContainers.map((c) => c.pattern))
 
   const allCardsAreText =
-    selectedCards.length > 0 && selectedCards.every((c) => c.kind === 'text')
+    selectedCards.length > 0 &&
+    selectedCards.every((c) => c.cardType === 'text')
   const commonTextSize = allCardsAreText
-    ? commonValue(selectedCards.map((c) => (c.kind === 'text' ? c.size : null)))
+    ? commonValue(
+        selectedCards.map((c) => (c.cardType === 'text' ? c.size : null)),
+      )
     : null
 
   const commonTaskKind = commonValue(
-    taskItems.map((item) => (item.task ? 'task' : 'default')),
+    taskItems.map((item) => (isTask(item) ? 'task' : 'default')),
   )
-  const allSelectedAreTasks =
-    taskItems.length > 0 && taskItems.every((item) => item.task)
+  const allSelectedAreTasks = taskItems.length > 0 && taskItems.every(isTask)
   const commonTaskStatus = commonValue(
-    taskItems.filter((item) => item.task).map((item) => item.task?.status),
+    taskItems.filter(isTask).map((item) => item.task),
   )
 
   return (

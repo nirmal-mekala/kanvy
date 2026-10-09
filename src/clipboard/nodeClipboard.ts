@@ -115,7 +115,7 @@ export const pasteFromNodeClipboardAtom = atom(
     const boardNodes: BoardCard[] = []
     const pastedNodes: Node[] = []
     for (const node of clip.nodes) {
-      if (node.type === 'card' && node.kind === 'board') {
+      if (node.nodeType === 'card' && node.cardType === 'board') {
         boardNodes.push(node)
         continue
       }

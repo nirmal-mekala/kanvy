@@ -63,7 +63,7 @@ export interface PendingBoardConfirm {
 }
 
 function isBoardCard(node: Node): node is BoardCard {
-  return node.type === 'card' && node.kind === 'board'
+  return node.nodeType === 'card' && node.cardType === 'board'
 }
 
 /** Design doc §4's copy pattern — "Delete 3 boards (47 nodes total)?" — shared across delete/duplicate/paste, which only differ in verb. */
@@ -141,7 +141,7 @@ export function useClipboardShortcuts({
 
   function containerRects(): Rect[] {
     return nodes
-      .filter((node) => node.type === 'container')
+      .filter((node) => node.nodeType === 'container')
       .map((node) => ({ x: node.x, y: node.y, w: node.w, h: node.h }))
   }
 
@@ -312,7 +312,7 @@ export function useClipboardShortcuts({
     // outside `contentRef`, multiboard support design doc §3), so this is
     // scoped to every *other* card kind, same as before that kind existed.
     const only = allNew.length === 1 ? allNew[0] : undefined
-    if (only?.type === 'card' && only.kind !== 'board') {
+    if (only?.nodeType === 'card' && only.cardType !== 'board') {
       setFocusNodeId(only.id)
     }
   }

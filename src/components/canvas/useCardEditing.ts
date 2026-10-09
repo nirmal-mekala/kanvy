@@ -1,19 +1,15 @@
 // Caption editing + URL-slurp orchestration (spec §5.4) — wires the pure
 // `detectSlurpOnType`/`detectSlurpOnBlur` (src/cards/urlSlurp.ts, built in
 // Stage 3) and `convertToLinkCard` (Stage 6) into the actual textarea
-// onChange/onBlur handlers. Only `kind: 'text'` cards ever slurp (spec
+// onChange/onBlur handlers. Only `cardType: 'text'` cards ever slurp (spec
 // §5.3: an image card's caption never triggers it).
 
 import { useSetAtom } from 'jotai'
-import { applyLinkMetadata } from '../../cards/applyLinkMetadata'
 import { convertToLinkCard } from '../../cards/convertCardKind'
 import { detectSlurpOnBlur, detectSlurpOnType } from '../../cards/urlSlurp'
 import type { Node, NodeId } from '../../schema/node'
-import {
-  replaceNodeAtom,
-  updateCardContentAtom,
-  updateLinkAtom,
-} from '../../state/atoms/nodes'
+import { fetchLinkMetadataAtom } from '../../state/atoms/linkFetch'
+import { replaceNodeAtom, updateCardContentAtom } from '../../state/atoms/nodes'
 
 export function useCardEditing({
   nodesById,
@@ -22,7 +18,7 @@ export function useCardEditing({
 }) {
   const updateCardContent = useSetAtom(updateCardContentAtom)
   const replaceNode = useSetAtom(replaceNodeAtom)
-  const updateLink = useSetAtom(updateLinkAtom)
+  const fetchLinkMetadataFor = useSetAtom(fetchLinkMetadataAtom)
 
   // CRAP scoring penalizes these handlers for 0% coverage —
   // component/interaction tests aren't a required tier for v0 (spec §13);
@@ -31,10 +27,10 @@ export function useCardEditing({
   // fallow-ignore-next-line complexity
   function handleContentChange(id: NodeId, content: string) {
     const node = nodesById.get(id)
-    if (node?.type !== 'card') return
+    if (node?.nodeType !== 'card') return
     updateCardContent(id, content)
 
-    if (node.kind !== 'text') return
+    if (node.cardType !== 'text') return
     // The textarea's onChange fires after the keystroke lands, so the just-
     // typed trigger character is the content's last character — matches
     // detectSlurpOnType's "at cursor position" contract for the live-typing
@@ -46,20 +42,20 @@ export function useCardEditing({
       id,
       convertToLinkCard({ ...node, content: slurp.remainingText }, slurp.url),
     )
-    applyLinkMetadata(id, slurp.url, updateLink)
+    fetchLinkMetadataFor(id, slurp.url)
   }
 
   // fallow-ignore-next-line complexity
   function handleContentBlur(id: NodeId) {
     const node = nodesById.get(id)
-    if (node?.type !== 'card' || node.kind !== 'text') return
+    if (node?.nodeType !== 'card' || node.cardType !== 'text') return
     const slurp = detectSlurpOnBlur(node.content)
     if (!slurp) return
     replaceNode(
       id,
       convertToLinkCard({ ...node, content: slurp.remainingText }, slurp.url),
     )
-    applyLinkMetadata(id, slurp.url, updateLink)
+    fetchLinkMetadataFor(id, slurp.url)
   }
 
   return { handleContentChange, handleContentBlur }

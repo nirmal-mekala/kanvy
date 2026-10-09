@@ -83,8 +83,8 @@ import { seedBoard } from './fixtures/board'
 function textCard(id: string, x: number, y: number, w = 224, h = 90) {
   return {
     id,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
@@ -100,7 +100,7 @@ function textCard(id: string, x: number, y: number, w = 224, h = 90) {
 function containerNode(id: string, x: number, y: number, w: number, h: number) {
   return {
     id,
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
     x,

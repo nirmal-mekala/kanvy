@@ -32,7 +32,7 @@ function page<T>(data: T[]) {
 
 const ts = '2026-01-01T00:00:00.000Z'
 
-/** A `GET /boards` entry as a v6 backend stores it. */
+/** A `GET /boards` entry as a v6+ backend stores it. */
 function serverBoard(id: string, isRoot: boolean) {
   return {
     id,
@@ -44,8 +44,8 @@ function serverBoard(id: string, isRoot: boolean) {
   }
 }
 
-/** A `fetch` stub serving `boards` for `/boards` and nothing for every other collection. */
-function stubServer(boards: unknown[]) {
+/** A `fetch` stub serving `boards` for `/boards`, `nodes` for `/nodes`, and nothing for `/edges`. */
+function stubServer(boards: unknown[], nodes: unknown[] = []) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -53,7 +53,10 @@ function stubServer(boards: unknown[]) {
       if (u.pathname.endsWith('/boards')) {
         return new Response(JSON.stringify(page(boards)), { status: 200 })
       }
-      if (u.pathname.endsWith('/nodes') || u.pathname.endsWith('/edges')) {
+      if (u.pathname.endsWith('/nodes')) {
+        return new Response(JSON.stringify(page(nodes)), { status: 200 })
+      }
+      if (u.pathname.endsWith('/edges')) {
         return new Response(JSON.stringify(page([])), { status: 200 })
       }
       throw new Error(`unexpected fetch: ${url}`)
@@ -65,7 +68,7 @@ const CONFIG = { baseUrl: 'https://api.example.test/', authToken: '' }
 
 function emptyBoard(): Board {
   return {
-    version: 6,
+    version: 7,
     nodes: [],
     edges: [],
     boards: [
@@ -173,6 +176,41 @@ describe('attemptBootReconnect', () => {
     expect(result).toBe('failed')
     expect(s.store.get(s.networkLoadErrorAtom)?.message).toMatch(
       /GET \/boards returned 1 invalid entry: id "root" \(isRoot: /,
+    )
+  })
+
+  it('fails, naming the nodes, when a home-board node uses a pre-v7 shape: task { status } or null, or index instead of position', async () => {
+    const s = await freshState()
+    const node = (id: string, fields: Record<string, unknown>) => ({
+      id,
+      boardId: 's3rv3rr00t00',
+      nodeType: 'container',
+      pattern: 'none',
+      x: 0,
+      y: 0,
+      w: 128,
+      h: 96,
+      color: 'gray',
+      status: 'active',
+      createdAt: ts,
+      updatedAt: ts,
+      ...fields,
+    })
+    const v7 = { task: 'none', position: 0 }
+    stubServer(
+      [serverBoard('s3rv3rr00t00', true)],
+      [
+        node('ok', { ...v7, task: 'done' }),
+        node('not-a-task', v7),
+        node('old', { ...v7, task: { status: 'done' } }),
+        node('nulled', { ...v7, task: null }),
+        node('indexed', { task: 'none', index: 0 }),
+      ],
+    )
+
+    expect(await s.attemptBootReconnect(CONFIG)).toBe('failed')
+    expect(s.store.get(s.networkLoadErrorAtom)?.message).toMatch(
+      /GET \/nodes returned 3 invalid entries: id "old" \(.*\); id "nulled" \(.*\); id "indexed" \(/,
     )
   })
 

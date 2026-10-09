@@ -38,8 +38,8 @@ import { makeImageDataUri } from './fixtures/testImage'
 function textCard(id: string, x: number, y: number, content = '') {
   return {
     id,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
@@ -55,7 +55,7 @@ function textCard(id: string, x: number, y: number, content = '') {
 function containerNode(id: string, x: number, y: number, w: number, h: number) {
   return {
     id,
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     color: 'gray',
     x,
@@ -76,11 +76,11 @@ async function seed(page: import('@playwright/test').Page, board: unknown) {
 // right after a gesture needs to wait past it.
 async function readBoardNodes(
   page: import('@playwright/test').Page,
-): Promise<{ id: string; type: string }[]> {
+): Promise<{ id: string; nodeType: string }[]> {
   await page.waitForTimeout(600)
   const raw = await page.evaluate(() => localStorage.getItem('kanvy.board'))
   const board = JSON.parse(raw ?? '{"nodes":[]}') as {
-    nodes: { id: string; type: string }[]
+    nodes: { id: string; nodeType: string }[]
   }
   return board.nodes
 }
@@ -139,6 +139,46 @@ test.describe('card-kind behavior (spec §5)', () => {
     await expect(page.locator('.card__link-title-text')).toHaveText(
       'Slow Site',
       { timeout: 5000 },
+    )
+  })
+
+  test('a v6 link card persisted mid-fetch (link.status "loading") migrates to flat fields and shows its URL, not a stuck "Loading…" (schema v7)', async ({
+    page,
+  }) => {
+    const now = '2026-01-01T00:00:00.000Z'
+    await seed(page, {
+      ...(childBoardDocument([]) as Record<string, unknown>),
+      version: 6,
+      nodes: [
+        {
+          id: 'l1',
+          boardId: CHILD_BOARD_ID,
+          type: 'card',
+          kind: 'link',
+          link: { url: 'https://stuck.example', status: 'loading' },
+          content: '',
+          x: 100,
+          y: 100,
+          w: 224,
+          h: 90,
+          color: 'gray',
+          status: 'active',
+          index: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      images: [],
+    })
+    await page.goto(`/${CHILD_BOARD_ID}`)
+    const card = page.locator('[data-node-id="l1"]:not(.node-connector)')
+    await expect(card).toHaveClass(/card--link/)
+    await expect(card.locator('.card__link-title-text')).toHaveText(
+      'https://stuck.example',
+    )
+    await expect(card.locator('.card__link-body')).toHaveAttribute(
+      'href',
+      'https://stuck.example',
     )
   })
 
@@ -808,7 +848,7 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
     // Proves this is an actual text card, not a board card (design doc §3).
     await expect(page.locator('.card--board')).toHaveCount(0)
     const nodes = await readBoardNodes(page)
-    const card = nodes.find((n) => n.type === 'card')
+    const card = nodes.find((n) => n.nodeType === 'card')
 
     // Carried along when the container is dragged — the only observable
     // proof of spatial containment there is, with no stored parentId.

@@ -176,11 +176,12 @@ export function Canvas() {
   // menu for the whole selection, however mixed" — both can show at once).
   const selectedEdges = boardEdges.filter((edge) => selection.has(edge.id))
   const selectedCards = boardNodes.filter(
-    (node): node is CardNode => node.type === 'card' && selection.has(node.id),
+    (node): node is CardNode =>
+      node.nodeType === 'card' && selection.has(node.id),
   )
   const selectedContainers = boardNodes.filter(
     (node): node is ContainerNode =>
-      node.type === 'container' && selection.has(node.id),
+      node.nodeType === 'container' && selection.has(node.id),
   )
   const selectedNodeIds = [...selectedCards, ...selectedContainers].map(
     (node) => node.id,
@@ -421,7 +422,7 @@ export function Canvas() {
             cleanly above everything before it. */}
         {sortContainersForRender(
           boardNodes.filter(
-            (node): node is ContainerNode => node.type === 'container',
+            (node): node is ContainerNode => node.nodeType === 'container',
           ),
         ).map((node) => (
           <Container
@@ -464,11 +465,11 @@ export function Canvas() {
         />
 
         {boardNodes
-          .filter((node) => node.type === 'card')
+          .filter((node) => node.nodeType === 'card')
           // fallow-ignore-next-line complexity
           .map((node) => {
             const imageSrc =
-              node.kind === 'image'
+              node.cardType === 'image'
                 ? findImageDataUri(images, node.imageId)
                 : undefined
             return (

@@ -9,7 +9,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { resolveNodeAccent, type ViewMode } from '../../colors/borderColor'
 import type { Side } from '../../geometry/anchor'
-import type { CardNode } from '../../schema/node'
+import { type CardNode, isTask } from '../../schema/node'
 import { NodeConnectors } from '../canvas/NodeConnectors'
 import { ResizeHandles } from '../canvas/ResizeHandles'
 import type { ResizeDir, ResizeKind } from '../canvas/useBoardInteraction'
@@ -170,7 +170,7 @@ function CardResizeHandles({
   }
   const kind: ResizeKind | null = isHeading
     ? 'heading'
-    : node.kind === 'board'
+    : node.cardType === 'board'
       ? 'board'
       : null
   if (!kind) return null
@@ -249,19 +249,19 @@ export function Card({
   onConnectorPointerMove?: (e: React.PointerEvent) => void
   onConnectorPointerUp?: (e: React.PointerEvent) => void
 }) {
-  const isHeading = node.kind === 'text' && node.size !== 'regular'
+  const isHeading = node.cardType === 'text' && node.size !== 'regular'
   // A board card's title is handled entirely inside CardBody's
   // `kind === 'board'` branch (always visible, via `BoardNameEditor`, not
   // gated by this at all — see ctx/notes/260918-board-node-redesign.md).
   // This remains the content-or-selected visibility rule for link/image
   // captions only.
   const showCaption =
-    (node.kind !== 'image' && node.kind !== 'link') ||
+    (node.cardType !== 'image' && node.cardType !== 'link') ||
     node.content !== '' ||
     selected
-  const isDone = node.task?.status === 'done'
+  const isDone = node.task === 'done'
   // Task mode dims everything that isn't a task, so tasks stand out.
-  const isDimmedByViewMode = viewMode === 'task' && node.task === undefined
+  const isDimmedByViewMode = viewMode === 'task' && !isTask(node)
   const accent = resolveNodeAccent(node, viewMode, new Date())
 
   const cardElRef = useRef<HTMLDivElement | null>(null)
@@ -301,7 +301,7 @@ export function Card({
       data-testid="card"
       data-accent={accent}
       className={cardClassNames(node, {
-        headingSize: node.kind === 'text' ? node.size : null,
+        headingSize: node.cardType === 'text' ? node.size : null,
         isDone,
         isDimmed: isDimmedByViewMode,
         selected,

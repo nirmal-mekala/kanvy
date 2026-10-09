@@ -10,16 +10,17 @@ function boardCard(id: string, boardRef: string, x = 100, y = 100): BoardCard {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef,
     x,
     y,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: NOW,
     updatedAt: NOW,
@@ -143,16 +144,17 @@ describe('duplicateBoardNodes', () => {
         {
           id: 'content-1',
           boardId: 'child-1',
-          type: 'card',
-          kind: 'text',
+          nodeType: 'card',
+          cardType: 'text',
           size: 'regular',
           x: 0,
           y: 0,
           w: 224,
           h: 90,
           color: 'gray',
+          task: 'none',
           status: 'active',
-          index: 0,
+          position: 0,
           content: 'hello',
           createdAt: NOW,
           updatedAt: NOW,
@@ -163,11 +165,11 @@ describe('duplicateBoardNodes', () => {
 
     const newBoardId = result.boards[0]?.id
     const copiedContent = result.nodes.find(
-      (n) => n.type === 'card' && n.kind === 'text',
+      (n) => n.nodeType === 'card' && n.cardType === 'text',
     )
     expect(copiedContent?.id).not.toBe('content-1')
     expect(copiedContent?.boardId).toBe(newBoardId)
-    expect(copiedContent?.type === 'card' && copiedContent.content).toBe(
+    expect(copiedContent?.nodeType === 'card' && copiedContent.content).toBe(
       'hello',
     )
   })
@@ -179,16 +181,17 @@ describe('duplicateBoardNodes', () => {
         {
           id: 'a',
           boardId: 'child-1',
-          type: 'card',
-          kind: 'text',
+          nodeType: 'card',
+          cardType: 'text',
           size: 'regular',
           x: 0,
           y: 0,
           w: 224,
           h: 90,
           color: 'gray',
+          task: 'none',
           status: 'active',
-          index: 0,
+          position: 0,
           content: '',
           createdAt: NOW,
           updatedAt: NOW,
@@ -196,16 +199,17 @@ describe('duplicateBoardNodes', () => {
         {
           id: 'c',
           boardId: 'child-1',
-          type: 'card',
-          kind: 'text',
+          nodeType: 'card',
+          cardType: 'text',
           size: 'regular',
           x: 300,
           y: 0,
           w: 224,
           h: 90,
           color: 'gray',
+          task: 'none',
           status: 'active',
-          index: 0,
+          position: 0,
           content: '',
           createdAt: NOW,
           updatedAt: NOW,
@@ -231,10 +235,10 @@ describe('duplicateBoardNodes', () => {
     expect(result.edges).toHaveLength(1)
     const edge = result.edges[0]
     const copiedA = result.nodes.find(
-      (n) => n.type === 'card' && n.content === '' && n.x === 0,
+      (n) => n.nodeType === 'card' && n.content === '' && n.x === 0,
     )
     const copiedC = result.nodes.find(
-      (n) => n.type === 'card' && n.content === '' && n.x === 300,
+      (n) => n.nodeType === 'card' && n.content === '' && n.x === 300,
     )
     expect(edge?.fromNodeId).toBe(copiedA?.id)
     expect(edge?.toNodeId).toBe(copiedC?.id)

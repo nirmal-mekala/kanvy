@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { seedBoard } from './fixtures/board'
+import { CHILD_BOARD_ID, childBoardDocument, seedBoard } from './fixtures/board'
 
 // Stage 8 (task layer & view modes) — spec §6. Written against
 // components/selection-menu/SelectionMenu.tsx's actual DOM contract
@@ -17,8 +17,8 @@ import { seedBoard } from './fixtures/board'
 function textCard(id: string, x: number, y: number) {
   return {
     id,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y,
@@ -59,6 +59,72 @@ test.describe('task toggle & status (spec §6.1)', () => {
     await expect(page.locator('.task-swatch[title="blocked"]')).toHaveClass(
       /task-swatch--active/,
     )
+  })
+
+  test('a full v6 document (task { status }, index, type/kind) migrates to v7 on load, and un-tasking persists "none" (schema v7)', async ({
+    page,
+  }) => {
+    const now = '2026-01-01T00:00:00.000Z'
+    await seed(page, {
+      ...(childBoardDocument([]) as Record<string, unknown>),
+      version: 6,
+      nodes: [
+        {
+          id: 'a',
+          boardId: CHILD_BOARD_ID,
+          type: 'card',
+          kind: 'text',
+          size: 'regular',
+          x: 100,
+          y: 100,
+          w: 224,
+          h: 90,
+          color: 'gray',
+          task: { status: 'blocked' },
+          status: 'active',
+          index: 0,
+          content: 'a',
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      images: [],
+    })
+    await page.goto(`/${CHILD_BOARD_ID}`)
+    const card = page.locator('[data-node-id="a"]:not(.node-connector)')
+    await expect(
+      card.locator('.task-status-icon[data-task-status="blocked"]'),
+    ).toBeVisible()
+
+    await card.click()
+    await page.locator('.task-swatch[title="Default"]').click()
+    await expect(card.locator('.task-status-icon')).toHaveCount(0)
+
+    await expect
+      .poll(async () => {
+        const raw = await page.evaluate(() =>
+          localStorage.getItem('kanvy.board'),
+        )
+        const stored = JSON.parse(raw ?? '{}')
+        const node = stored.nodes?.find((n: { id: string }) => n.id === 'a')
+        return { version: stored.version, node }
+      })
+      .toEqual({
+        version: 7,
+        node: expect.objectContaining({
+          nodeType: 'card',
+          cardType: 'text',
+          position: 0,
+          task: 'none',
+        }),
+      })
+    const stored = JSON.parse(
+      (await page.evaluate(() => localStorage.getItem('kanvy.board'))) ?? '{}',
+    )
+    const node = stored.nodes.find((n: { id: string }) => n.id === 'a')
+    for (const oldKey of ['type', 'kind', 'index']) {
+      expect(node).not.toHaveProperty(oldKey)
+    }
   })
 
   test('done styling strikes through and dims the caption', async ({

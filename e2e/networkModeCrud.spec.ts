@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { NETWORK_ROOT_ID, ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 import { startJsonServer } from './fixtures/jsonServer'
+import { mockLinkMetadata } from './fixtures/linkMetadata'
 
 // Closes the coverage gaps a 260924 audit flagged: Board/board-card,
 // Container, and Edge CRUD had never been exercised against a real
@@ -35,7 +36,7 @@ const NOW = '2026-01-01T00:00:00.000Z'
 const SAMPLE_BOARD_ID = 'b1'
 
 const EMPTY_LOCAL_DOCUMENT = {
-  version: 6,
+  version: 7,
   nodes: [],
   edges: [],
   boards: [
@@ -76,16 +77,17 @@ function baseDb(extraNodes: Record<string, unknown>[] = []) {
       {
         id: 'n0',
         boardId: NETWORK_ROOT_ID,
-        type: 'card',
-        kind: 'board',
+        nodeType: 'card',
+        cardType: 'board',
         boardRef: SAMPLE_BOARD_ID,
         x: 88,
         y: 104,
         w: 224,
         h: 90,
         color: 'gray',
+        task: 'none',
         status: 'active',
-        index: 0,
+        position: 0,
         content: '',
         createdAt: NOW,
         updatedAt: NOW,
@@ -101,16 +103,17 @@ function textCard(id: string, x: number, content: string) {
   return {
     id,
     boardId: SAMPLE_BOARD_ID,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x,
     y: 100,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     status: 'active',
-    index: 0,
+    position: 0,
     content,
     createdAt: NOW,
     updatedAt: NOW,
@@ -304,6 +307,116 @@ test.describe('text card CRUD over the network', () => {
           timeout: 10_000,
         })
         .toBe('trashed')
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
+test.describe('undo/redo over the network (ctx/notes/261008-network-undo-redo.md)', () => {
+  test('undo restores an update and tombstones a create on the server; redo reactivates it without a second POST and re-applies the update', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+      const poll = <T>(read: () => Promise<T>) =>
+        expect.poll(read, { timeout: 10_000 })
+      const serverNode = () => getSampleBoardNode(page, baseUrl)
+      const sampleBoardNodeCount = async () =>
+        (await getCollection(page, baseUrl, 'nodes')).filter(
+          (node) => node.boardId === SAMPLE_BOARD_ID,
+        ).length
+
+      // DO — create (POST), then, past the 400ms undo-coalescing window so
+      // it's its own undo step, recolor (PATCH).
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 500, y: 400 } })
+      const card = page.locator('[data-testid="card"]')
+      await expect(card).toHaveCount(1, { timeout: 10_000 })
+      await poll(async () => (await serverNode())?.status).toBe('active')
+      await page.waitForTimeout(600)
+      await card.locator('.card__bar').click()
+      await page.locator('.swatch[title="coral"]').click()
+      await poll(async () => (await serverNode())?.color).toBe('coral')
+
+      // UNDO the recolor — PATCHes the op's `before`.
+      await page.keyboard.press('ControlOrMeta+z')
+      await poll(async () => (await serverNode())?.color).toBe('gray')
+
+      // UNDO the create — a tombstone, not a DELETE.
+      await page.keyboard.press('ControlOrMeta+z')
+      await expect(card).toHaveCount(0)
+      await poll(async () => (await serverNode())?.status).toBe('trashed')
+
+      // REDO the create — reactivates the same server entity.
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await expect(card).toHaveCount(1)
+      await poll(async () => (await serverNode())?.status).toBe('active')
+
+      // REDO the recolor.
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await poll(async () => (await serverNode())?.color).toBe('coral')
+
+      // Exactly one server node the whole way through — redo never re-POSTed.
+      expect(await sampleBoardNodeCount()).toBe(1)
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
+test.describe('link card conversion over the network (schema v7, ctx/notes/261008-flat-link-fields.md)', () => {
+  test('slurping a URL into a text card PATCHes flat link fields, blanks the dropped size with an explicit null, and never persists fetch state', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    await mockLinkMetadata(page, { status: 'ready', title: 'Example Site' })
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 500, y: 400 } })
+      const card = page.locator('[data-testid="card"]')
+      await expect(card).toHaveCount(1, { timeout: 10_000 })
+      await expect
+        .poll(async () => (await getSampleBoardNode(page, baseUrl))?.size, {
+          timeout: 10_000,
+        })
+        .toBe('regular')
+
+      await card.locator('.card__content').fill('see https://example.com ')
+      await expect(card).toHaveClass(/card--link/)
+      await expect(card.locator('.card__link-title-text')).toHaveText(
+        'Example Site',
+      )
+
+      await expect
+        .poll(async () => getSampleBoardNode(page, baseUrl), {
+          timeout: 10_000,
+        })
+        .toMatchObject({
+          cardType: 'link',
+          linkUrl: 'https://example.com',
+          linkTitle: 'Example Site',
+          linkImageUrl: null,
+          size: null,
+        })
+      const stored = await getSampleBoardNode(page, baseUrl)
+      expect(stored).not.toHaveProperty('link')
+      expect(stored).not.toHaveProperty('linkStatus')
     } finally {
       await server.stop()
     }

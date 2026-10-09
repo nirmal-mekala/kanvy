@@ -13,16 +13,17 @@ function validTextCard() {
   return {
     id: 'c1',
     boardId: ROOT_ID,
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x: 0,
     y: 0,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none' as const,
     status: 'active' as const,
-    index: 0,
+    position: 0,
     content: 'hello',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -33,15 +34,16 @@ function validContainer() {
   return {
     id: 'g1',
     boardId: ROOT_ID,
-    type: 'container',
+    nodeType: 'container',
     pattern: 'none',
     x: 0,
     y: 0,
     w: 128,
     h: 96,
     color: 'gray',
+    task: 'none' as const,
     status: 'active' as const,
-    index: 0,
+    position: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   }
@@ -62,16 +64,17 @@ function validBoardCard() {
   return {
     id: 'b1',
     boardId: ROOT_ID,
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef: 'child-1',
     x: 0,
     y: 0,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none' as const,
     status: 'active' as const,
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -108,6 +111,115 @@ describe('BoardSchema', () => {
       images: [],
     }
     expect(BoardSchema.safeParse(board).success).toBe(true)
+  })
+
+  it.each(['none', 'in_progress'])(
+    "accepts a node whose task is '%s' (schema v7)",
+    (task) => {
+      const board = {
+        version: SCHEMA_VERSION,
+        nodes: [
+          { ...validTextCard(), task },
+          { ...validContainer(), task },
+        ],
+        edges: [],
+        boards: [validBoardMeta()],
+        images: [],
+      }
+      expect(BoardSchema.safeParse(board).success).toBe(true)
+    },
+  )
+
+  it.each([
+    ['the pre-v7 { status } object', { task: { status: 'done' } }],
+    ['an unknown status', { task: 'someday' }],
+    ['null', { task: null }],
+    ['absent', { task: undefined }],
+  ])('rejects a node whose task is %s', (_label, taskField) => {
+    const { task: _task, ...container } = validContainer()
+    const result = BoardSchema.safeParse({
+      version: SCHEMA_VERSION,
+      nodes: [
+        taskField.task === undefined
+          ? container
+          : { ...container, ...taskField },
+      ],
+      edges: [],
+      boards: [validBoardMeta()],
+      images: [],
+    })
+    expect(result.success).toBe(false)
+    // NodeSchema is a z.union, so Zod reports at the node (`nodes.0`); the
+    // `task` path lives in the union's per-member `errors`.
+    expect(JSON.stringify(result.error?.issues)).toContain('"path":["task"]')
+  })
+
+  describe('link cards (flat link fields, schema v7)', () => {
+    function linkCard(fields: Record<string, unknown>) {
+      const { size: _size, ...text } = validTextCard()
+      return { ...text, cardType: 'link', ...fields }
+    }
+    function parse(node: unknown) {
+      return BoardSchema.safeParse({
+        version: SCHEMA_VERSION,
+        nodes: [node],
+        edges: [],
+        boards: [validBoardMeta()],
+        images: [],
+      })
+    }
+    const flat = {
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
+    }
+
+    it.each([
+      ['null title/image (not fetched yet, or the page has none)', flat],
+      [
+        'a fetched title and image',
+        { ...flat, linkTitle: 'T', linkImageUrl: 'https://example.com/i.png' },
+      ],
+    ])('accepts %s', (_label, fields) => {
+      expect(parse(linkCard(fields)).error?.issues).toBeUndefined()
+    })
+
+    it.each([
+      [
+        'the pre-v7 nested link object',
+        { link: { url: 'https://example.com', status: 'ready' } },
+      ],
+      [
+        'an absent (rather than null) linkTitle',
+        { ...flat, linkTitle: undefined },
+      ],
+    ])('rejects %s', (_label, fields) => {
+      const node = linkCard(fields)
+      if ('linkTitle' in fields && fields.linkTitle === undefined) {
+        delete (node as Record<string, unknown>).linkTitle
+      }
+      expect(parse(node).success).toBe(false)
+    })
+
+    it('strips a persisted linkStatus — fetch state is in-memory only', () => {
+      const result = parse(linkCard({ ...flat, linkStatus: 'loading' }))
+      expect(result.data?.nodes[0]).not.toHaveProperty('linkStatus')
+    })
+  })
+
+  it('rejects a node that still carries the pre-v7 index instead of position', () => {
+    const { position, ...container } = validContainer()
+    const result = BoardSchema.safeParse({
+      version: SCHEMA_VERSION,
+      nodes: [{ ...container, index: position }],
+      edges: [],
+      boards: [validBoardMeta()],
+      images: [],
+    })
+    expect(result.success).toBe(false)
+    expect(JSON.stringify(result.error?.issues)).toContain(
+      '"path":["position"]',
+    )
   })
 
   it('rejects a boards entry missing isRoot, naming the field', () => {
@@ -202,7 +314,7 @@ describe('BoardSchema', () => {
   it('rejects a heading-size image card (invalid kind/size combination)', () => {
     const invalid = {
       ...validTextCard(),
-      kind: 'image',
+      cardType: 'image',
       imageId: 'img1',
       size: 'h1',
     }
@@ -216,7 +328,7 @@ describe('BoardSchema', () => {
   })
 
   it('rejects a link card missing its link payload', () => {
-    const invalid = { ...validTextCard(), kind: 'link' }
+    const invalid = { ...validTextCard(), cardType: 'link' }
     const board = {
       version: SCHEMA_VERSION,
       nodes: [invalid],
@@ -229,7 +341,7 @@ describe('BoardSchema', () => {
   it('rejects a node with an unrecognized type', () => {
     const board = {
       version: SCHEMA_VERSION,
-      nodes: [{ ...validTextCard(), type: 'widget' }],
+      nodes: [{ ...validTextCard(), nodeType: 'widget' }],
       edges: [],
       images: [],
     }
@@ -325,26 +437,29 @@ describe('normalizeLegacyBoard', () => {
   })
 
   it('sorts containers before cards (array-order-as-z-index, phase 2 schema §1)', () => {
-    expect(normalizedLegacyFixture().nodes[0]?.type).toBe('container')
+    expect(normalizedLegacyFixture().nodes[0]?.nodeType).toBe('container')
   })
 
   it('maps a retired legacy pattern key (no longer in the v0 palette) to none', () => {
     const container = normalizedLegacyFixture().nodes[0]
     expect(container).toMatchObject({
-      type: 'container',
+      nodeType: 'container',
       pattern: 'none',
     })
   })
 
-  it('converts a flat linkUrl card into a nested link payload, preserving legacy taskStatus', () => {
+  it('keeps a prototype flat linkUrl card flat (schema v7), dropping linkStatus and preserving legacy taskStatus', () => {
     const linkCard = normalizedLegacyFixture().nodes.find(
-      (n) => n.type === 'card' && n.kind === 'link',
+      (n) => n.nodeType === 'card' && n.cardType === 'link',
     )
     expect(linkCard).toMatchObject({
-      kind: 'link',
-      link: { url: 'https://example.com' },
-      task: { status: 'done' },
+      cardType: 'link',
+      linkUrl: 'https://example.com',
+      linkTitle: null,
+      linkImageUrl: null,
+      task: 'done',
     })
+    expect(linkCard).not.toHaveProperty('linkStatus')
   })
 
   it('renames fromId/toId to fromNodeId/toNodeId on edges', () => {
@@ -495,7 +610,7 @@ describe('normalizeLegacyBoard — v5 → v6 root-board migration (ctx/notes/261
     const rootId = rootBoardId(result.boards)
     const refOf = (id: string) => {
       const node = result.nodes.find((n) => n.id === id)
-      return node?.type === 'card' && node.kind === 'board'
+      return node?.nodeType === 'card' && node.cardType === 'board'
         ? node.boardRef
         : undefined
     }

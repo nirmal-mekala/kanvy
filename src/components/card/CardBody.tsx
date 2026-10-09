@@ -19,7 +19,7 @@ import { LayoutDashboard, MoreHorizontal } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ViewMode } from '../../colors/borderColor'
 import { useEmojiTrigger } from '../../emoji/useEmojiTrigger'
-import type { CardNode } from '../../schema/node'
+import { type CardNode, isTask } from '../../schema/node'
 import { boardFamily, renameBoardAtom } from '../../state/atoms/boards'
 import { BoardNameEditor } from '../board/BoardNameEditor'
 import { EmojiSuggestionMenu } from '../emoji/EmojiSuggestionMenu'
@@ -79,7 +79,7 @@ export function CardBody({
   // `boardFamily('')` (never a real id) when this isn't a board card —
   // keeps the hook call unconditional without needing a real lookup.
   const referencedBoard = useAtomValue(
-    boardFamily(node.kind === 'board' ? node.boardRef : ''),
+    boardFamily(node.cardType === 'board' ? node.boardRef : ''),
   )
 
   const [emojiView, emojiHandlers] = useEmojiTrigger(contentRef, (newValue) =>
@@ -96,7 +96,7 @@ export function CardBody({
             className="recency-indicator"
           />
         )}
-        {node.kind === 'board' && (
+        {node.cardType === 'board' && (
           // Centered in the bar rather than inline with the name (260918
           // redesign, see ctx/notes/260918-board-node-redesign.md) — a
           // subtle "this is a board" glyph, not competing with the
@@ -108,16 +108,16 @@ export function CardBody({
             aria-hidden="true"
           />
         )}
-        {node.task && (
+        {isTask(node) && (
           <TaskStatusIcon
-            status={node.task.status}
+            status={node.task}
             className="task-status-icon"
-            ariaLabel={`Status: ${node.task.status.replace('_', ' ')}`}
+            ariaLabel={`Status: ${node.task.replace('_', ' ')}`}
           />
         )}
       </div>
 
-      {node.kind === 'image' && imageSrc && (
+      {node.cardType === 'image' && imageSrc && (
         <CardMedia
           src={imageSrc}
           alt={node.content || 'Image card'}
@@ -127,28 +127,28 @@ export function CardBody({
         />
       )}
 
-      {node.kind === 'link' && (
+      {node.cardType === 'link' && (
         <a
           className="card__link-body no-drag"
-          href={node.link.url}
+          href={node.linkUrl}
           target="_blank"
           rel="noreferrer noopener"
           draggable={false}
         >
-          {node.link.imageUrl && (
+          {node.linkImageUrl && (
             <CardMedia
-              src={node.link.imageUrl}
-              alt={node.link.title || 'Link preview image'}
+              src={node.linkImageUrl}
+              alt={node.linkTitle || 'Link preview image'}
               divided={false}
               tinted={tinted}
               className="card__link-image"
             />
           )}
-          <CardLinkMeta link={node.link} />
+          <CardLinkMeta node={node} />
         </a>
       )}
 
-      {node.kind === 'board' && (
+      {node.cardType === 'board' && (
         // Reuses the link node's click-semantics model exactly (border/
         // drag-handle = select, interior click = activate) — the only
         // deviation is *what* activation does: in-app navigation instead
@@ -170,7 +170,7 @@ export function CardBody({
         </div>
       )}
 
-      {showCaption && node.kind !== 'board' && (
+      {showCaption && node.cardType !== 'board' && (
         <>
           <textarea
             ref={contentRef}

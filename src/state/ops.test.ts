@@ -8,8 +8,8 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x: 0,
     y: 0,
@@ -17,7 +17,7 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     h: 90,
     color: 'gray',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -154,6 +154,22 @@ describe('mergeOpLists', () => {
       entity: 'node',
       value: { ...created, x: 9 },
     })
+  })
+
+  it('drops a field the folded update removes from the created value, rather than keeping an undefined key', () => {
+    const created = node('a', { x: 0 })
+    const prev: Op[] = [{ kind: 'create', entity: 'node', value: created }]
+    const next: Op[] = [
+      {
+        kind: 'update',
+        entity: 'node',
+        id: 'a',
+        before: { size: 'regular' },
+        after: { size: undefined },
+      },
+    ]
+    const [merged] = mergeOpLists(prev, next)
+    expect(merged?.kind === 'create' && merged.value).not.toHaveProperty('size')
   })
 
   it('merges two image ops on the same id, keeping the earliest before', () => {

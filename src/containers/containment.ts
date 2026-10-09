@@ -26,7 +26,7 @@ export function containersContainingPoint(
   return nodes
     .filter(
       (node): node is ContainerNode =>
-        node.type === 'container' &&
+        node.nodeType === 'container' &&
         point.x >= node.x &&
         point.x <= node.x + node.w &&
         point.y >= node.y &&

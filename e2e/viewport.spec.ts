@@ -17,14 +17,15 @@ import { ROOT_BOARD_ID, seedBoard } from './fixtures/board'
 
 const NODE_A = {
   id: 'node-a',
-  type: 'card',
-  kind: 'text',
+  nodeType: 'card',
+  cardType: 'text',
   size: 'regular',
   x: 100,
   y: 100,
   w: 224,
   h: 90,
   color: 'gray',
+  task: 'none',
   content: 'A',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
@@ -226,14 +227,15 @@ test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit 
   const BOARD_CARD = {
     id: 'board-card',
     boardId: ROOT_BOARD_ID,
-    type: 'card',
-    kind: 'board',
+    nodeType: 'card',
+    cardType: 'board',
     boardRef: 'child-1',
     x: 400,
     y: 300,
     w: 224,
     h: 90,
     color: 'gray',
+    task: 'none',
     content: '',
     createdAt: NOW,
     updatedAt: NOW,
@@ -246,7 +248,7 @@ test('entering a board (client-side navigation, no reload) snaps to zoom-to-fit 
     y: 2000,
   }
   const doc = {
-    version: 6,
+    version: 7,
     nodes: [BOARD_CARD, CHILD_CARD],
     edges: [],
     boards: [

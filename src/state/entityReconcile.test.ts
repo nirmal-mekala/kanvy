@@ -11,8 +11,8 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
     id,
     boardId: 'h0me0b0ard00',
-    type: 'card',
-    kind: 'text',
+    nodeType: 'card',
+    cardType: 'text',
     size: 'regular',
     x: 0,
     y: 0,
@@ -20,7 +20,7 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     h: 90,
     color: 'gray',
     status: 'active',
-    index: 0,
+    position: 0,
     content: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -64,7 +64,7 @@ describe('reconcileEntityId', () => {
         node('n-inside', { boardId: 'client-board' }),
         node('n-card', {
           boardId: 'h0me0b0ard00',
-          kind: 'board',
+          cardType: 'board',
           boardRef: 'client-board',
         } as Partial<Node>),
       ],
@@ -118,7 +118,10 @@ describe('reconcileEntityId', () => {
     const board = emptyBoard({
       images: [{ id: 'client-img', dataUri: 'data:x' }],
       nodes: [
-        node('n1', { kind: 'image', imageId: 'client-img' } as Partial<Node>),
+        node('n1', {
+          cardType: 'image',
+          imageId: 'client-img',
+        } as Partial<Node>),
       ],
     })
     const result = reconcileEntityId(board, 'image', 'client-img', 'server-img')

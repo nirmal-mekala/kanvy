@@ -16,7 +16,7 @@
 
 import type { Board } from '../schema/board'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
-import type { Op } from '../state/ops'
+import type { Op, OpReplay } from '../state/ops'
 import {
   type LoadResult,
   loadBoard,
@@ -94,6 +94,7 @@ export function saveBoard(board: Board): Promise<void> {
 export function saveBoardOverNetwork(
   config: NetworkConfig,
   ops: readonly Op[],
+  replay: OpReplay,
 ): Promise<void> {
-  return withSimulatedNetwork(() => applyOpsToNetwork(config, ops))
+  return withSimulatedNetwork(() => applyOpsToNetwork(config, ops, replay))
 }
