@@ -11,6 +11,7 @@
 // prefetch, navigate immediately").
 
 import { atom, getDefaultStore } from 'jotai'
+import { type NetworkReapResult, runNetworkReap } from '../api/networkReaper'
 import { queryClient } from '../api/queryClient'
 import { fetchCollection, testConnection } from '../api/restClient'
 import { ResponseValidationError } from '../api/validateEntries'
@@ -36,6 +37,23 @@ import { reapEntities } from './reaper'
 
 /** Every board id whose own nodes/edges/images have been loaded in this network session (design doc §6b/§6c) — reset on every mode switch. Not read outside this module — `ensureBoardLoaded`'s own no-op check and `initializeNetworkMode`/`switchToLocalMode`'s resets are the only readers/writers. */
 const loadedBoardIdsAtom = atom<Set<string>>(new Set<string>())
+
+/** Bumped whenever the network session starts over (`initializeNetworkMode`) or ends (`switchToLocalMode`) — lets a background task that outlives its session (the reaper) tell it's stale. */
+const networkSessionAtom = atom(0)
+
+/** Every id the network reaper has hard-deleted this session, per kind (server ids are only unique per collection) — reset alongside `loadedBoardIdsAtom`. Board content fetched before a reap can land after it (`ensureBoardLoaded`), so it's filtered against this before merging. */
+type ReapedIds = Record<keyof NetworkReapResult, ReadonlySet<string>>
+
+function noReapedIds(): ReapedIds {
+  return {
+    edgeIds: new Set(),
+    nodeIds: new Set(),
+    boardIds: new Set(),
+    imageIds: new Set(),
+  }
+}
+
+const reapedIdsAtom = atom<ReapedIds>(noReapedIds())
 
 /** True while the blocking home-board load (design doc §6a) is in flight — drives the settings modal's own "Connecting…" state. */
 export const networkHomeLoadingAtom = atom(false)
@@ -124,6 +142,34 @@ export function mergeBoardContent(board: Board, content: BoardContent): Board {
   }
 }
 
+/** Exported for direct unit testing — see networkBoardLoader.test.ts. `board` without anything in `reaped`; the same reference back when nothing matched. */
+export function withoutReapedEntities(board: Board, reaped: ReapedIds): Board {
+  const nodes = board.nodes.filter((n) => !reaped.nodeIds.has(n.id))
+  const edges = board.edges.filter((e) => !reaped.edgeIds.has(e.id))
+  const boards = board.boards.filter((b) => !reaped.boardIds.has(b.id))
+  const images = board.images.filter((i) => !reaped.imageIds.has(i.id))
+  if (
+    nodes.length === board.nodes.length &&
+    edges.length === board.edges.length &&
+    boards.length === board.boards.length &&
+    images.length === board.images.length
+  ) {
+    return board
+  }
+  return { ...board, nodes, edges, boards, images }
+}
+
+function withoutReapedContent(
+  content: BoardContent,
+  reaped: ReapedIds,
+): BoardContent {
+  return {
+    nodes: content.nodes.filter((n) => !reaped.nodeIds.has(n.id)),
+    edges: content.edges.filter((e) => !reaped.edgeIds.has(e.id)),
+    images: content.images.filter((i) => !reaped.imageIds.has(i.id)),
+  }
+}
+
 /**
  * Ensures `boardId`'s own nodes/edges/images are loaded (network mode
  * only — a no-op in local mode, where everything is already resident).
@@ -149,8 +195,11 @@ export async function ensureBoardLoaded(boardId: string): Promise<void> {
     // this was in flight must not merge network data into what's now the
     // local document (design doc §1's "ships in the night").
     if (store.get(accessModeAtom) !== 'network') return
+    // Content fetched before a background reap deleted some of it can
+    // resolve after — never let a reaped entity back in.
+    const reaped = store.get(reapedIdsAtom)
     store.set(currentBoardAtom, (current) =>
-      mergeBoardContent(current, content),
+      mergeBoardContent(current, withoutReapedContent(content, reaped)),
     )
     store.set(
       loadedBoardIdsAtom,
@@ -184,6 +233,46 @@ async function eagerLoadOtherBoards(
 }
 
 /**
+ * The network reaper (ctx/notes/261009-network-reaper-and-image-lifecycle.md),
+ * run in the background after a successful home-board load: hard-deletes
+ * aged tombstones on the server, then drops what it deleted from the live
+ * document directly — not through history, since aged tombstones can't be
+ * in this session's fresh undo stack. Failures are only `console.warn`ed
+ * (the next network start retries). Once the session it started in is over
+ * (a switch to local mode, or a re-initialization), it stops and leaves
+ * local state alone.
+ */
+async function reapInBackground(
+  config: NetworkConfig,
+  session: number,
+): Promise<void> {
+  const store = getDefaultStore()
+  const isCurrent = () =>
+    store.get(accessModeAtom) === 'network' &&
+    store.get(networkSessionAtom) === session
+  try {
+    const reaped = await runNetworkReap(config, Date.now(), {
+      shouldContinue: isCurrent,
+    })
+    if (!isCurrent()) return
+    store.set(reapedIdsAtom, (ids) => ({
+      edgeIds: new Set([...ids.edgeIds, ...reaped.edgeIds]),
+      nodeIds: new Set([...ids.nodeIds, ...reaped.nodeIds]),
+      boardIds: new Set([...ids.boardIds, ...reaped.boardIds]),
+      imageIds: new Set([...ids.imageIds, ...reaped.imageIds]),
+    }))
+    store.set(currentBoardAtom, (board) =>
+      withoutReapedEntities(board, store.get(reapedIdsAtom)),
+    )
+    for (const boardId of reaped.boardIds) {
+      queryClient.removeQueries({ queryKey: boardContentQueryKey(boardId) })
+    }
+  } catch (error) {
+    console.warn('Network reaper failed', error)
+  }
+}
+
+/**
  * The blocking home-board load (design doc §6a) — fetches every `boards`
  * entry plus the root board's own nodes/edges/images, replacing whatever
  * document (local or a previous network session's) was live, then kicks
@@ -195,6 +284,8 @@ export async function initializeNetworkMode(
   config: NetworkConfig,
 ): Promise<void> {
   const store = getDefaultStore()
+  store.set(networkSessionAtom, (session) => session + 1)
+  const session = store.get(networkSessionAtom)
   store.set(networkHomeLoadingAtom, true)
   store.set(networkLoadErrorAtom, undefined)
   // Known only once `GET /boards` has succeeded — the root board is
@@ -223,9 +314,11 @@ export async function initializeNetworkMode(
       createHistoryState({ ops: [], boardId: homeId }),
     )
     store.set(loadedBoardIdsAtom, new Set([homeId]))
+    store.set(reapedIdsAtom, noReapedIds())
     void eagerLoadOtherBoards(
       boards.map((b) => b.id).filter((id) => id !== homeId),
     )
+    void reapInBackground(config, session)
   } catch (error) {
     store.set(networkLoadErrorAtom, {
       message: `Couldn't load boards from the network — ${(error as Error).message}`,
@@ -286,5 +379,7 @@ export function switchToLocalMode(): void {
     createHistoryState({ ops: [], boardId: rootBoardId(board.boards) }),
   )
   store.set(loadedBoardIdsAtom, new Set())
+  store.set(reapedIdsAtom, noReapedIds())
+  store.set(networkSessionAtom, (session) => session + 1)
   store.set(networkLoadErrorAtom, undefined)
 }

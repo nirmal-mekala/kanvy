@@ -218,4 +218,47 @@ describe('reconcileHistoryIds', () => {
     )
     expect(reconciled.lastActionAt).toBe(12345)
   })
+
+  it("rewrites an image paste's image op and its node's imageId, so a network redo re-adds the entry under the server id the original POST reconciled", () => {
+    const ops: Op[] = [
+      { kind: 'image', id: 'client-img', before: undefined, after: 'data:x' },
+      {
+        kind: 'create',
+        entity: 'node',
+        value: node('n1', {
+          cardType: 'image',
+          imageId: 'client-img',
+        } as Partial<Node>),
+      },
+    ]
+    const history = createHistoryState<AttributedOps>({
+      ops,
+      boardId: 'h0me0b0ard00',
+    })
+    const reconciled = reconcileHistoryIds(
+      history,
+      'image',
+      'client-img',
+      'server-img',
+    )
+    const undone = applyOps(
+      emptyBoard({
+        nodes: [
+          node('n1', {
+            cardType: 'image',
+            imageId: 'server-img',
+          } as Partial<Node>),
+        ],
+        images: [{ id: 'server-img', dataUri: 'data:x' }],
+      }),
+      reconciled.present.state.ops,
+      'before',
+    )
+    expect(undone.images).toEqual([])
+    const redone = applyOps(undone, reconciled.present.state.ops, 'after')
+    expect(redone.images).toEqual([{ id: 'server-img', dataUri: 'data:x' }])
+    expect((redone.nodes[0] as Node & { imageId: string }).imageId).toBe(
+      'server-img',
+    )
+  })
 })
