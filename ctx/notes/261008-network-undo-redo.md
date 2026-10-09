@@ -25,11 +25,15 @@ localStorage mode was unaffected: it persists the whole document.
 `state/ops.ts`) instead of `direction`, threaded through
 `saveBoardOverNetwork` to `applyOpsToNetwork(config, ops, replay)`:
 
-| op       | do                   | undo                                | redo                                |
-| -------- | -------------------- | ----------------------------------- | ----------------------------------- |
-| `update` | PATCH `after`        | PATCH `before`                      | PATCH `after`                       |
-| `create` | POST (reconcile id)  | PATCH `{ status: 'trashed' }`       | PATCH `{ status: 'active' }`        |
-| `image`  | POST / PATCH / DELETE by `before`→`after` | the same, `after`→`before` | the same as do               |
+| op               | do                                        | undo                                              | redo                                                      |
+| ---------------- | ----------------------------------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| `update`         | PATCH `after`                             | PATCH `before`                                    | PATCH `after`                                             |
+| `create`         | POST (reconcile id)                       | PATCH `{ status: 'trashed', updatedAt: <now> }` | PATCH `{ status: 'active', updatedAt: <op.value.updatedAt> }` |
+| `image` (create) | POST (reconcile id)                       | nothing                                           | nothing                                                   |
+| `image` (other)  | PATCH / DELETE by `before`→`after`        | the same, `after`→`before`                        | the same as do                                            |
+
+(The `image` create rows and the `updatedAt` in the `create` rows were
+added on 261009; see `261009-network-reaper-and-image-lifecycle.md`.)
 
 - **Undoing a create is a tombstone, not a DELETE.** The entity stays on
   the server (trashed), so redo reactivates the same record with a status
@@ -37,9 +41,19 @@ localStorage mode was unaffected: it persists the whole document.
   and boards all have `status`. Locally, undoing a create still removes it
   from the array (`applyOps(…, 'before')`), so the server copy is trashed
   but the local one is gone, which renders the same.
-- **Images have no `status`**, so an undone image create is really
-  DELETEd, and its redo re-POSTs (reconciling the new server id like a
-  first create).
+- **An image create's undo and redo send nothing** (since 261009). The
+  image row stays on the server through undo, because the now-trashed node
+  still references it, and a backend with a `RESTRICT` foreign key would
+  reject the DELETE. Redo has nothing to re-create, and the row's server
+  id was already reconciled into app state and history by the original
+  POST. The network reaper deletes the row once its last referencing node
+  is reaped (`261009-network-reaper-and-image-lifecycle.md`). Locally the
+  entry is still dropped on undo and re-added on redo. (Before 261009,
+  undo DELETEd the image and redo re-POSTed it.)
+- **Undo/redo of a create carry `updatedAt`** (since 261009). Undo stamps
+  the tombstone time, because the network reaper ages a trashed entity by
+  `updatedAt`. Redo restores the original, matching local redo, which
+  re-appends `op.value` unchanged.
 - **Undo replays a batch in reverse order**, matching the local
   `applyOps(…, 'before')`.
 - Removed fields go over the wire as explicit `null` in both directions

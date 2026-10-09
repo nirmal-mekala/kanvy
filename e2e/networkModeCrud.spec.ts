@@ -1,8 +1,10 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { NETWORK_ROOT_ID, ROOT_BOARD_ID, seedBoard } from './fixtures/board'
+import { dispatchPaste } from './fixtures/clipboard'
 import { startJsonServer } from './fixtures/jsonServer'
 import { mockLinkMetadata } from './fixtures/linkMetadata'
+import { makeImageDataUri } from './fixtures/testImage'
 
 // Closes the coverage gaps a 260924 audit flagged: Board/board-card,
 // Container, and Edge CRUD had never been exercised against a real
@@ -672,3 +674,154 @@ test.describe('id reconciliation regression (ctx/notes/260925-network-id-reconci
     }
   })
 })
+
+test.describe('image lifecycle and the network reaper (ctx/notes/261009-network-reaper-and-image-lifecycle.md)', () => {
+  test('undoing an image paste keeps the image row on the server; redo reuses it (no second image row) and the card renders', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+      const poll = <T>(read: () => Promise<T>) =>
+        expect.poll(read, { timeout: 10_000 })
+      const serverNode = () => getSampleBoardNode(page, baseUrl)
+      const serverImageIds = async () =>
+        (await getCollection(page, baseUrl, 'images')).map((i) => i.id)
+
+      await dispatchPaste(page, {
+        imageDataUri: await makeImageDataUri(page, 200, 120),
+      })
+      const card = page.locator('.card--image')
+      await expect(card).toHaveCount(1, { timeout: 10_000 })
+      await poll(async () => (await serverImageIds()).length).toBe(1)
+      const [imageId] = await serverImageIds()
+      await poll(async () => (await serverNode())?.imageId).toBe(imageId)
+      await page.waitForTimeout(600)
+      // The synthetic paste leaves nothing focused — give the canvas focus
+      // (an empty-spot click) so the undo shortcut reaches it.
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .click({ position: { x: 30, y: 300 } })
+
+      // UNDO — the node is tombstoned; the image row it references stays.
+      await page.keyboard.press('ControlOrMeta+z')
+      await expect(card).toHaveCount(0)
+      await poll(async () => (await serverNode())?.status).toBe('trashed')
+      expect(await serverImageIds()).toEqual([imageId])
+
+      // REDO — reactivates the node against the same image row.
+      await page.keyboard.press('ControlOrMeta+Shift+z')
+      await expect(card).toHaveCount(1)
+      await expect(card.locator('img')).toHaveAttribute('src', /^data:image\//)
+      await poll(async () => (await serverNode())?.status).toBe('active')
+      expect(await serverImageIds()).toEqual([imageId])
+      expect((await serverNode())?.imageId).toBe(imageId)
+      await expect(page.locator('.toast')).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('network init reaps aged tombstones (a trashed board with its content, trashed image cards, orphaned images) but keeps an image a live card on another board still shares', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const AGED = '2020-01-01T00:00:00.000Z'
+    const OLD_BOARD_ID = 'old-board'
+    const node = (
+      id: string,
+      boardId: string,
+      status: string,
+      fields: Record<string, unknown>,
+    ) => ({
+      ...textCard(id, 100, ''),
+      boardId,
+      status,
+      createdAt: AGED,
+      updatedAt: AGED,
+      ...fields,
+    })
+    const image = (id: string) =>
+      ({ cardType: 'image', imageId: id, size: undefined }) as const
+    const db = baseDb([
+      // Shares `shared` with the aged, trashed `old-copy` below — e.g. a
+      // copy pasted onto another board before the original was deleted.
+      node('live-copy', SAMPLE_BOARD_ID, 'active', image('shared')),
+      node('old-copy', NETWORK_ROOT_ID, 'trashed', image('shared')),
+      node('old-orphan', NETWORK_ROOT_ID, 'trashed', image('orphan-img')),
+      node('old-board-card', NETWORK_ROOT_ID, 'trashed', {
+        cardType: 'board',
+        boardRef: OLD_BOARD_ID,
+        size: undefined,
+      }),
+      // Content on the trashed board is reaped regardless of its own status.
+      node('on-old-1', OLD_BOARD_ID, 'active', image('old-board-img')),
+      node('on-old-2', OLD_BOARD_ID, 'active', { content: 'gone' }),
+    ])
+    db.boards.push({
+      id: OLD_BOARD_ID,
+      title: 'Old board',
+      status: 'trashed',
+      isRoot: false,
+      createdAt: AGED,
+      updatedAt: AGED,
+    })
+    ;(db.edges as Record<string, unknown>[]).push({
+      id: 'old-edge',
+      boardId: OLD_BOARD_ID,
+      fromNodeId: 'on-old-1',
+      fromSide: 'right',
+      toNodeId: 'on-old-2',
+      toSide: 'left',
+      direction: 'none',
+      status: 'active',
+      createdAt: AGED,
+      updatedAt: AGED,
+    })
+    ;(db.images as Record<string, unknown>[]).push(
+      { id: 'shared', dataUri: await imageUri(page) },
+      { id: 'orphan-img', dataUri: 'data:image/png;base64,AAAA' },
+      { id: 'old-board-img', dataUri: 'data:image/png;base64,AAAA' },
+    )
+    const server = await startJsonServer(db, JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      const ids = async (name: string) =>
+        (await getCollection(page, baseUrl, name)).map((e) => e.id).sort()
+
+      await expect
+        .poll(() => ids('boards'), { timeout: 10_000 })
+        .toEqual([NETWORK_ROOT_ID, SAMPLE_BOARD_ID].sort())
+      await expect
+        .poll(() => ids('images'), { timeout: 10_000 })
+        .toEqual(['shared'])
+      expect(await ids('nodes')).toEqual(['live-copy', 'n0'])
+      expect(await ids('edges')).toEqual([])
+
+      // The live, shared image still renders on the other board.
+      await navigateIntoSampleBoard(page)
+      await expect(page.locator('.card--image img')).toHaveAttribute(
+        'src',
+        /^data:image\//,
+        { timeout: 10_000 },
+      )
+      await expect(page.locator('.toast')).toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
+/** A small, valid PNG data URI, rendered in-page — needs a page, so the db is seeded after the browser's up. */
+async function imageUri(page: Page): Promise<string> {
+  await page.goto('/')
+  return makeImageDataUri(page, 40, 40)
+}

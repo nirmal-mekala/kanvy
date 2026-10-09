@@ -60,7 +60,11 @@ TanStack Query as the mutation layer are implemented — see
 In network mode, saves carry an `OpReplay` (`'do' | 'undo' | 'redo'`):
 undo PATCHes each update's `before`, and undoing a create tombstones it
 (redo reactivates it, never re-POSTs) — see
-`ctx/notes/261008-network-undo-redo.md`.
+`ctx/notes/261008-network-undo-redo.md`. An image create's undo/redo
+sends nothing (the image row stays until its last referencing node is
+reaped), and a background network reaper hard-deletes aged tombstones on
+the server after each network init — see
+`ctx/notes/261009-network-reaper-and-image-lifecycle.md`.
 
 Network mode / backend integration (a REST backend, json-server for now,
 alongside the existing localStorage-backed Local mode) is implemented —

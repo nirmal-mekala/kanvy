@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as imageFile from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import type { Op } from '../state/ops'
@@ -357,7 +357,12 @@ describe('applyOpsToNetwork — undo/redo replay (ctx/notes/261008-network-undo-
   const createNode: Op = {
     kind: 'create',
     entity: 'node',
-    value: { id: 'n1', x: 1, status: 'active' } as never,
+    value: {
+      id: 'n1',
+      x: 1,
+      status: 'active',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as never,
   }
 
   it('undoes an update by PATCHing its `before`, blanking fields the original update added with an explicit null', async () => {
@@ -392,23 +397,37 @@ describe('applyOpsToNetwork — undo/redo replay (ctx/notes/261008-network-undo-
     expect(requests(fetchImpl)[0]?.body).toEqual({ title: 'new' })
   })
 
-  it.each([
-    ['undo', 'trashed'],
-    ['redo', 'active'],
-  ] as const)(
-    'replays a create on %s as a status PATCH (%s) against the existing entity — never a POST or DELETE',
-    async (replay, status) => {
+  describe('a replayed create is a status PATCH against the existing entity — never a POST or DELETE', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('undo trashes it, stamping `updatedAt` with the tombstone time (the network reaper ages by it)', async () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-10-09T12:00:00.000Z'))
       const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
-      await applyOpsToNetwork(config, [createNode], replay, fetchImpl)
+      await applyOpsToNetwork(config, [createNode], 'undo', fetchImpl)
       expect(requests(fetchImpl)).toEqual([
         {
           method: 'PATCH',
           url: 'http://localhost:1996/nodes/n1',
-          body: { status },
+          body: { status: 'trashed', updatedAt: '2026-10-09T12:00:00.000Z' },
         },
       ])
-    },
-  )
+    })
+
+    it("redo reactivates it, restoring the create's original `updatedAt` (local redo re-appends `op.value` unchanged)", async () => {
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+      await applyOpsToNetwork(config, [createNode], 'redo', fetchImpl)
+      expect(requests(fetchImpl)).toEqual([
+        {
+          method: 'PATCH',
+          url: 'http://localhost:1996/nodes/n1',
+          body: { status: 'active', updatedAt: '2026-01-01T00:00:00.000Z' },
+        },
+      ])
+    })
+  })
 
   it('undoes a batch in reverse order (like applyOps(…, "before") locally)', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
@@ -423,22 +442,42 @@ describe('applyOpsToNetwork — undo/redo replay (ctx/notes/261008-network-undo-
     ])
   })
 
-  describe('image ops (no status field — undone creates are really deleted)', () => {
-    it('undoes an image create with a DELETE', async () => {
+  describe('image ops (no status field)', () => {
+    const createImage: Op = {
+      kind: 'image',
+      id: 'img1',
+      before: undefined,
+      after: 'data:x',
+    }
+
+    it.each(['undo', 'redo'] as const)(
+      'sends nothing on %s of an image create — the row stays on the server until the reaper deletes it with its last referencing node',
+      async (replay) => {
+        const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
+        await applyOpsToNetwork(config, [createImage], replay, fetchImpl)
+        expect(fetchImpl).not.toHaveBeenCalled()
+      },
+    )
+
+    it("undoing an image paste only tombstones the node — the image itself isn't DELETEd", async () => {
       const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
-      const op: Op = {
-        kind: 'image',
-        id: 'img1',
-        before: undefined,
-        after: 'data:x',
+      const createImageCard: Op = {
+        kind: 'create',
+        entity: 'node',
+        value: {
+          id: 'n1',
+          imageId: 'img1',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        } as never,
       }
-      await applyOpsToNetwork(config, [op], 'undo', fetchImpl)
-      expect(requests(fetchImpl)).toEqual([
-        {
-          method: 'DELETE',
-          url: 'http://localhost:1996/images/img1',
-          body: undefined,
-        },
+      await applyOpsToNetwork(
+        config,
+        [createImage, createImageCard],
+        'undo',
+        fetchImpl,
+      )
+      expect(requests(fetchImpl).map((r) => [r.method, r.url])).toEqual([
+        ['PATCH', 'http://localhost:1996/nodes/n1'],
       ])
     })
 
@@ -456,26 +495,6 @@ describe('applyOpsToNetwork — undo/redo replay (ctx/notes/261008-network-undo-
           method: 'PATCH',
           url: 'http://localhost:1996/images/img1',
           body: { dataUri: 'data:old' },
-        },
-      ])
-    })
-
-    it('redoes an image create with a fresh POST', async () => {
-      const fetchImpl = vi
-        .fn()
-        .mockResolvedValue(jsonResponse({ id: 'server-img' }))
-      const op: Op = {
-        kind: 'image',
-        id: 'img1',
-        before: undefined,
-        after: 'data:x',
-      }
-      await applyOpsToNetwork(config, [op], 'redo', fetchImpl)
-      expect(requests(fetchImpl)).toEqual([
-        {
-          method: 'POST',
-          url: 'http://localhost:1996/images',
-          body: { dataUri: 'data:x' },
         },
       ])
     })

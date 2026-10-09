@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Board } from '../schema/board'
-import { mergeBoardContent } from './networkBoardLoader'
+import { mergeBoardContent, withoutReapedEntities } from './networkBoardLoader'
 
 class MemoryStorage {
   private store = new Map<string, string>()
@@ -125,6 +125,40 @@ describe('mergeBoardContent', () => {
   })
 })
 
+describe('withoutReapedEntities', () => {
+  it('drops reaped ids per kind, leaving same-id entities of other kinds alone', () => {
+    const board: Board = {
+      ...emptyBoard(),
+      nodes: [{ id: 'n1' } as never, { id: 'x' } as never],
+      edges: [{ id: 'e1' } as never],
+      images: [{ id: 'img1', dataUri: 'data:x' }],
+    }
+    const result = withoutReapedEntities(board, {
+      nodeIds: new Set(['n1']),
+      edgeIds: new Set(['x', 'e1']),
+      boardIds: new Set(['h0me0b0ard00']),
+      imageIds: new Set(['img1']),
+    })
+    expect(result.nodes).toEqual([{ id: 'x' }])
+    expect(result.edges).toEqual([])
+    expect(result.boards).toEqual([])
+    expect(result.images).toEqual([])
+  })
+
+  it('returns the same board when nothing was reaped', () => {
+    const board = emptyBoard()
+    const none = new Set<string>()
+    expect(
+      withoutReapedEntities(board, {
+        nodeIds: none,
+        edgeIds: none,
+        boardIds: none,
+        imageIds: none,
+      }),
+    ).toBe(board)
+  })
+})
+
 // Fresh module instance per test (same rationale as boardAccessResolver
 // .test.ts) — `attemptBootReconnect` calls `getDefaultStore()` internally,
 // so the test must observe that same store instance via a fresh `jotai`
@@ -137,8 +171,12 @@ async function freshState() {
     './networkBoardLoader'
   )
   const { rootBoardIdAtom } = await import('./atoms/currentBoard')
+  const { switchToLocalMode } = await import('./networkBoardLoader')
+  const { currentBoardAtom } = await import('./history/liveBoard')
   return {
     store: getDefaultStore(),
+    switchToLocalMode,
+    currentBoardAtom,
     accessModeAtom,
     attemptBootReconnect,
     networkLoadErrorAtom,
@@ -248,5 +286,89 @@ describe('attemptBootReconnect', () => {
 
     expect(result).toBe('failed')
     expect(s.store.get(s.accessModeAtom)).toBe('local')
+  })
+})
+
+describe('background network reap after network init', () => {
+  const aged = '2020-01-01T00:00:00.000Z'
+  const homeNode = (id: string, status: string) => ({
+    id,
+    boardId: 'h',
+    nodeType: 'container',
+    pattern: 'none',
+    x: 0,
+    y: 0,
+    w: 128,
+    h: 96,
+    color: 'gray',
+    task: 'none',
+    position: 0,
+    status,
+    createdAt: aged,
+    updatedAt: aged,
+  })
+
+  /** Honors `field=value` filters and DELETE, unlike `stubServer`. */
+  function stubFilteringServer(nodes: Record<string, unknown>[]) {
+    const deletes: string[] = []
+    const db: Record<string, Record<string, unknown>[]> = {
+      boards: [serverBoard('h', true)],
+      nodes,
+      edges: [],
+      images: [],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const u = new URL(url)
+        const [collection = '', id] = u.pathname.slice(1).split('/')
+        if (init?.method === 'DELETE') {
+          deletes.push(`${collection}/${id}`)
+          db[collection] = (db[collection] ?? []).filter((r) => r.id !== id)
+          return new Response('{}', { status: 200 })
+        }
+        const rows = (db[collection] ?? []).filter((row) =>
+          [...u.searchParams].every(
+            ([key, value]) =>
+              key.startsWith('_') ||
+              (key.endsWith(':in')
+                ? value.split(',').includes(String(row[key.slice(0, -3)]))
+                : String(row[key]) === value),
+          ),
+        )
+        return new Response(JSON.stringify(page(rows)), { status: 200 })
+      }),
+    )
+    return deletes
+  }
+
+  it('hard-deletes an aged, trashed node on the server and drops it from the live document', async () => {
+    const s = await freshState()
+    const deletes = stubFilteringServer([
+      homeNode('live', 'active'),
+      homeNode('old', 'trashed'),
+    ])
+
+    expect(await s.attemptBootReconnect(CONFIG)).toBe('connected')
+
+    await vi.waitFor(() => expect(deletes).toEqual(['nodes/old']))
+    await vi.waitFor(() =>
+      expect(s.store.get(s.currentBoardAtom).nodes.map((n) => n.id)).toEqual([
+        'live',
+      ]),
+    )
+  })
+
+  it('stops, deleting nothing, when the user switches back to local mode first', async () => {
+    const s = await freshState()
+    const deletes = stubFilteringServer([homeNode('old', 'trashed')])
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect(await s.attemptBootReconnect(CONFIG)).toBe('connected')
+    s.switchToLocalMode()
+    s.store.set(s.accessModeAtom, 'local')
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(deletes).toEqual([])
   })
 })
