@@ -52,6 +52,16 @@ jobs:
       - run: pnpm exec tsc -b
       - run: pnpm exec vite build --base=${{ steps.pages.outputs.base_path }}/
 
+      # SPA fallback for hard refreshes/deep links (e.g. /kanvy/<boardId>):
+      # Pages has no rewrite rules, but serves a site's own 404.html for
+      # any missing path, so a copy of index.html boots the app and lets
+      # TanStack Router resolve the URL client-side. A project site's
+      # 404.html only covers paths under its own subpath (/kanvy/*) —
+      # anything outside it (e.g. /gobbledigook) is still served by the
+      # <user>.github.io site's 404.html, never this app. Asset URLs are
+      # absolute (prefixed with `base`), so the copy works at any depth.
+      - run: cp dist/index.html dist/404.html
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
