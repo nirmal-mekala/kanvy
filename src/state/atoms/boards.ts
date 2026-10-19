@@ -6,10 +6,11 @@
 import { atom } from 'jotai'
 import { newBoardCard } from '../../cards/newCard'
 import { duplicateBoardNodes } from '../../clipboard/duplicateBoardNodes'
+import { inheritEnclosingTask } from '../../containers/inheritTask'
 import { generateId } from '../../schema/legacy'
 import type { BoardCard } from '../../schema/node'
 import { boardAtom, updateBoardAtom } from '../history/boardHistoryAtom'
-import { nextNodePosition } from '../liveEntities'
+import { getLiveNodes, nextNodePosition } from '../liveEntities'
 import type { Op } from '../ops'
 import { atomFamily } from './atomFamily'
 import { currentBoardIdAtom, rootBoardIdAtom } from './currentBoard'
@@ -60,7 +61,9 @@ export const renameBoardAtom = atom(
  * removes both at once rather than leaving an orphan behind mid-undo.
  * A no-op anywhere but the home board — `board` nodes are never creatable
  * on any other board (design doc §3); the UI additionally only ever
- * offers this action while viewing root, this is just the backstop.
+ * offers this action while viewing root, this is just the backstop. Like any
+ * card created at a point, the new board-node inherits its immediate parent
+ * container's task status (ctx/notes/261019-inherit-container-task.md).
  */
 export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
   const currentBoardId = get(currentBoardIdAtom)
@@ -85,7 +88,10 @@ export const createBoardAtom = atom(null, (get, set, x: number, y: number) => {
       kind: 'create',
       entity: 'node',
       value: {
-        ...newBoardCard(x, y, newBoardId),
+        ...inheritEnclosingTask(
+          newBoardCard(x, y, newBoardId),
+          getLiveNodes(board, currentBoardId),
+        ),
         boardId: currentBoardId,
         position: nextNodePosition(board, currentBoardId),
       },

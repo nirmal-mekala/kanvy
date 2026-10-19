@@ -40,12 +40,28 @@ describe('pushUpdate', () => {
     expect(history.past.map((e) => e.state)).toEqual([0, 1])
   })
 
-  it('forceNewEntry starts a new step even within the coalesce window (multiboard support: two rapid edits attributed to different boards must never merge)', () => {
+  it('coalesce mode "never" starts a new step even within the coalesce window (multiboard support: two rapid edits attributed to different boards must never merge)', () => {
     let history = createHistoryState(0)
     history = pushUpdate(history, 1, T0)
-    history = pushUpdate(history, 2, T0 + 100, undefined, true)
+    history = pushUpdate(history, 2, T0 + 100, undefined, 'never')
     expect(history.past.map((e) => e.state)).toEqual([0, 1])
     expect(history.present.state).toBe(2)
+  })
+
+  it('coalesce mode "always" merges into the present step even past the coalesce window (a drop joining its own drag gesture)', () => {
+    let history = createHistoryState<number[]>([])
+    const merge = (prev: number[], next: number[]) => [...prev, ...next]
+    history = pushUpdate(history, [1], T0)
+    history = pushUpdate(
+      history,
+      [2],
+      T0 + COALESCE_MS * 10,
+      undefined,
+      'always',
+      merge,
+    )
+    expect(history.present.state).toEqual([1, 2])
+    expect(history.past.map((e) => e.state)).toEqual([[]])
   })
 
   it('drops a no-op update (same reference) without recording a step', () => {
@@ -60,8 +76,8 @@ describe('pushUpdate', () => {
     let history = createHistoryState<number[]>([])
     history = pushUpdate(history, [1], T0)
     const merge = (prev: number[], next: number[]) => [...prev, ...next]
-    history = pushUpdate(history, [2], T0 + 100, undefined, false, merge)
-    history = pushUpdate(history, [3], T0 + 200, undefined, false, merge)
+    history = pushUpdate(history, [2], T0 + 100, undefined, 'auto', merge)
+    history = pushUpdate(history, [3], T0 + 200, undefined, 'auto', merge)
     expect(history.present.state).toEqual([1, 2, 3])
     expect(history.past.map((e) => e.state)).toEqual([[]])
   })
@@ -69,13 +85,13 @@ describe('pushUpdate', () => {
   it('does not call `merge` across a coalesce-window boundary — a fresh entry starts instead', () => {
     let history = createHistoryState<number[]>([])
     const merge = (prev: number[], next: number[]) => [...prev, ...next]
-    history = pushUpdate(history, [1], T0, undefined, false, merge)
+    history = pushUpdate(history, [1], T0, undefined, 'auto', merge)
     history = pushUpdate(
       history,
       [2],
       T0 + COALESCE_MS + 1,
       undefined,
-      false,
+      'auto',
       merge,
     )
     expect(history.present.state).toEqual([2])

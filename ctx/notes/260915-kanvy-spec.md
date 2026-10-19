@@ -209,8 +209,11 @@ meaningful) node/edge data isn't buried under base64 blobs.
   Light theme: fill is the accent lifted toward white, ink a deep accent
   shade, edge the accent darkened. Dark theme: fill is the accent pulled
   toward the dark surface, edge the full-strength accent, ink a pale
-  accent tint. The neutral accents — `gray` (the default) and task
-  `todo` — are *not* tinted and keep border-only styling. On a tinted
+  accent tint. The default accent, `gray`, is *not* tinted and keeps
+  border-only styling. Task `todo` has no hue, so it gets its own neutral
+  slate tint instead (a fill one step off the theme surface, a muted
+  slate edge, the theme's own ink) — a todo task reads as a task in task
+  view without the stark full-strength outline it used to have. On a tinted
   node the task-status glyph draws in the node's ink rather than its
   status color (status reads from glyph shape, and in task view from the
   fill). Color-picker swatches still show the raw accent.
@@ -341,6 +344,8 @@ respect.
   selection too — merged so nothing double-moves.
 - Dragging any node that's part of a multi-selection carries the whole
   selection, preserving relative positions.
+- Dropping into a different task container inherits its task status
+  (§6.1's container task inheritance).
 - A container's body is not itself a drag surface — only its top handle bar
   drags it. This is deliberate: it lets a click-drag starting inside a
   container's body become a marquee-select over its contents instead.
@@ -489,9 +494,20 @@ respect.
 - Any card or container can optionally be a task. Toggled via the
   selection-menu's Default/Task section; independent of node kind.
 - Once a task, it has exactly one of four statuses: `todo` (default on
-  first becoming a task), `blocked`, `in_progress`, `done`. Changed only via
+  first becoming a task), `blocked`, `in_progress`, `done`. Changed via
   the selection menu's status section (never by clicking the status glyph
-  directly).
+  directly), or by container task inheritance (below).
+- **Container task inheritance** (`ctx/notes/261019-inherit-container-task.md`):
+  a node dropped into a *different* immediate parent container (the
+  smallest container completely enclosing it, §2.3) that is a task takes
+  on that container's status — a non-task becomes a task, an existing
+  task's status is overwritten. A dragged container's carried contents
+  inherit along with it. Repositioning within the same parent, a non-task
+  parent, or a task grandparent changes nothing (never un-tasks). A card
+  created by double-click or image-file drop inside a task container
+  inherits the same way; ⌘/Ctrl+N, paste, duplicate, resize, and
+  ⌘/Ctrl-drag container creation never do. Only `task` is inherited, and
+  the move/create plus inheritance is one undo step.
 - Toggling "Default" → "Task" on an already-task item is idempotent — it
   never resets an existing status back to `todo`.
 - Stored as a single required enum field, `task: 'none' | TaskStatus`

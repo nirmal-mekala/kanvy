@@ -19,35 +19,11 @@
 //
 // v0.1 (ctx/notes/260915-kanvy-spec.md §2.3): there's no stored `parentId`
 // to walk anymore, so the "parent" edge this traversal groups by is derived
-// fresh from geometry instead — see `immediateEnclosingParent` below. The
-// traversal itself is otherwise unchanged.
+// fresh from geometry instead — see `immediateEnclosingContainer`
+// (./containment.ts). The traversal itself is otherwise unchanged.
 
-import { fullyEncloses } from '../geometry/containment'
 import type { ContainerNode } from '../schema/node'
-
-/**
- * The smallest-area *other* container that fully encloses `container`, or
- * `undefined` if none does — the geometric stand-in for "immediate parent."
- * On a tie (equal area — always true between a container and its own
- * ⌘/Ctrl+D duplicate or paste, which only ever shifts x/y), the *later*
- * one in `containers` wins: duplicates/pastes are always appended to the
- * end, so this naturally attaches a freshly-duplicated child to its own
- * freshly-duplicated parent instead of the original it also happens to
- * still geometrically fit inside (a real bug caught by
- * renderOrder.test.ts's duplicate-subtree case).
- */
-function immediateEnclosingParent(
-  container: ContainerNode,
-  containers: readonly ContainerNode[],
-): ContainerNode | undefined {
-  let best: ContainerNode | undefined
-  for (const candidate of containers) {
-    if (candidate.id === container.id) continue
-    if (!fullyEncloses(candidate, container)) continue
-    if (!best || candidate.w * candidate.h <= best.w * best.h) best = candidate
-  }
-  return best
-}
+import { immediateEnclosingContainer } from './containment'
 
 /**
  * `containers` reordered into a depth-first pre-order by geometric nesting
@@ -64,7 +40,7 @@ export function sortContainersForRender(
   const roots: ContainerNode[] = []
 
   for (const container of containers) {
-    const parent = immediateEnclosingParent(container, containers)
+    const parent = immediateEnclosingContainer(container, containers)
     if (parent) {
       const siblings = childrenByParent.get(parent.id)
       if (siblings) siblings.push(container)

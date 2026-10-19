@@ -21,6 +21,10 @@
 
 import { atom } from 'jotai'
 import {
+  computeDropTaskInheritance,
+  type DroppedNode,
+} from '../../containers/inheritTask'
+import {
   CARD_WIDTH,
   HEADING_DEFAULT_H,
   HEADING_DEFAULT_W,
@@ -292,6 +296,42 @@ export const moveNodesAtom = atom(
     }
     if (ops.length === 0) return
     set(updateBoardAtom, get(currentBoardIdAtom), ops)
+  },
+)
+
+/**
+ * Container task inheritance on drop (ctx/notes/261019-inherit-container-
+ * task.md) — compares `startNodes` (the board's live nodes at drag start)
+ * against the live board now, and stamps each newly-entered task
+ * container's status onto what landed in it (`computeDropTaskInheritance`).
+ * Joins the drag's own history step (`joinPresent`), so one undo reverts
+ * both the move and the inherited statuses together.
+ */
+export const inheritDropTasksAtom = atom(
+  null,
+  (get, set, dropped: readonly DroppedNode[], startNodes: readonly Node[]) => {
+    const boardId = get(currentBoardIdAtom)
+    const board = get(boardAtom)
+    const statuses = computeDropTaskInheritance(
+      dropped,
+      startNodes,
+      getLiveNodes(board, boardId),
+    )
+    if (statuses.size === 0) return
+    const now = nowISO()
+    const ops: Op[] = []
+    for (const node of board.nodes) {
+      const task = statuses.get(node.id)
+      if (task === undefined) continue
+      ops.push({
+        kind: 'update',
+        entity: 'node',
+        id: node.id,
+        before: { task: node.task, updatedAt: node.updatedAt },
+        after: { task, updatedAt: now },
+      })
+    }
+    set(updateBoardAtom, boardId, ops, undefined, true)
   },
 )
 

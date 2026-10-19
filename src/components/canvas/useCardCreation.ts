@@ -23,6 +23,7 @@ import { newImageCard, newLinkCard, newTextCard } from '../../cards/newCard'
 import { isPlainUrl } from '../../cards/urlSlurp'
 import { isEditableTarget } from '../../clipboard/dom'
 import { hasNodeClipboardContentAtom } from '../../clipboard/nodeClipboard'
+import { inheritEnclosingTask } from '../../containers/inheritTask'
 
 import { generateId } from '../../schema/legacy'
 import type { CardNode, Node, NodeId } from '../../schema/node'
@@ -80,6 +81,13 @@ export function useCardCreation({
     )
   }
 
+  // Double-click and image-file drop create a card *at a point*, so (unlike
+  // ⌘/Ctrl+N or paste) the new card inherits its immediate parent container's
+  // task status (ctx/notes/261019-inherit-container-task.md).
+  function liveNodes(): Node[] {
+    return [...nodesById.values()]
+  }
+
   function viewportCenter() {
     const rect = boardElRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
@@ -128,7 +136,7 @@ export function useCardCreation({
       createBoard(point.x, point.y)
       return
     }
-    addNode(newTextCard(point.x, point.y))
+    addNode(inheritEnclosingTask(newTextCard(point.x, point.y), liveNodes()))
   }
 
   function handleCanvasDragOver(e: React.DragEvent) {
@@ -144,7 +152,8 @@ export function useCardCreation({
     const point = pointFromEvent(e.clientX, e.clientY)
     processImageFile(file).then(({ dataUri, width, height }) => {
       const imageId = generateId()
-      addNode(newImageCard(point.x, point.y, imageId, width / height), {
+      const card = newImageCard(point.x, point.y, imageId, width / height)
+      addNode(inheritEnclosingTask(card, liveNodes()), {
         id: imageId,
         dataUri,
       })

@@ -233,6 +233,9 @@ function autosaveIfAcknowledged(
  * same gesture touched. The pending *save* respects the same boundary —
  * flushed first whenever `boardId` changes — so `mergePendingSave` never
  * has to reconcile ops from two different boards into one mutation.
+ * `joinPresent` forces coalescing into the present entry regardless of the
+ * window (still never across boards) — for an action that finishes the
+ * gesture before it, like a drop's task inheritance.
  */
 export const updateBoardAtom = atom(
   null,
@@ -242,6 +245,7 @@ export const updateBoardAtom = atom(
     boardId: string,
     ops: Op[],
     restoreSelection?: readonly string[],
+    joinPresent = false,
   ) => {
     if (ops.length === 0) return
     const nextBoard = applyOps(get(currentBoardAtom), ops, 'after')
@@ -254,7 +258,7 @@ export const updateBoardAtom = atom(
       { ops, boardId },
       Date.now(),
       restoreSelection,
-      forceNewEntry,
+      forceNewEntry ? 'never' : joinPresent ? 'always' : 'auto',
       mergeAttributedOps,
     )
     set(boardHistoryAtom, nextHistory)

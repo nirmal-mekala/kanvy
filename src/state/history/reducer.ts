@@ -33,16 +33,25 @@ export function createHistoryState<T>(initial: T): HistoryState<T> {
 }
 
 /**
+ * Whether an update may coalesce into the present entry: `'auto'` by the
+ * rapid-fire window alone; `'never'` starts a new step regardless; `'always'`
+ * merges into the present step regardless of elapsed time.
+ */
+export type CoalesceMode = 'auto' | 'never' | 'always'
+
+/**
  * Applies a new state value as the next history step. A no-op (same
  * reference as the current present) is dropped rather than recorded, same
  * as the prototype. `now` is injected (rather than read internally) so the
- * coalescing window is deterministically testable. `forceNewEntry` lets a
- * caller override coalescing even within the window, when its own domain
- * logic says these two updates shouldn't merge regardless of timing — e.g.
- * multiboard support's per-board attribution (state/history/
- * boardHistoryAtom.ts): two rapid edits to *different* boards must never
- * coalesce into one entry, since that entry's single attribution couldn't
- * represent both.
+ * coalescing window is deterministically testable. `coalesceMode` lets a
+ * caller override the window when its own domain logic says how these two
+ * updates relate regardless of timing. `'never'` — e.g. multiboard
+ * support's per-board attribution (state/history/boardHistoryAtom.ts): two
+ * rapid edits to *different* boards must never coalesce into one entry,
+ * since that entry's single attribution couldn't represent both.
+ * `'always'` — e.g. a drop's container task inheritance (state/atoms/
+ * nodes.ts's `inheritDropTasksAtom`), which belongs to the drag gesture it
+ * ends however long the user paused before releasing.
  *
  * `merge`, when given, is used instead of a bare wholesale replace when an
  * update coalesces into the current entry — schema v4's ops-based history
@@ -57,11 +66,13 @@ export function pushUpdate<T>(
   next: T,
   now: number,
   restoreSelection?: readonly string[],
-  forceNewEntry = false,
+  coalesceMode: CoalesceMode = 'auto',
   merge?: (prev: T, next: T) => T,
 ): HistoryState<T> {
   if (next === history.present.state) return history
-  const coalesce = !forceNewEntry && now - history.lastActionAt < COALESCE_MS
+  const coalesce =
+    coalesceMode === 'always' ||
+    (coalesceMode === 'auto' && now - history.lastActionAt < COALESCE_MS)
   const past = coalesce
     ? history.past
     : [...history.past, history.present].slice(-MAX_HISTORY)

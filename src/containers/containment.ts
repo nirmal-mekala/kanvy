@@ -63,3 +63,29 @@ export function computeCarryIds(
     .filter((node) => node.id !== excludeId && fullyEncloses(rect, node))
     .map((node) => node.id)
 }
+
+/**
+ * The smallest-area *other* container that fully encloses `node`, or
+ * `undefined` if none does — the geometric stand-in for "immediate parent"
+ * (render order, ./renderOrder.ts; task inheritance, ./inheritTask.ts),
+ * using the same full-containment test as `computeCarryIds`. On a tie
+ * (equal area — always true between a container and its own ⌘/Ctrl+D
+ * duplicate or paste, which only ever shifts x/y), the *later* one in
+ * `nodes` wins: duplicates/pastes are always appended to the end, so this
+ * naturally attaches a freshly-duplicated child to its own
+ * freshly-duplicated parent instead of the original it also happens to
+ * still geometrically fit inside (a real bug caught by
+ * renderOrder.test.ts's duplicate-subtree case).
+ */
+export function immediateEnclosingContainer(
+  node: Rect & { id: NodeId },
+  nodes: readonly Node[],
+): ContainerNode | undefined {
+  let best: ContainerNode | undefined
+  for (const candidate of nodes) {
+    if (candidate.nodeType !== 'container' || candidate.id === node.id) continue
+    if (!fullyEncloses(candidate, node)) continue
+    if (!best || candidate.w * candidate.h <= best.w * best.h) best = candidate
+  }
+  return best
+}
