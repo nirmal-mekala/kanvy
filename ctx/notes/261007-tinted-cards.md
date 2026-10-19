@@ -64,3 +64,13 @@ showcase board per topic, linked from Home, and covers every persisted
 node state. Interaction states (hover, selected, editing) aren't data, so
 check those live. Its two sample images (`server/fixtures/*.png`) come
 from the workspace HTML.
+
+## Addendum (261019): task-todo tinted
+
+`task-todo` is no longer border-only. In task view its full-strength
+`--color-task-todo` border (nord4 in dark mode) read as a stark white
+outline, out of step with the tinted statuses. It now gets the shared
+re-theme rule with its own neutral-slate recipe (`accents.css`, "Recipe —
+task-todo"): fill a step off the theme surface, a muted slate edge, and the
+theme's own ink. Contrast (ink vs fill): light 9.0:1, dark 6.8:1. `gray`
+stays border-only.

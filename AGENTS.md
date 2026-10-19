@@ -42,6 +42,12 @@ Schema revisions since the initial migration (see spec §2.3):
   extend it with every further v7 change
   (`src/schema/migrateV6ToV7Script.test.ts` fails if it drifts from
   `schema/legacy.ts`).
+- **Container task inheritance** (behavior, not schema): a node dropped
+  into a *different* immediate parent container that is a task — or
+  created inside one by double-click/image drop — takes on its `task`
+  status (carried contents too); nothing else is inherited. See
+  `ctx/notes/261019-inherit-container-task.md` and
+  `src/containers/inheritTask.ts`.
 - **Tinted nodes** (visual, not schema): a chromatic accent colors the
   whole card/container (fill + edge + ink), not only its border; gray and
   task-todo stay border-only, and pink is a muted rose, not nord9. See

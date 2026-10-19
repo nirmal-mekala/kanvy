@@ -15,6 +15,7 @@ import {
   containersContainingPoint,
 } from '../../containers/containment'
 import { createContainer } from '../../containers/createContainer'
+import type { DroppedNode } from '../../containers/inheritTask'
 import {
   BOARD_MIN_W,
   CONTAINER_MIN_H,
@@ -34,6 +35,7 @@ import {
 import type { CardNode, Node, NodeId } from '../../schema/node'
 import {
   addNodeAtom,
+  inheritDropTasksAtom,
   moveNodesAtom,
   updateNodeAtom,
 } from '../../state/atoms/nodes'
@@ -77,6 +79,10 @@ interface DragState {
   w: number
   h: number
   carryOrigins: Map<NodeId, { x: number; y: number }>
+  /** What drop-time task inheritance judges (grabbed node + rest of the selection, each with what it spatially carries). */
+  dropped: DroppedNode[]
+  /** The board's nodes at drag start — the "before" side of the drop's parent-change check. */
+  startNodes: readonly Node[]
   lastX: number
   lastY: number
 }
@@ -171,6 +177,7 @@ export function useBoardInteraction({
   const moveNodes = useSetAtom(moveNodesAtom)
   const updateNode = useSetAtom(updateNodeAtom)
   const addNode = useSetAtom(addNodeAtom)
+  const inheritDropTasks = useSetAtom(inheritDropTasksAtom)
 
   const nodesById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
@@ -273,7 +280,14 @@ export function useBoardInteraction({
       if (carried) origins.set(carryId, { x: carried.x, y: carried.y })
     }
 
-    return origins
+    // Only the grabbed node carries spatially; the rest of the selection
+    // moves on its own account (spec §4.4), so each is judged separately.
+    const dropped: DroppedNode[] = [
+      { id, carriedIds: [...spatialCarryIds] },
+      ...selectionCarryIds.map((otherId) => ({ id: otherId, carriedIds: [] })),
+    ]
+
+    return { origins, dropped }
   }
 
   function handleNodePointerDown(id: NodeId, e: React.PointerEvent) {
@@ -293,7 +307,11 @@ export function useBoardInteraction({
     // the bar (or an empty part of the card) starts a drag.
     if ((e.target as HTMLElement).closest('.no-drag')) return
 
-    const carryOrigins = beginNodeDrag(id, node, nextSelection)
+    const { origins: carryOrigins, dropped } = beginNodeDrag(
+      id,
+      node,
+      nextSelection,
+    )
     dragRef.current = {
       grabId: id,
       isContainer: node.nodeType === 'container',
@@ -304,6 +322,8 @@ export function useBoardInteraction({
       w: node.w,
       h: node.h,
       carryOrigins,
+      dropped,
+      startNodes: nodes,
       lastX: node.x,
       lastY: node.y,
     }
@@ -388,8 +408,11 @@ export function useBoardInteraction({
     } catch {
       // ignore
     }
-    // Nothing to assign on drop (spec §2.3, v0.1) — container membership is
-    // purely spatial, re-derived fresh the next time anything needs it.
+    // Nothing to *store* on drop (spec §2.3, v0.1) — container membership
+    // is purely spatial, re-derived fresh the next time anything needs it.
+    // Landing in a different task container does stamp its status onto
+    // what landed, though (ctx/notes/261019-inherit-container-task.md).
+    inheritDropTasks(state.dropped, state.startNodes)
   }
 
   // A `pointercancel` (the browser can send one instead of `pointerup` —

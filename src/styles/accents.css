@@ -16,9 +16,11 @@
    duotone image tint — then picks up the tint with no per-color
    duplication and no per-element overrides.
 
-   Neutral accents (gray, task-todo) are deliberately left out of the
-   tinted rule, so they keep the original border-only styling exactly — no
-   accent variable is ever left undefined.
+   The default accent (gray) is deliberately left out of the tinted rule,
+   so it keeps the original border-only styling exactly — no accent
+   variable is ever left undefined. Task-todo *is* tinted (so a todo task
+   reads as a task in task view, a step above the dimmed non-tasks), but
+   with its own neutral-slate recipe rather than the hue recipe below.
 
    Recipe knobs (the only numbers to tune) live in the two theme rules:
      --tint-fill   background
@@ -63,20 +65,14 @@
   --accent: var(--color-task-done);
 }
 
-/* Neutral accents: original border-only treatment, untouched. */
+/* Default accent: original border-only treatment, untouched. */
 :is(.card, .container-node)[data-accent="gray"] {
   border-color: var(--color-accent-gray);
 }
-:is(.card, .container-node)[data-accent="task-todo"] {
-  border-color: var(--color-task-todo);
-}
 
 /* Shared: re-theme the node from the recipe (the --tint-* knobs are set
-   per theme by the two rules after this one). */
-:is(.card, .container-node)[data-accent]:not(
-  [data-accent="gray"],
-  [data-accent="task-todo"]
-) {
+   per theme by the rules after this one). */
+:is(.card, .container-node)[data-accent]:not([data-accent="gray"]) {
   --color-surface: var(--tint-fill);
   --color-surface-hover: color-mix(
     in oklab,
@@ -115,6 +111,22 @@
   --tint-fill: color-mix(in oklab, var(--accent) 42%, #2e3440);
   --tint-ink: color-mix(in oklab, var(--accent) 16%, white);
   --tint-edge: var(--accent);
+}
+
+/* Recipe — task-todo: no hue of its own, so instead of the accent recipe
+   a neutral slate tint, just a step off the theme surface, with a muted
+   edge (not the full-strength --color-task-todo, which read as a stark
+   white outline in dark mode) and the theme's own ink. Contrast (WCAG,
+   ink vs fill): light 9.0:1, dark 6.8:1; status glyph vs fill >= 5.3:1. */
+:is(.card, .container-node)[data-accent="task-todo"] {
+  --tint-fill: color-mix(in oklab, var(--color-task-todo) 12%, #eceff4);
+  --tint-ink: #2e3440;
+  --tint-edge: color-mix(in oklab, var(--color-task-todo) 75%, #eceff4);
+}
+[data-theme="dark"] :is(.card, .container-node)[data-accent="task-todo"] {
+  --tint-fill: color-mix(in oklab, var(--color-task-todo) 20%, #2e3440);
+  --tint-ink: #eceff4;
+  --tint-edge: color-mix(in oklab, var(--color-task-todo) 50%, #2e3440);
 }
 
 /* Color-picker swatches. The `background` shorthand (not
@@ -172,8 +184,8 @@ svg[data-task-status="done"] {
 /* On a tinted node the status glyph sits on its own status/accent color
    (e.g. done-green on a lime card), so it draws in the node's ink —
    status still reads from the glyph's shape, and in task view mode from
-   the node's own fill. Untinted (gray/todo) nodes keep the colored glyphs
-   above. */
+   the node's own fill. Gray (untinted) and todo nodes keep the colored
+   glyphs above — todo's neutral glyph already reads on its slate fill. */
 :is(.card, .container-node)[data-accent]:not(
   [data-accent="gray"],
   [data-accent="task-todo"]
