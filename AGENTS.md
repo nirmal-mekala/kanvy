@@ -84,6 +84,18 @@ canonical app state (not a side table) the instant it's known — see
 `ctx/notes/260925-network-id-reconciliation.md` and `src/state/
 entityReconcile.ts`/`src/state/networkReconcile.ts`.
 
+Network mode speaks more than one backend through **dialects**
+(`src/api/dialects/`): json-server and PostgREST presets, chosen from
+the settings modal's Backend dropdown and persisted as
+`NetworkConfig.dialectId`. A dialect owns every backend-specific detail
+(paths, filter/pagination syntax, envelopes, field-name mapping, extra
+headers, error bodies); `restClient` only sends what it builds and
+Zod-checks every dialect return. Callers speak app field names and
+`Filter` objects, never a backend's query syntax. See
+`ctx/notes/261020-network-dialects.md` (and
+`ctx/notes/261019-pgrest-vs-json-server-api-differences.md` for the
+PostgREST differences it encodes).
+
 Link-card metadata fetching no longer proxies through microlink.io (its
 free tier's ~25 req/day cap made it unsustainable). A same-origin raw
 `fetch()` of the pasted/typed URL was tried and dropped (CORS broke it

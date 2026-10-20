@@ -137,6 +137,7 @@ describe('resolveBoardAccess', () => {
     s.store.set(s.networkConfigAtom, {
       baseUrl: 'https://api.example.test/',
       authToken: '',
+      dialectId: 'json-server',
     })
     const boards = [
       {
@@ -182,6 +183,7 @@ describe('resolveBoardAccess', () => {
     s.store.set(s.networkConfigAtom, {
       baseUrl: 'https://api.example.test/',
       authToken: '',
+      dialectId: 'json-server',
     })
     vi.stubGlobal(
       'fetch',

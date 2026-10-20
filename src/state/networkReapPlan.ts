@@ -64,8 +64,27 @@ export function candidateNodeIds(
   ]
 }
 
+/**
+ * Why a node or edge is in the plan. The reaper turns this into the
+ * delete's server-side guard (api/networkReaper.ts), so a row that no
+ * longer qualifies by the time its delete is sent is left alone.
+ */
+export type DeleteReason =
+  /** Trashed itself, with an aged tombstone. */
+  | { kind: 'tombstone' }
+  /** On a board being reaped, whatever its own status. */
+  | { kind: 'on-board'; boardId: string }
+  /** An edge touching a node being deleted (see `edgesToDelete`). */
+  | { kind: 'touching'; fromNodeId: string; toNodeId: string }
+
+export interface PlannedEdgeDelete {
+  id: string
+  reason: DeleteReason
+}
+
 export interface PlannedNodeDelete {
   id: string
+  reason: Exclude<DeleteReason, { kind: 'touching' }>
   /** Edges that reference this node, deleted first. */
   edgeIds: string[]
   /** The image this node references, if it's an image card — an image-deletion candidate once this node is gone. */
@@ -87,14 +106,14 @@ interface SkippedBoard {
 }
 
 /**
- * The ordered delete plan: every `edgeIds` entry first, then `nodes`, then
+ * The ordered delete plan: every `edges` entry first, then `nodes`, then
  * `boards`. The runner deletes a node only once all its `edgeIds`
  * deletes have succeeded, and a board only once all its `nodeIds` and
  * `edgeIds` deletes have. Images aren't planned up front:
  * `imageCandidateIds` derives them from the nodes actually deleted.
  */
 export interface NetworkReapPlan {
-  edgeIds: string[]
+  edges: PlannedEdgeDelete[]
   nodes: PlannedNodeDelete[]
   boards: PlannedBoardDelete[]
   skippedBoards: SkippedBoard[]
@@ -193,6 +212,19 @@ function edgesToDelete(
   ])
 }
 
+/** A tombstone reason wins over an on-board one: it holds even if the board stops being reaped. */
+function deleteReason(
+  item: Node | Edge,
+  tombstones: ReadonlySet<string>,
+  boardIds: ReadonlySet<string>,
+): PlannedNodeDelete['reason'] | undefined {
+  if (tombstones.has(item.id)) return { kind: 'tombstone' }
+  if (boardIds.has(item.boardId)) {
+    return { kind: 'on-board', boardId: item.boardId }
+  }
+  return undefined
+}
+
 function imageIdOf(node: Node): string | undefined {
   return node.nodeType === 'card' && node.cardType === 'image'
     ? node.imageId
@@ -207,10 +239,24 @@ export function planNetworkReap(
   const { boardIds, nodes, skippedBoards } = settleBoards(candidates, now)
   const nodeIds = new Set(nodes.map((node) => node.id))
   const edges = edgesToDelete(candidates, boardIds, nodeIds, now)
+  const nodeTombstones = new Set(reapableNodeIds(candidates.trashedNodes, now))
+  const edgeTombstones = new Set(reapableEdgeIds(candidates.trashedEdges, now))
   return {
-    edgeIds: edges.map((edge) => edge.id),
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      reason: deleteReason(edge, edgeTombstones, boardIds) ?? {
+        kind: 'touching',
+        fromNodeId: edge.fromNodeId,
+        toNodeId: edge.toNodeId,
+      },
+    })),
     nodes: nodes.map((node) => ({
       id: node.id,
+      // nodesToDelete only returns tombstones and nodes on reaped boards.
+      reason: deleteReason(node, nodeTombstones, boardIds) ?? {
+        kind: 'on-board',
+        boardId: node.boardId,
+      },
       edgeIds: edges
         .filter(
           (edge) => edge.fromNodeId === node.id || edge.toNodeId === node.id,
