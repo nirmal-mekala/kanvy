@@ -7,13 +7,16 @@ import { applyOpsToNetwork } from './networkOps'
 const config: NetworkConfig = {
   baseUrl: 'http://localhost:1996',
   authToken: '',
+  dialectId: 'json-server',
 }
 
-function jsonResponse(body: unknown): Response {
+/** A re-readable stand-in for a JSON `Response` — several tests resolve every call with the same one. */
+function jsonResponse(body: unknown, status = 200): Response {
   return {
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(body),
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(),
+    text: () => Promise.resolve(JSON.stringify(body)),
   } as Response
 }
 
@@ -100,7 +103,7 @@ describe('applyOpsToNetwork', () => {
     expect(JSON.parse(init.body as string)).toEqual({ dataUri: 'data:new' })
   })
 
-  it('maps an ImageOp with an undefined `after` to a DELETE /images/:id', async () => {
+  it('never DELETEs an image for an ImageOp with an undefined `after` — only the network reaper deletes images, after a server-side reference check', async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}))
     const op: Op = {
       kind: 'image',
@@ -109,9 +112,7 @@ describe('applyOpsToNetwork', () => {
       after: undefined,
     }
     await applyOpsToNetwork(config, [op], 'do', fetchImpl)
-    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:1996/images/img1')
-    expect(init.method).toBe('DELETE')
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 
   it('skips ReplaceBoardOp — no REST mapping (design doc §10)', async () => {
@@ -166,10 +167,31 @@ describe('applyOpsToNetwork', () => {
     spy.mockRestore()
   })
 
-  it('throws when a REST call fails', async () => {
+  it("leaves an image alone on a dialect with no per-request size limit (PostgREST), sending it in that dialect's field names", async () => {
     const fetchImpl = vi
       .fn()
-      .mockResolvedValue({ ok: false, status: 500 } as Response)
+      .mockResolvedValue(jsonResponse({ id: 'server-img', data_uri: 'x' }))
+    const spy = vi.spyOn(imageFile, 'ensureDataUriUnderBytes')
+    const op: Op = {
+      kind: 'image',
+      id: 'img1',
+      before: undefined,
+      after: 'data:big',
+    }
+    await applyOpsToNetwork(
+      { ...config, dialectId: 'postgrest' },
+      [op],
+      'do',
+      fetchImpl,
+    )
+    expect(spy).not.toHaveBeenCalled()
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toEqual({ data_uri: 'data:big' })
+    spy.mockRestore()
+  })
+
+  it('throws when a REST call fails', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({}, 500))
     const op: Op = {
       kind: 'create',
       entity: 'node',

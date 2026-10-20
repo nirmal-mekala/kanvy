@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { REAP_AGE_MS } from '../state/reaper'
 import { runNetworkReap } from './networkReaper'
 
-const config = { baseUrl: 'http://localhost:1996', authToken: '' }
+const config = {
+  baseUrl: 'http://localhost:1996',
+  authToken: '',
+  dialectId: 'json-server',
+}
 const NOW = new Date('2026-10-09T00:00:00.000Z').getTime()
 const AGED = new Date(NOW - REAP_AGE_MS - 1000).toISOString()
 
@@ -66,6 +70,8 @@ function matches(row: Row, params: URLSearchParams): boolean {
       if (!value.split(',').includes(String(row[key.slice(0, -3)]))) {
         return false
       }
+    } else if (key.endsWith(':lt')) {
+      if (!(String(row[key.slice(0, -3)]) < value)) return false
     } else if (String(row[key]) !== value) {
       return false
     }
@@ -73,21 +79,33 @@ function matches(row: Row, params: URLSearchParams): boolean {
   return true
 }
 
-/** A json-server-shaped fake: `field=value` / `field:in=a,b` filters, paginated GETs, DELETE by id; `failDeletes` answer 500. */
-function fakeServer(db: Db, failDeletes: string[] = []) {
+/**
+ * A json-server-shaped fake: `field=value` / `field:in=a,b` / `field:lt=v`
+ * filters, paginated GETs, DELETE by id; `failDeletes` answer 500.
+ * `beforeDelete` runs before each DELETE, to change the db mid-run (as
+ * another client could).
+ */
+function fakeServer(
+  db: Db,
+  failDeletes: string[] = [],
+  beforeDelete: (path: string) => void = () => {},
+) {
   const deletes: string[] = []
   const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
     const u = new URL(url)
     const [collection, id] = u.pathname.slice(1).split('/') as [string, string?]
-    const rows = db[collection] ?? []
     if (init?.method === 'DELETE') {
       const path = `${collection}/${id}`
+      beforeDelete(path)
+      const rows = db[collection] ?? []
       if (failDeletes.includes(path)) return new Response('', { status: 500 })
       deletes.push(path)
       db[collection] = rows.filter((row) => row.id !== id)
       return new Response('{}', { status: 200 })
     }
-    const data = rows.filter((row) => matches(row, u.searchParams))
+    const data = (db[collection] ?? []).filter((row) =>
+      matches(row, u.searchParams),
+    )
     return new Response(
       JSON.stringify({
         first: 1,
@@ -113,7 +131,7 @@ afterEach(() => {
 })
 
 describe('runNetworkReap', () => {
-  it('deletes edges, then nodes, then boards, then orphaned images — and leaves live content alone', async () => {
+  it('deletes standalone tombstones, then board content (edges before nodes), then boards, then orphaned images — and leaves live content alone', async () => {
     const db: Db = {
       boards: [board('h', 'active', true), board('b1', 'trashed')],
       nodes: [
@@ -127,8 +145,8 @@ describe('runNetworkReap', () => {
     const { fetchImpl, deletes } = fakeServer(db)
     const result = await runNetworkReap(config, NOW, { fetchImpl })
     expect(deletes).toEqual([
-      'edges/e1',
       'nodes/bc',
+      'edges/e1',
       'nodes/on-b1',
       'boards/b1',
       'images/img1',
@@ -178,6 +196,92 @@ describe('runNetworkReap', () => {
     expect(deletes).toEqual(['nodes/solo', 'images/img-s'])
     expect(result.boardIds.size).toBe(0)
     expect(console.warn).toHaveBeenCalled()
+  })
+
+  describe('guards against changes made after planning (ctx/notes/261020-safe-network-deletes.md)', () => {
+    it("leaves a board's content alone when the board is restored before its content is reached", async () => {
+      const db: Db = {
+        boards: [board('h', 'active', true), board('b1', 'trashed')],
+        nodes: [
+          card('solo', 'h', 'trashed'),
+          card('bc', 'h', 'trashed', { cardType: 'board', boardRef: 'b1' }),
+          card('on-b1', 'b1', 'active'),
+        ],
+        edges: [],
+        images: [],
+      }
+      const { fetchImpl, deletes } = fakeServer(db, [], (path) => {
+        // Another client undoes the board's deletion mid-run.
+        if (path === 'nodes/solo') {
+          const b1 = db.boards?.find((b) => b.id === 'b1')
+          if (b1) b1.status = 'active'
+        }
+      })
+      const result = await runNetworkReap(config, NOW, { fetchImpl })
+      expect(deletes).toEqual(['nodes/solo', 'nodes/bc'])
+      expect(db.nodes?.map((n) => n.id)).toEqual(['on-b1'])
+      expect(result.boardIds.size).toBe(0)
+    })
+
+    it('skips a board something new was added to, rather than letting ON DELETE CASCADE take it', async () => {
+      const db: Db = {
+        boards: [board('h', 'active', true), board('b1', 'trashed')],
+        nodes: [card('on-b1', 'b1', 'active')],
+        edges: [],
+        images: [],
+      }
+      const { fetchImpl, deletes } = fakeServer(db, [], (path) => {
+        if (path === 'nodes/on-b1') db.nodes?.push(card('new', 'b1', 'active'))
+      })
+      await runNetworkReap(config, NOW, { fetchImpl })
+      expect(deletes).toEqual(['nodes/on-b1'])
+      expect(db.boards?.map((b) => b.id)).toEqual(['h', 'b1'])
+      expect(db.nodes?.map((n) => n.id)).toEqual(['new'])
+    })
+
+    it('skips a tombstone that was restored after planning', async () => {
+      const db: Db = {
+        boards: [board('h', 'active', true)],
+        nodes: [card('n1', 'h', 'trashed'), card('n2', 'h', 'trashed')],
+        edges: [],
+        images: [],
+      }
+      const { fetchImpl, deletes } = fakeServer(db, [], (path) => {
+        if (path === 'nodes/n1') {
+          const n2 = db.nodes?.find((n) => n.id === 'n2')
+          if (n2) n2.status = 'active'
+        }
+      })
+      await runNetworkReap(config, NOW, { fetchImpl })
+      expect(deletes).toEqual(['nodes/n1'])
+    })
+
+    it('skips a node an edge created after planning still touches', async () => {
+      const db: Db = {
+        boards: [board('h', 'active', true)],
+        nodes: [card('n1', 'h', 'trashed'), card('live', 'h', 'active')],
+        edges: [],
+        images: [],
+      }
+      const { fetchImpl, deletes } = fakeServer(db)
+      let touchingReads = 0
+      const wrapped = (async (url: string, init?: RequestInit) => {
+        // The edge appears between planning (the first touching-edge read)
+        // and the pre-delete re-read (the second).
+        if (new URL(url).searchParams.has('fromNodeId:in')) {
+          touchingReads += 1
+          if (touchingReads === 2) {
+            db.edges?.push(edge('new', 'h', 'active', 'live', 'n1'))
+          }
+        }
+        return fetchImpl(url, init)
+      }) as typeof fetch
+      await runNetworkReap(config, NOW, { fetchImpl: wrapped })
+      expect(deletes).toEqual([])
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('still touched by edges/new'),
+      )
+    })
   })
 
   it('stops issuing requests once shouldContinue turns false, reporting what it already deleted', async () => {

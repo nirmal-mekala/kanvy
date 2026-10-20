@@ -5,15 +5,19 @@
 // state until Confirm is pressed: the fields/checkbox are pure local draft
 // state, and Confirm only applies the draft after a successful connection
 // test — same "Save & Connect" behavior the modal always had, just without
-// its own Local/Network buttons.
+// its own Local/Network buttons. The Backend dropdown picks the connection's
+// dialect preset (api/dialects/registry.ts, ctx/notes/
+// 261020-network-dialects.md).
 
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useState } from 'react'
+import { DIALECTS, getDialect } from '../../api/dialects/registry'
 import { testConnection } from '../../api/restClient'
 import { ResponseValidationError } from '../../api/validateEntries'
 import {
   accessModeAtom,
   clearNetworkAuthSettings,
+  EMPTY_NETWORK_CONFIG,
   networkConfigAtom,
   persistTokenAtom,
   settingsModalOpenAtom,
@@ -31,12 +35,32 @@ import { FieldMessage } from './FieldMessage'
  * The inline error for a failed Confirm. A schema mismatch (e.g. a
  * `boards` entry missing `isRoot`) is a data problem on a server that
  * *was* reachable — say exactly what's wrong rather than the generic
- * connection message.
+ * connection message. Anything else names the backend preset too, since
+ * the wrong preset for a reachable server fails the same way.
  */
 function confirmErrorMessage(error: unknown): string {
   return error instanceof ResponseValidationError
     ? `The server's data doesn't match this app's schema — ${error.message}`
-    : 'Could not connect — check the base URL and try again.'
+    : 'Could not connect — check the backend, base URL and token, and try again.'
+}
+
+/** The per-backend setup tip under the fields. */
+function DialectTip({ dialectId }: { dialectId: string }) {
+  if (dialectId === 'postgrest') {
+    return (
+      <FieldMessage tone="tip">
+        Expects <code>boards</code>, <code>nodes</code>, <code>edges</code> and{' '}
+        <code>images</code> tables with snake_case columns. The token is sent as
+        the PostgREST JWT.
+      </FieldMessage>
+    )
+  }
+  return (
+    <FieldMessage tone="tip">
+      The board JSON downloaded from the toolbar can be served directly as a
+      json-server db file: <code>npx json-server &lt;file&gt;</code>.
+    </FieldMessage>
+  )
 }
 
 // CRAP scoring penalizes this component's 0% coverage — component tests
@@ -52,6 +76,7 @@ export function SettingsModal() {
   const [networkConfig, setNetworkConfig] = useAtom(networkConfigAtom)
   const [persistToken, setPersistToken] = useAtom(persistTokenAtom)
 
+  const [draftDialectId, setDraftDialectId] = useState(networkConfig.dialectId)
   const [draftBaseUrl, setDraftBaseUrl] = useState(networkConfig.baseUrl)
   const [draftAuthToken, setDraftAuthToken] = useState(networkConfig.authToken)
   const [draftPersistToken, setDraftPersistToken] = useState(persistToken)
@@ -63,7 +88,11 @@ export function SettingsModal() {
     if (testing || !draftBaseUrl) return
     setTesting(true)
     setError(undefined)
-    const config = { baseUrl: draftBaseUrl, authToken: draftAuthToken }
+    const config = {
+      baseUrl: draftBaseUrl,
+      authToken: draftAuthToken,
+      dialectId: draftDialectId,
+    }
     try {
       await testConnection(config)
       setAccessMode('network')
@@ -89,8 +118,9 @@ export function SettingsModal() {
       setAccessMode('local')
     }
     clearNetworkAuthSettings()
-    setNetworkConfig({ baseUrl: '', authToken: '' })
+    setNetworkConfig(EMPTY_NETWORK_CONFIG)
     setPersistToken(false)
+    setDraftDialectId(EMPTY_NETWORK_CONFIG.dialectId)
     setDraftBaseUrl('')
     setDraftAuthToken('')
     setDraftPersistToken(false)
@@ -109,11 +139,25 @@ export function SettingsModal() {
     >
       <div className="settings-modal__fields">
         <label className="settings-modal__field">
+          <span className="settings-modal__label">Backend</span>
+          <select
+            className="settings-modal__input"
+            value={draftDialectId}
+            onChange={(e) => setDraftDialectId(e.target.value)}
+          >
+            {DIALECTS.map((dialect) => (
+              <option key={dialect.id} value={dialect.id}>
+                {dialect.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="settings-modal__field">
           <span className="settings-modal__label">Base URL</span>
           <input
             type="text"
             className="settings-modal__input"
-            placeholder="http://localhost:1996"
+            placeholder={getDialect(draftDialectId).exampleBaseUrl}
             value={draftBaseUrl}
             onChange={(e) => setDraftBaseUrl(e.target.value)}
           />
@@ -142,10 +186,7 @@ export function SettingsModal() {
             storage. Anyone with access to this device/browser could read it.
           </FieldMessage>
         )}
-        <FieldMessage tone="tip">
-          The board JSON downloaded from the toolbar can be served directly as a
-          json-server db file: <code>npx json-server &lt;file&gt;</code>.
-        </FieldMessage>
+        <DialectTip dialectId={draftDialectId} />
       </div>
 
       {error && <FieldMessage tone="error">{error}</FieldMessage>}

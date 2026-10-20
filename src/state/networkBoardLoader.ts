@@ -77,7 +77,7 @@ function boardContentQueryKey(boardId: string) {
   return ['network', 'board-content', boardId] as const
 }
 
-/** All images referenced by any `cardType: 'image'` node in `nodes` — json-server's `id:in` filter fetches exactly these, never the whole `images` collection. */
+/** All images referenced by any `cardType: 'image'` node in `nodes` — an `id` `in` filter fetches exactly these, never the whole `images` collection. */
 async function fetchReferencedImages(
   config: NetworkConfig,
   nodes: readonly Node[],
@@ -93,9 +93,9 @@ async function fetchReferencedImages(
     ),
   ]
   if (imageIds.length === 0) return []
-  return fetchCollection(config, 'images', ImageEntrySchema, {
-    'id:in': imageIds.join(','),
-  })
+  return fetchCollection(config, 'images', ImageEntrySchema, [
+    { field: 'id', op: 'in', values: imageIds },
+  ])
 }
 
 async function fetchBoardContent(
@@ -103,8 +103,12 @@ async function fetchBoardContent(
   boardId: string,
 ): Promise<BoardContent> {
   const [nodes, edges] = await Promise.all([
-    fetchCollection(config, 'nodes', NodeSchema, { boardId }),
-    fetchCollection(config, 'edges', EdgeSchema, { boardId }),
+    fetchCollection(config, 'nodes', NodeSchema, [
+      { field: 'boardId', op: 'eq', value: boardId },
+    ]),
+    fetchCollection(config, 'edges', EdgeSchema, [
+      { field: 'boardId', op: 'eq', value: boardId },
+    ]),
   ])
   const images = await fetchReferencedImages(config, nodes)
   return { nodes, edges, images }

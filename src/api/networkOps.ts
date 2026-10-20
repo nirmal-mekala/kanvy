@@ -21,6 +21,8 @@ import { ensureDataUriUnderBytes } from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import { reconcileNetworkEntityIdAtom } from '../state/networkReconcile'
 import type { CreateOp, EntityKind, ImageOp, Op, OpReplay } from '../state/ops'
+import { getDialect } from './dialects/registry'
+import type { Collection, EntityCreate, EntityPatch } from './dialects/types'
 import {
   createIdRemapTable,
   type IdRemapTable,
@@ -28,24 +30,36 @@ import {
   resolveId,
   resolveValueReferences,
 } from './networkIdRemap'
-import { createEntity, deleteEntity, patchEntity } from './restClient'
+import { createEntity, patchEntity } from './restClient'
 
-const COLLECTION_BY_ENTITY: Record<EntityKind, string> = {
+type EntityCollection = Exclude<Collection, 'images'>
+
+const COLLECTION_BY_ENTITY: Record<EntityKind, EntityCollection> = {
   node: 'nodes',
   edge: 'edges',
   board: 'boards',
 }
 
-/**
- * json-server's default body-size limit is ~100KB — a pasted/dropped image
- * already downsized to spec §2.6's 1200px-long-edge cap can still exceed
- * that for a busy/high-detail PNG (the reported bug: pasting an image in
- * network mode failed the `POST /images`). Targets comfortably under the
- * limit rather than right up against it, to leave headroom for the JSON
- * envelope (`{"id":"...","dataUri":"..."}`) around the base64 payload
- * itself.
- */
-const JSON_SERVER_MAX_IMAGE_BYTES = 90_000
+// Ops carry their values/patches as `Record<string, unknown>` (state/
+// ops.ts), but every one was built by a mutation atom from a typed entity,
+// and `resolveValueReferences` only ever swaps id strings for id strings —
+// so these two casts restate types the op already had, at the one place
+// ops meet the typed REST boundary.
+const asCreate = (value: Record<string, unknown>) =>
+  value as unknown as EntityCreate<EntityCollection>
+const asPatch = (patch: Record<string, unknown>) =>
+  patch as EntityPatch<EntityCollection>
+
+/** An image's data URI, shrunk to fit the connection's dialect's per-request limit (json-server's ~100KB body cap — the reported bug: pasting an image in network mode failed the `POST /images`), if it has one. */
+function fitImageToDialect(
+  config: NetworkConfig,
+  dataUri: string,
+): Promise<string> {
+  const { maxImageBytes } = getDialect(config.dialectId).limits
+  return maxImageBytes === null
+    ? Promise.resolve(dataUri)
+    : ensureDataUriUnderBytes(dataUri, maxImageBytes)
+}
 
 /**
  * A PATCH body for an update op's patch: every field the patch *removes*
@@ -127,10 +141,10 @@ async function applyCreate(
     idRemapTable,
     op.value as unknown as Record<string, unknown>,
   )
-  const created = await createEntity<Record<string, unknown>>(
+  const created = await createEntity(
     config,
     COLLECTION_BY_ENTITY[op.entity],
-    withoutId(value),
+    asCreate(withoutId(value)),
     fetchImpl,
   )
   recordAndReconcile(idRemapTable, op.entity, op.value.id, created.id)
@@ -159,7 +173,7 @@ async function applyOp(
       config,
       COLLECTION_BY_ENTITY[op.entity],
       id,
-      patchBody(resolveValueReferences(idRemapTable, patch)),
+      asPatch(patchBody(resolveValueReferences(idRemapTable, patch))),
       fetchImpl,
     )
     return
@@ -172,8 +186,13 @@ async function applyOp(
 
 /**
  * An image op, in either direction. `from`/`to` are the image's server-side
- * value before/after this replay (`undefined` = no such image): no target
- * → DELETE, no source → POST, otherwise PATCH.
+ * value before/after this replay (`undefined` = no such image): no source
+ * → POST, otherwise PATCH. No target sends nothing: an image row is only
+ * ever deleted by the network reaper, after it has asked the server that
+ * no node row of any status still references it — never from an op, which
+ * only knows the client's partially loaded document (images are shared
+ * across nodes and boards by copy/paste/duplicate). No mutation produces
+ * such an op today.
  *
  * Replaying an image *create* is the exception: neither undo nor redo
  * sends anything. The row stays on the server through undo, because the
@@ -196,21 +215,13 @@ async function applyImageOp(
   const [from, to] =
     replay === 'undo' ? [op.after, op.before] : [op.before, op.after]
   const id = resolveId(idRemapTable, 'image', op.id)
-  if (to === undefined) {
-    await deleteEntity(config, 'images', id, fetchImpl)
-    return
-  }
-  const dataUri = await ensureDataUriUnderBytes(to, JSON_SERVER_MAX_IMAGE_BYTES)
+  if (to === undefined) return
+  const dataUri = await fitImageToDialect(config, to)
   if (from !== undefined) {
     await patchEntity(config, 'images', id, { dataUri }, fetchImpl)
     return
   }
-  const created = await createEntity<Record<string, unknown>>(
-    config,
-    'images',
-    { dataUri },
-    fetchImpl,
-  )
+  const created = await createEntity(config, 'images', { dataUri }, fetchImpl)
   recordAndReconcile(idRemapTable, 'image', op.id, created.id)
 }
 

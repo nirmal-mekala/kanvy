@@ -45,3 +45,40 @@ describe('bootPhaseAtom', () => {
     expect(createStore().get(bootPhaseAtom)).toBe('ready')
   })
 })
+
+// The backend preset (ctx/notes/261020-network-dialects.md) is persisted
+// alongside the base URL, and normalized on read.
+describe('networkConfigAtom dialectId', () => {
+  async function bootDialectId(): Promise<string> {
+    vi.resetModules()
+    const { networkConfigAtom } = await import('./networkSettings')
+    return createStore().get(networkConfigAtom).dialectId
+  }
+
+  it('restores a persisted preset', async () => {
+    localStorage.setItem('kanvy-network-dialect', 'postgrest')
+    expect(await bootDialectId()).toBe('postgrest')
+  })
+
+  it.each([
+    ['nothing was persisted (a connection saved before presets existed)', null],
+    ['the persisted preset no longer exists', 'retired-backend'],
+  ])('falls back to json-server when %s', async (_label, saved) => {
+    if (saved !== null) localStorage.setItem('kanvy-network-dialect', saved)
+    expect(await bootDialectId()).toBe('json-server')
+  })
+
+  it('is written with the base URL and cleared with it', async () => {
+    vi.resetModules()
+    const { writeNetworkAuthSettings, clearNetworkAuthSettings } = await import(
+      './networkSettings'
+    )
+    writeNetworkAuthSettings(
+      { baseUrl: 'http://pg', authToken: '', dialectId: 'postgrest' },
+      false,
+    )
+    expect(localStorage.getItem('kanvy-network-dialect')).toBe('postgrest')
+    clearNetworkAuthSettings()
+    expect(localStorage.getItem('kanvy-network-dialect')).toBeNull()
+  })
+})

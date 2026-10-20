@@ -170,7 +170,7 @@ describe('planNetworkReap', () => {
       NOW,
     )
     expect(plan.nodes.map((n) => n.id)).toEqual(['n1'])
-    expect(plan.edgeIds).toEqual(['e1'])
+    expect(plan.edges.map((e) => e.id)).toEqual(['e1'])
     expect(plan.boards).toEqual([])
   })
 
@@ -188,13 +188,25 @@ describe('planNetworkReap', () => {
       }),
       NOW,
     )
-    expect(plan.edgeIds).toEqual(['e1'])
+    expect(plan.edges.map((e) => e.id)).toEqual(['e1'])
     expect(plan.nodes.map((n) => n.id).sort()).toEqual([
       'bc',
       'live',
       'trashed-fresh',
     ])
     expect(plan.nodes.find((n) => n.id === 'live')?.edgeIds).toEqual(['e1'])
+    // Each delete records why it qualifies — the reaper's server-side guard.
+    // A tombstone wins: it still qualifies if the board is restored.
+    expect(Object.fromEntries(plan.nodes.map((n) => [n.id, n.reason]))).toEqual(
+      {
+        bc: { kind: 'tombstone' },
+        live: { kind: 'on-board', boardId: 'b1' },
+        'trashed-fresh': { kind: 'on-board', boardId: 'b1' },
+      },
+    )
+    expect(plan.edges).toEqual([
+      { id: 'e1', reason: { kind: 'on-board', boardId: 'b1' } },
+    ])
     expect(plan.boards).toEqual([
       { id: 'b1', nodeIds: ['bc', 'live', 'trashed-fresh'], edgeIds: ['e1'] },
     ])
@@ -213,7 +225,7 @@ describe('planNetworkReap', () => {
     )
     expect(plan.boards).toEqual([])
     expect(plan.nodes).toEqual([])
-    expect(plan.edgeIds).toEqual([])
+    expect(plan.edges.map((e) => e.id)).toEqual([])
     expect(plan.skippedBoards).toEqual([
       { id: 'b1', reason: 'still referenced by active board card bc' },
     ])
@@ -250,9 +262,20 @@ describe('planNetworkReap', () => {
       }),
       NOW,
     )
-    expect(plan.edgeIds).toEqual(['dangling'])
+    expect(plan.edges.map((e) => e.id)).toEqual(['dangling'])
     expect(plan.nodes).toEqual([
-      { id: 'n1', edgeIds: ['dangling'], imageId: undefined },
+      {
+        id: 'n1',
+        reason: { kind: 'tombstone' },
+        edgeIds: ['dangling'],
+        imageId: undefined,
+      },
+    ])
+    expect(plan.edges).toEqual([
+      {
+        id: 'dangling',
+        reason: { kind: 'touching', fromNodeId: 'n1', toNodeId: 'other' },
+      },
     ])
   })
 
@@ -261,7 +284,14 @@ describe('planNetworkReap', () => {
       candidates({ trashedNodes: [imageCard('n1', 'h', 'trashed', 'img1')] }),
       NOW,
     )
-    expect(plan.nodes).toEqual([{ id: 'n1', edgeIds: [], imageId: 'img1' }])
+    expect(plan.nodes).toEqual([
+      {
+        id: 'n1',
+        reason: { kind: 'tombstone' },
+        edgeIds: [],
+        imageId: 'img1',
+      },
+    ])
   })
 })
 

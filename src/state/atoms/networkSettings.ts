@@ -6,19 +6,36 @@
 // URL is persisted so that boot check has something to try; the auth token
 // is persisted only when the user opts in via the settings modal's
 // "persist token" checkbox (`persistTokenAtom`), since it's more sensitive
-// than a URL.
+// than a URL. The backend preset (`dialectId`, ctx/notes/
+// 261020-network-dialects.md) is persisted alongside the base URL.
 
 import { atom } from 'jotai'
+import { DEFAULT_DIALECT_ID, isDialectId } from '../../api/dialects/registry'
 
 type AccessMode = 'local' | 'network'
 
 export interface NetworkConfig {
   baseUrl: string
   authToken: string
+  /** Which backend preset (api/dialects/registry.ts) speaks to `baseUrl`. */
+  dialectId: string
+}
+
+/** No connection configured — the reset state, and the boot state when nothing is persisted. */
+export const EMPTY_NETWORK_CONFIG: NetworkConfig = {
+  baseUrl: '',
+  authToken: '',
+  dialectId: DEFAULT_DIALECT_ID,
 }
 
 const BASE_URL_KEY = 'kanvy-network-base-url'
 const AUTH_TOKEN_KEY = 'kanvy-network-auth-token'
+const DIALECT_KEY = 'kanvy-network-dialect'
+
+/** A persisted dialect id, or the default when none was saved (a connection from before presets existed) or the saved one no longer exists. */
+function persistedDialectId(saved: string | null): string {
+  return saved !== null && isDialectId(saved) ? saved : DEFAULT_DIALECT_ID
+}
 
 // CRAP scoring penalizes this function's 0% coverage — it's a one-time
 // module-init boundary reading localStorage, not pure application logic;
@@ -29,9 +46,10 @@ function initialNetworkConfig(): NetworkConfig {
     return {
       baseUrl: localStorage.getItem(BASE_URL_KEY) ?? '',
       authToken: localStorage.getItem(AUTH_TOKEN_KEY) ?? '',
+      dialectId: persistedDialectId(localStorage.getItem(DIALECT_KEY)),
     }
   } catch {
-    return { baseUrl: '', authToken: '' }
+    return EMPTY_NETWORK_CONFIG
   }
 }
 
@@ -71,7 +89,7 @@ export const settingsModalOpenAtom = atom<boolean>(false)
 
 /**
  * Persists (or clears) the connection config to localStorage. The base URL
- * is always saved; the auth token is saved only when `persistToken` is
+ * and dialect are always saved; the auth token is saved only when `persistToken` is
  * true, and deleted otherwise — so toggling the checkbox off and
  * confirming removes any token a prior session may have persisted.
  * Silent-failure on a full/unavailable localStorage, matching this
@@ -85,8 +103,10 @@ export function writeNetworkAuthSettings(
   try {
     if (config.baseUrl) {
       localStorage.setItem(BASE_URL_KEY, config.baseUrl)
+      localStorage.setItem(DIALECT_KEY, config.dialectId)
     } else {
       localStorage.removeItem(BASE_URL_KEY)
+      localStorage.removeItem(DIALECT_KEY)
     }
     if (persistToken) {
       localStorage.setItem(AUTH_TOKEN_KEY, config.authToken)
@@ -99,7 +119,7 @@ export function writeNetworkAuthSettings(
 }
 
 /**
- * Removes any persisted network settings (base URL + auth token) from
+ * Removes any persisted network settings (base URL, dialect, auth token) from
  * localStorage. Silent-failure on a full/unavailable localStorage, same
  * as `writeNetworkAuthSettings`. Does not touch in-memory state
  * (`networkConfigAtom`/`persistTokenAtom`) — callers update those atoms
@@ -109,6 +129,7 @@ export function clearNetworkAuthSettings(): void {
   try {
     localStorage.removeItem(BASE_URL_KEY)
     localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.removeItem(DIALECT_KEY)
   } catch {
     // ignore — persistence is a nicety, not required for the app to work
   }

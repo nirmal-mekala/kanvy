@@ -64,7 +64,11 @@ function stubServer(boards: unknown[], nodes: unknown[] = []) {
   )
 }
 
-const CONFIG = { baseUrl: 'https://api.example.test/', authToken: '' }
+const CONFIG = {
+  baseUrl: 'https://api.example.test/',
+  authToken: '',
+  dialectId: 'json-server',
+}
 
 function emptyBoard(): Board {
   return {
@@ -282,6 +286,7 @@ describe('attemptBootReconnect', () => {
     const result = await s.attemptBootReconnect({
       baseUrl: 'https://api.example.test/',
       authToken: '',
+      dialectId: 'json-server',
     })
 
     expect(result).toBe('failed')
@@ -333,7 +338,9 @@ describe('background network reap after network init', () => {
               key.startsWith('_') ||
               (key.endsWith(':in')
                 ? value.split(',').includes(String(row[key.slice(0, -3)]))
-                : String(row[key]) === value),
+                : key.endsWith(':lt')
+                  ? String(row[key.slice(0, -3)]) < value
+                  : String(row[key]) === value),
           ),
         )
         return new Response(JSON.stringify(page(rows)), { status: 200 })
