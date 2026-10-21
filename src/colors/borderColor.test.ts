@@ -29,7 +29,7 @@ describe('resolveNodeAccent', () => {
         {
           ...node,
           task: 'done',
-          updatedAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
         },
         'recency',
         now,

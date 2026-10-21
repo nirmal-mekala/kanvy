@@ -12,20 +12,21 @@ function minutesAgo(minutes: number): string {
 }
 
 describe('resolveRecencyColor', () => {
-  it('resolves to lime within 1 day', () => {
+  it('resolves to lime within 1 month', () => {
     expect(resolveRecencyColor(hoursAgo(1), now)).toBe('lime')
+    expect(resolveRecencyColor(hoursAgo(14 * 24), now)).toBe('lime')
   })
 
-  it('resolves to amber within 1 week (but past 1 day)', () => {
-    expect(resolveRecencyColor(hoursAgo(3 * 24), now)).toBe('amber')
+  it('resolves to amber within 3 months (but past 1 month)', () => {
+    expect(resolveRecencyColor(hoursAgo(60 * 24), now)).toBe('amber')
   })
 
-  it('resolves to orange within 1 month (but past 1 week)', () => {
-    expect(resolveRecencyColor(hoursAgo(14 * 24), now)).toBe('orange')
+  it('resolves to orange within 1 year (but past 3 months)', () => {
+    expect(resolveRecencyColor(hoursAgo(180 * 24), now)).toBe('orange')
   })
 
-  it('resolves to coral beyond 1 month', () => {
-    expect(resolveRecencyColor(hoursAgo(60 * 24), now)).toBe('coral')
+  it('resolves to coral beyond 1 year', () => {
+    expect(resolveRecencyColor(hoursAgo(400 * 24), now)).toBe('coral')
   })
 })
 

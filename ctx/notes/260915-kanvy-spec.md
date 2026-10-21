@@ -538,10 +538,13 @@ Selected from a menu (eye icon) in the top bar; persisted across sessions.
   `updatedAt` instead of its own accent color, ignoring task status
   entirely. Four gradations, most-recent to stalest — **(wart, keep, per
   Q8–Q9)**:
-  - ≤ 1 day: `lime`
-  - ≤ 1 week: `amber`
-  - ≤ 1 month: `orange`
+  - ≤ 1 month: `lime`
+  - ≤ 3 months: `amber`
+  - ≤ 1 year: `orange`
   - older: `coral`
+  (Widened 2026-10-21 from ≤1 day / ≤1 week / ≤1 month: nodes are
+  expected to stay on a board for long stretches, so a month-old node
+  shouldn't already read as stalest.)
   These thresholds are fixed constants for v0, not user-configurable (Q9).
   Recency reflects "touched at all" (any mutation, including a bare move),
   not "content changed" — an accepted wart, not something to fix now (Q8).
