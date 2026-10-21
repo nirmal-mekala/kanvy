@@ -66,9 +66,9 @@ function ago(ms: number): string {
 }
 
 // Nodes without an explicit age cycle through one representative age per
-// recency band (≤1d lime, ≤1w amber, ≤1mo orange, older coral), so
+// recency band (≤1mo lime, ≤3mo amber, ≤1y orange, older coral), so
 // recency mode shows a spread on every board, not only the recency one.
-const AGE_CYCLE = [10 * MINUTE, 3 * DAY, 2 * WEEK, 90 * DAY]
+const AGE_CYCLE = [10 * MINUTE, 60 * DAY, 180 * DAY, 730 * DAY]
 
 // ---------- images ----------
 
@@ -535,7 +535,8 @@ const RECENCY_AGES: [string, number][] = [
   ['6 hours', 6 * HOUR],
   ['3 days', 3 * DAY],
   ['2 weeks', 2 * WEEK],
-  ['3 months', 90 * DAY],
+  ['2 months', 60 * DAY],
+  ['6 months', 180 * DAY],
   ['2 years', 730 * DAY],
 ]
 

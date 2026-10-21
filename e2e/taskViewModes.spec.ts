@@ -203,12 +203,12 @@ test.describe('view modes (spec §6.2)', () => {
   test("recency view re-evaluates periodically while active (Canvas.tsx's 60s interval)", async ({
     page,
   }) => {
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000
+    const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000
     const install = new Date('2026-06-01T00:00:00.000Z')
-    // Just inside the "lime" (<=1 day) threshold — 30s of headroom before
+    // Just inside the "lime" (<=1 month) threshold — 30s of headroom before
     // it crosses into "amber".
     const updatedAt = new Date(
-      install.getTime() - (ONE_DAY_MS - 30_000),
+      install.getTime() - (ONE_MONTH_MS - 30_000),
     ).toISOString()
 
     // Installed before navigation so the interval Canvas.tsx sets up on
