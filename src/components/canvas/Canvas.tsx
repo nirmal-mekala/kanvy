@@ -53,6 +53,7 @@ import {
   clamp,
   FIT_PADDING,
   gridScreenSpacing,
+  keyboardZoomFactor,
   MAX_ZOOM,
   MIN_ZOOM,
   WHEEL_ZOOM_INTENSITY,
@@ -313,13 +314,22 @@ export function Canvas() {
     // fallow's static analysis can't see.
     // fallow-ignore-next-line complexity
     function onKeyDown(e: KeyboardEvent) {
+      // ⌘/Ctrl + =/- zooms the canvas around the viewport center, same as
+      // the on-screen buttons — preventDefault keeps the browser from also
+      // zooming the page.
+      const factor = keyboardZoomFactor(e)
+      if (factor !== null) {
+        e.preventDefault()
+        zoomByButton(factor)
+        return
+      }
       if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key !== 'Enter') return
       e.preventDefault()
       zoomToFitAll()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [zoomToFitAll])
+  }, [zoomToFitAll, zoomByButton])
 
   function handlePointerDown(e: React.PointerEvent) {
     if (e.button === 2) {

@@ -166,6 +166,20 @@ test('clicking the zoom-percentage readout resets zoom to 100%', async ({
   expect((await getView(page)).zoom).toBe(1)
 })
 
+test('Ctrl+= / Ctrl+- zoom the canvas in and out by the button step', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const start = (await getView(page)).zoom
+
+  await page.keyboard.press('Control+Equal')
+  expect((await getView(page)).zoom).toBeCloseTo(start * 1.2, 5)
+
+  await page.keyboard.press('Control+Minus')
+  await page.keyboard.press('Control+Minus')
+  expect((await getView(page)).zoom).toBeCloseTo(start / 1.2, 5)
+})
+
 test('zoom to fit (Ctrl+Shift+Enter) never zooms in past 100% and centers the content', async ({
   page,
 }) => {
