@@ -31,6 +31,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { lazy, Suspense, useEffect } from 'react'
 import { queryClient } from './api/queryClient'
+import { LoadingIndicator } from './components/loading/LoadingIndicator'
 import { router } from './router'
 import { bootPhaseAtom, networkConfigAtom } from './state/atoms/networkSettings'
 import { themeAtom } from './state/atoms/theme'
@@ -89,11 +90,7 @@ function App() {
   }, [])
 
   if (bootPhase === 'resolving') {
-    return (
-      <div className="board__loading" role="status">
-        Loading…
-      </div>
-    )
+    return <LoadingIndicator label="Loading" screen />
   }
 
   return (

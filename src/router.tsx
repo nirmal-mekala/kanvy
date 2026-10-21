@@ -30,6 +30,7 @@ import {
 import { getDefaultStore, useAtomValue } from 'jotai'
 import { useEffect } from 'react'
 import { BoardPage } from './components/canvas/BoardPage'
+import { LoadingIndicator } from './components/loading/LoadingIndicator'
 import { NetworkErrorNotice } from './components/notifications/NetworkErrorNotice'
 import { RecoveryNotice } from './components/notifications/RecoveryNotice'
 import { ToastStack } from './components/notifications/ToastStack'
@@ -161,11 +162,7 @@ export const boardRoute = createRoute({
       // rather than hard-failing the navigation.
     }
   },
-  pendingComponent: () => (
-    <div className="board__loading" role="status">
-      Loading board…
-    </div>
-  ),
+  pendingComponent: () => <LoadingIndicator label="Loading board" />,
   component: BoardRouteComponent,
 })
 

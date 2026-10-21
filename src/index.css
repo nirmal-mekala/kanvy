@@ -9,6 +9,7 @@
 @import "./components/notifications/toast-stack.css";
 @import "./components/toolbar/toolbar.css";
 @import "./components/canvas/canvas.css";
+@import "./components/loading/loading.css";
 @import "./components/modal/modal.css";
 @import "./components/help-panel/help-panel.css";
 @import "./components/canvas/resize-handles.css";
