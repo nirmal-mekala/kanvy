@@ -44,6 +44,19 @@ export function resolveReconciledNodeId(id: string): string {
   return current
 }
 
+// The reverse direction, for rendering: server-assigned id -> the id a
+// node was first rendered under. Canvas keys each node's component by
+// this rather than by its live id, so reconciliation updates a
+// just-created card in place instead of remounting it — a remount drops
+// the caption's focus out from under a ⌘/Ctrl+N'd card, or one the user
+// is already typing into.
+const nodeRenderKeys = new Map<string, string>()
+
+/** A React key for node `id` that stays the same across its id reconciliation. */
+export function nodeRenderKey(id: string): string {
+  return nodeRenderKeys.get(id) ?? id
+}
+
 let navigateToBoardId: ((boardId: string) => void) | undefined
 
 /** Called once by router.tsx, at its own module scope — see module comment for why this is a registration instead of a direct import. */
@@ -87,7 +100,10 @@ export const reconcileNetworkEntityIdAtom = (
   newId: string,
 ): void => {
   if (oldId === newId) return
-  if (kind === 'node') nodeIdAliases.set(oldId, newId)
+  if (kind === 'node') {
+    nodeIdAliases.set(oldId, newId)
+    nodeRenderKeys.set(newId, nodeRenderKey(oldId))
+  }
   if (!reconcileTargets) return
   const store = getDefaultStore()
   const { currentBoardAtom, boardHistoryAtom } = reconcileTargets

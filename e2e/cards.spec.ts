@@ -811,7 +811,7 @@ test.describe('heading cards (spec §5.2)', () => {
 })
 
 test.describe('node creation lands inside a container it is drawn/dropped in (spec §2.3, v0.1)', () => {
-  test('double-click on blank canvas creates a new text card', async ({
+  test('double-click on blank canvas creates a new text card, focused', async ({
     page,
   }) => {
     await seed(page, childBoardDocument([]))
@@ -827,6 +827,11 @@ test.describe('node creation lands inside a container it is drawn/dropped in (sp
     // not a board card (which is what double-click creates on root
     // instead, multiboard support design doc §3).
     await expect(page.locator('.card--board')).toHaveCount(0)
+    await expect(page.locator('textarea.card__content')).toBeFocused()
+    await page.keyboard.type('typed straight in')
+    await expect(page.locator('textarea.card__content')).toHaveValue(
+      'typed straight in',
+    )
   })
 
   test('double-clicking inside a container creates a card that is carried along when the container is later dragged', async ({

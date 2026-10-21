@@ -32,6 +32,7 @@ import {
   currentBoardIdAtom,
   rootBoardIdAtom,
 } from '../../state/atoms/currentBoard'
+import { focusNodeIdAtom } from '../../state/atoms/focus'
 import { fetchLinkMetadataAtom } from '../../state/atoms/linkFetch'
 import { addNodeAtom, replaceNodeAtom } from '../../state/atoms/nodes'
 import type { View } from './viewportCoords'
@@ -65,6 +66,7 @@ export function useCardCreation({
   const replaceNode = useSetAtom(replaceNodeAtom)
   const fetchLinkMetadataFor = useSetAtom(fetchLinkMetadataAtom)
   const createBoard = useSetAtom(createBoardAtom)
+  const setFocusNodeId = useSetAtom(focusNodeIdAtom)
   const hasNodeClipboardContent = useAtomValue(hasNodeClipboardContentAtom)
   const currentBoardId = useAtomValue(currentBoardIdAtom)
   const rootBoardId = useAtomValue(rootBoardIdAtom)
@@ -136,7 +138,13 @@ export function useCardCreation({
       createBoard(point.x, point.y)
       return
     }
-    addNode(inheritEnclosingTask(newTextCard(point.x, point.y), liveNodes()))
+    const card = inheritEnclosingTask(
+      newTextCard(point.x, point.y),
+      liveNodes(),
+    )
+    addNode(card)
+    // Focused for editing straight away, same as ⌘/Ctrl+N's new card.
+    setFocusNodeId(card.id)
   }
 
   function handleCanvasDragOver(e: React.DragEvent) {

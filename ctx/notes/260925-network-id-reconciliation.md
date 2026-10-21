@@ -85,18 +85,23 @@ synchronously, before anything is written, and `writeBoard` never
 reassigns it — there's nothing to reconcile. See the doc comment at the
 top of `state/persistence/storage.ts`.
 
-## Known limitation
+## Stable render keys (formerly a known limitation)
 
-A just-created entity is rendered by id (`nodeFamily(id)`/`boardFamily(id)`
-atom families, keyed by id in list renders). When reconciliation swaps an
-id in place, React unmounts the old-id component and mounts a new-id one
-for the same visual card — harmless in the common case, but if a user is
-actively typing into a just-created, not-yet-confirmed card's text field
-at the exact moment its create resolves, that remount could drop focus/
-cursor position. Not addressed here — low-probability in practice given
-json-server's local latency, and worth revisiting only if it's ever
-actually observed.
+A just-created entity is rendered by id. Keying its component by the live
+id meant that when reconciliation swapped the id in place, React
+unmounted the old-id component and mounted a new-id one for the same
+visual card — dropping focus out of the caption. This was originally
+judged low-probability, but it reliably broke ⌘/Ctrl+N (whose card is
+focused *immediately*, before its POST resolves): focus landed, then
+vanished a beat later. Typing into any just-created card hit it too.
 
+Fix (261020): `state/networkReconcile.ts` records, alongside
+`nodeIdAliases`, the reverse map — server id → the id the node was first
+rendered under — and `nodeRenderKey(id)` exposes it. `Canvas` keys
+cards and containers by `nodeRenderKey(node.id)`, so reconciliation is
+an ordinary prop update on the same mounted component. Covered by
+`src/state/networkReconcile.test.ts` and the "⌘/Ctrl+N card keeps its
+caption focus" test in `e2e/networkModeCrud.spec.ts`.
 ## Regression coverage
 
 - `src/state/entityReconcile.test.ts` — the pure rewrite functions.

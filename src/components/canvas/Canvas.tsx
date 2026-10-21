@@ -34,6 +34,7 @@ import { themeAtom } from '../../state/atoms/theme'
 import { viewModeAtom } from '../../state/atoms/viewMode'
 import { boardAtom } from '../../state/history/boardHistoryAtom'
 import { getLiveEdges, getLiveNodes } from '../../state/liveEntities'
+import { nodeRenderKey } from '../../state/networkReconcile'
 import { Card } from '../card/Card'
 import { ConfirmModal } from '../confirm-modal/ConfirmModal'
 import { Container } from '../container/Container'
@@ -426,7 +427,7 @@ export function Canvas() {
           ),
         ).map((node) => (
           <Container
-            key={node.id}
+            key={nodeRenderKey(node.id)}
             node={node}
             theme={theme}
             viewMode={viewMode}
@@ -474,7 +475,7 @@ export function Canvas() {
                 : undefined
             return (
               <Card
-                key={node.id}
+                key={nodeRenderKey(node.id)}
                 node={node}
                 {...(imageSrc ? { imageSrc } : {})}
                 viewMode={viewMode}

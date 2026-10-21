@@ -40,13 +40,17 @@
 // unavailable until A is edited again.
 
 import { MutationObserver } from '@tanstack/react-query'
-import { atom, getDefaultStore } from 'jotai'
+import { atom, type Getter, getDefaultStore } from 'jotai'
 import { fetchBoard, saveBoard, saveBoardOverNetwork } from '../../api/boardApi'
 import { queryClient } from '../../api/queryClient'
 import type { Board } from '../../schema/board'
 import { rootBoardId } from '../../schema/boardMeta'
 import { currentBoardIdAtom } from '../atoms/currentBoard'
-import { accessModeAtom, networkConfigAtom } from '../atoms/networkSettings'
+import {
+  accessModeAtom,
+  type NetworkConfig,
+  networkConfigAtom,
+} from '../atoms/networkSettings'
 import { selectionAtom } from '../atoms/selection'
 import { pushToastAtom } from '../atoms/toasts'
 import { registerReconcileTargets } from '../networkReconcile'
@@ -91,16 +95,39 @@ interface PendingSave {
   replay: OpReplay
   boardId: string
   board: Board
+  /** Where `ops` belong — stamped when the save is queued, not read when it's flushed. */
+  target: SaveTarget
 }
 
 /**
- * Only ever called with same-`replay`/same-`boardId` pending saves in
- * practice: `updateBoardAtom` is the only caller that can accumulate
- * across calls (always `replay: 'do'`, and it flushes first itself
+ * The mode (and, for network, the connection) an edit was made in. A save
+ * waits out the debounce window before it's sent, and the mode can change
+ * inside that window — resolving the destination at flush time instead
+ * sent a just-switched-from Local edit to the network backend (a 404 for
+ * a node id the server never had), and merged a just-switched-from
+ * Network edit into Local's next save, which only ever writes `board` (the
+ * Local document) — silently dropping the network edit.
+ */
+type SaveTarget = { mode: 'local' } | { mode: 'network'; config: NetworkConfig }
+
+function sameSaveTarget(a: SaveTarget, b: SaveTarget): boolean {
+  if (a.mode === 'local' || b.mode === 'local') return a.mode === b.mode
+  return (
+    a.config.baseUrl === b.config.baseUrl &&
+    a.config.authToken === b.config.authToken &&
+    a.config.dialectId === b.config.dialectId
+  )
+}
+
+/**
+ * Only ever called with same-`replay`/same-`boardId`/same-`target`
+ * pending saves in practice: `updateBoardAtom` is the only caller that
+ * can accumulate across calls (always `replay: 'do'`, and it flushes first itself
  * — see its own comment — whenever `boardId` would otherwise change
  * mid-batch), and every other caller (undo/redo/recovery-ack)
  * flushes before its own `save`, so `pending` is always empty by the time
  * they call it and this never actually has to reconcile a mismatch.
+ * `queueSave` likewise flushes first whenever `target` would change.
  */
 function mergePendingSave(prev: PendingSave, next: PendingSave): PendingSave {
   return {
@@ -108,6 +135,7 @@ function mergePendingSave(prev: PendingSave, next: PendingSave): PendingSave {
     replay: next.replay,
     boardId: next.boardId,
     board: next.board,
+    target: next.target,
   }
 }
 
@@ -140,16 +168,16 @@ void queryClient.prefetchQuery({
 // each one as a real action, not just "a board got saved."
 const saveMutation = new MutationObserver(queryClient, {
   mutationKey: ['board', 'save'],
-  // Mode-aware (network mode design doc §5): reads the current mode/config
-  // fresh at mutate time (not captured once at module scope), since
-  // settings can change between one save and the next. Network mode maps
-  // `pending.ops` onto real per-entity REST calls instead of a
-  // whole-document write; local mode's own behavior is unchanged.
+  // Mode-aware (network mode design doc §5): goes wherever the save's own
+  // `target` says — the mode/config its edit was made in (see
+  // `SaveTarget`), not whatever's current by the time the debounce fires.
+  // Network mode maps `pending.ops` onto real per-entity REST calls
+  // instead of a whole-document write; local mode's own behavior is
+  // unchanged.
   mutationFn: (pending: PendingSave) => {
-    const store = getDefaultStore()
-    if (store.get(accessModeAtom) === 'network') {
+    if (pending.target.mode === 'network') {
       return saveBoardOverNetwork(
-        store.get(networkConfigAtom),
+        pending.target.config,
         pending.ops,
         pending.replay,
       )
@@ -160,6 +188,7 @@ const saveMutation = new MutationObserver(queryClient, {
 const saver = createDebouncedSaver<PendingSave>(
   undefined,
   (pending) => {
+    queuedTarget = undefined
     saveMutation.mutate(pending).catch(() => {
       // Surfaced via a toast (state/atoms/toasts.ts) rather than silently
       // swallowed — now that saves route through the TanStack Query
@@ -208,11 +237,36 @@ export const boardAtom = atom((get) => get(currentBoardAtom))
 // import this registration (rather than a direct import) avoids.
 registerReconcileTargets(currentBoardAtom, boardHistoryAtom)
 
+// The target of whatever the saver is still holding, if anything — so a
+// save for a different target flushes that first rather than merging
+// into it (`mergePendingSave` keeps only one `target` and one `board`).
+let queuedTarget: SaveTarget | undefined
+
+function queueSave(get: Getter, pending: Omit<PendingSave, 'target'>): void {
+  const target: SaveTarget =
+    get(accessModeAtom) === 'network'
+      ? { mode: 'network', config: get(networkConfigAtom) }
+      : { mode: 'local' }
+  if (queuedTarget && !sameSaveTarget(queuedTarget, target)) saver.flush()
+  queuedTarget = target
+  saver.save({ ...pending, target })
+}
+
+// Sends a still-debounced save the moment the mode or connection changes,
+// rather than leaving it to land after the switch. Its `target` already
+// routes it correctly either way; this just keeps it from sitting behind
+// the switch (e.g. a reload right after switching would otherwise drop it).
+// Every switch site — the mode toggle, the settings modal, the boot
+// reconnect, and boardAccessResolver's cross-mode navigation — sets these
+// atoms on the default store, so one subscription covers them all.
+getDefaultStore().sub(accessModeAtom, () => saver.flush())
+getDefaultStore().sub(networkConfigAtom, () => saver.flush())
+
 function autosaveIfAcknowledged(
-  get: (a: typeof recoveryAcknowledgedAtom) => boolean,
-  pending: PendingSave,
+  get: Getter,
+  pending: Omit<PendingSave, 'target'>,
 ): void {
-  if (get(recoveryAcknowledgedAtom)) saver.save(pending)
+  if (get(recoveryAcknowledgedAtom)) queueSave(get, pending)
 }
 
 /**
@@ -280,7 +334,7 @@ export const acknowledgeRecoveryAtom = atom(null, (get, set) => {
     before: board,
     after: board,
   }
-  saver.save({
+  queueSave(get, {
     ops: [op],
     replay: 'do',
     boardId: get(currentBoardIdAtom),

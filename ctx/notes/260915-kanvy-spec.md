@@ -286,7 +286,7 @@ meaningful) node/edge data isn't buried under base64 blobs.
 | ⌘/Ctrl + V (nothing else matched) | In-app paste of previously copied selection, or system-clipboard plain text as a new card |
 | ⌘/Ctrl + Z / ⌘/Ctrl + Shift+Z / Ctrl+Y | Undo / redo |
 | Backspace / Delete | Delete selection (not while editing text) |
-| Double-click canvas | Create a new text card at that point |
+| Double-click canvas | Create a new text card at that point, immediately focused for editing |
 | Escape | Close the help panel |
 
 Help panel: `?` button, bottom-left, opens a modal listing the shortcuts
