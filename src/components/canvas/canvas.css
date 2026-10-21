@@ -20,19 +20,6 @@
   cursor: grabbing;
 }
 
-/* Network mode's per-board navigation wait (design doc §6c) — should
-   usually be invisible (the background eager-load, §6b, has normally
-   already reached the board by the time it's clicked into); shown only
-   when that isn't yet true. */
-.board__loading {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-ink-soft);
-  font-size: 0.9rem;
-}
-
 .board__layer {
   position: absolute;
   inset: 0;

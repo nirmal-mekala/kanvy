@@ -1,0 +1,36 @@
+/* ---------- loading indicator ---------- */
+
+/* Default: grows into the `.app` flex column below the toolbar (network
+   mode's per-board navigation wait, design doc §6c) — should usually be
+   invisible, since the background eager-load (§6b) has normally already
+   reached the board by the time it's clicked into. */
+.loading {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+}
+
+/* Boot-time reconnect: rendered before `.app` exists, so there's no flex
+   parent to grow into — fill the viewport directly instead. */
+.loading--screen {
+  height: 100%;
+}
+
+/* Three equal-width dots revealed left to right by clipping: four
+   discrete steps (none, one, two, three) per cycle, never a sweep. */
+.loading__dots {
+  animation: loading-dots 1.6s steps(4, jump-none) infinite;
+}
+
+@keyframes loading-dots {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
