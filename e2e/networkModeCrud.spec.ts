@@ -673,6 +673,121 @@ test.describe('id reconciliation regression (ctx/notes/260925-network-id-reconci
       await server.stop()
     }
   })
+
+  test('a ⌘/Ctrl+N card keeps its caption focus when its server-assigned id is reconciled in', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      await page.keyboard.press('ControlOrMeta+n')
+      const caption = page.locator('[data-testid="card"] .card__content')
+      await expect(caption).toBeFocused()
+      const localId = await page
+        .locator('[data-testid="card"]')
+        .getAttribute('data-node-id')
+
+      // Wait out the POST's reconciliation — the card's id swaps to the
+      // server's in place, without remounting (and so blurring) it.
+      await expect(page.locator('[data-testid="card"]')).not.toHaveAttribute(
+        'data-node-id',
+        localId as string,
+        { timeout: 10_000 },
+      )
+      await expect(caption).toBeFocused()
+
+      await page.keyboard.type('still focused')
+      await expect
+        .poll(async () => (await getSampleBoardNode(page, baseUrl))?.content, {
+          timeout: 10_000,
+        })
+        .toBe('still focused')
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
+// Autosave is debounced (500ms), so an edit made just before a mode switch
+// is still waiting to be sent when the switch lands — it must still go
+// where it was made, never to the mode just switched into.
+test.describe('autosave across a mode switch', () => {
+  test('a Local edit made right before switching to Network is saved locally and never sent to the backend', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      const toggle = page.locator('.board__mode-toggle')
+      await toggle.click()
+      await expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+      const writes: string[] = []
+      page.on('request', (req) => {
+        if (req.url().startsWith(baseUrl) && req.method() !== 'GET') {
+          writes.push(`${req.method()} ${req.url()}`)
+        }
+      })
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 500, y: 400 } })
+      await expect(page.locator('.card--board')).toHaveCount(1)
+      await toggle.click()
+      await expect(toggle).toHaveAttribute('aria-checked', 'true')
+      await page.waitForTimeout(1000)
+
+      expect(writes).toEqual([])
+      const local = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('kanvy.board') ?? '{"nodes":[]}'),
+      )
+      expect(local.nodes).toHaveLength(1)
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('a Network edit made right before switching to Local still reaches the backend', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      await page
+        .locator('[data-testid="canvas-root"]')
+        .dblclick({ position: { x: 500, y: 400 } })
+      await expect(page.locator('textarea.card__content')).toBeFocused()
+      await page.keyboard.type('made in network mode')
+      await page.locator('.board__mode-toggle').click()
+
+      await expect
+        .poll(async () => (await getSampleBoardNode(page, baseUrl))?.content, {
+          timeout: 10_000,
+        })
+        .toBe('made in network mode')
+      const local = await page.evaluate(
+        () => localStorage.getItem('kanvy.board') ?? '',
+      )
+      expect(local).not.toContain('made in network mode')
+    } finally {
+      await server.stop()
+    }
+  })
 })
 
 test.describe('image lifecycle and the network reaper (ctx/notes/261009-network-reaper-and-image-lifecycle.md)', () => {
