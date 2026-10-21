@@ -253,12 +253,14 @@ meaningful) node/edge data isn't buried under base64 blobs.
 - Pan: right-click + drag, or two-finger scroll (trackpad) / mouse wheel
   scroll (non-zoom axis).
 - Zoom: Ctrl/Cmd + scroll or trackpad pinch (reported as a wheel event with
-  `ctrlKey` set), or the on-screen zoom in/out buttons (fixed step factor).
-  Range roughly 10%–250% (floor lowered from 25% so large boards still
-  fit on one screen). Below ~8px on-screen spacing the background dot
-  grid thins out (spacing doubles) so it doesn't become a solid wash.
+  `ctrlKey` set), the on-screen zoom in/out buttons (fixed step factor),
+  or ⌘/Ctrl + `=`/`-` (same step as the buttons; preventDefaulted so the
+  browser doesn't also zoom the page). Range roughly 5%–250% (floor
+  lowered from 25%, then 10%, so large boards still fit on one screen).
+  Below ~8px on-screen spacing the background dot grid thins out
+  (spacing doubles) so it doesn't become a solid wash.
 - Zoom-by-wheel keeps the point under the cursor visually fixed; zoom-by-
-  button zooms around the viewport center.
+  button and zoom-by-keyboard zoom around the viewport center.
 - Clicking the zoom-percentage readout resets zoom to 100% (no keyboard
   shortcut for this — see §4.2's history for why).
 - **Zoom to fit** (⌘/Ctrl+Shift+Enter): zooms out (never in past 100%) and
@@ -279,6 +281,7 @@ meaningful) node/edge data isn't buried under base64 blobs.
 | Type a URL, then a space | Convert the card into a link card ("slurp") |
 | ⌘/Ctrl + V (image on clipboard) | Paste into focused/selected card, or create a new image card |
 | ⌘/Ctrl + V (link on clipboard) | Paste into focused/selected card, or create a new link card |
+| ⌘/Ctrl + = / - | Zoom in / out (around the viewport center) |
 | ⌘/Ctrl + Shift + Enter | Zoom to fit everything in view |
 | ⌘/Ctrl + N | New (empty) text card, centered, immediately focused for editing |
 | ⌘/Ctrl + D | Duplicate selection, immediately focused for editing (single-card case) |

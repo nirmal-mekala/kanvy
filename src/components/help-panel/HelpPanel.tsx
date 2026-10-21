@@ -19,6 +19,7 @@ const SHORTCUTS: readonly [string, string][] = [
     '⌘/Ctrl + V (with a link)',
     'Paste a link into a focused/selected card, or create a new link card',
   ],
+  ['⌘/Ctrl + = / −', 'Zoom in / out'],
   ['⌘/Ctrl + Shift + Enter', 'Zoom out to fit everything in view'],
 ]
 

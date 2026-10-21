@@ -3,7 +3,7 @@
 
 import { GRID_SIZE } from '../../geometry/snap'
 
-export const MIN_ZOOM = 0.1
+export const MIN_ZOOM = 0.05
 export const MAX_ZOOM = 2.5
 export const ZOOM_BUTTON_STEP = 1.2
 export const WHEEL_ZOOM_INTENSITY = 0.0015
@@ -18,13 +18,32 @@ export const MIN_GRID_SCREEN_SPACING = 8
  * On-screen spacing for the background dot grid: `GRID_SIZE * zoom`,
  * doubled as many times as needed to stay at least
  * MIN_GRID_SCREEN_SPACING apart. At low zoom the dots would otherwise
- * crowd into a solid wash (1px-radius dots under 2px apart at 10%).
+ * crowd into a solid wash (1px-radius dots under 1px apart at 5%).
  * Purely visual — snapping still uses GRID_SIZE.
  */
 export function gridScreenSpacing(zoom: number): number {
   let spacing = GRID_SIZE * zoom
   while (spacing < MIN_GRID_SCREEN_SPACING) spacing *= 2
   return spacing
+}
+
+const ZOOM_IN_CODES = new Set(['Equal', 'NumpadAdd'])
+const ZOOM_OUT_CODES = new Set(['Minus', 'NumpadSubtract'])
+
+/**
+ * The zoom factor a ⌘/Ctrl + `=`/`-` keydown asks for (spec §4.2), or
+ * null if the event isn't one. Matched on `code`, not `key`, so Shift
+ * (`+`/`_`) and non-US layouts still hit the same physical keys. The
+ * caller must preventDefault a match — these are the browser's own
+ * page-zoom keys.
+ */
+export function keyboardZoomFactor(
+  e: Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'code'>,
+): number | null {
+  if (!(e.metaKey || e.ctrlKey)) return null
+  if (ZOOM_IN_CODES.has(e.code)) return ZOOM_BUTTON_STEP
+  if (ZOOM_OUT_CODES.has(e.code)) return 1 / ZOOM_BUTTON_STEP
+  return null
 }
 
 export function clamp(value: number, min: number, max: number): number {
