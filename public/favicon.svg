@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- kanvy: two cards joined by an edge on the dotted canvas, in the
+       app's Nord palette (nord0 canvas, nord6 card, nord8 tinted card). -->
+  <defs>
+    <pattern id="dots" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="0.55" fill="#4c566a" />
+    </pattern>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="#2e3440" />
+  <rect width="32" height="32" rx="7" fill="url(#dots)" />
+  <path
+    d="M11 15.5V22.5H13.2"
+    fill="none"
+    stroke="#d8dee9"
+    stroke-width="1.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path d="M12.6 19.9L15.6 22.5L12.6 25.1Z" fill="#d8dee9" />
+  <rect x="4.5" y="5.5" width="13" height="10" rx="2" fill="#eceff4" />
+  <rect x="7" y="9" width="8" height="1.6" rx="0.8" fill="#4c566a" />
+  <rect x="16" y="17.5" width="11.5" height="10" rx="2" fill="#88c0d0" />
+  <rect x="18.5" y="21" width="6.5" height="1.6" rx="0.8" fill="#2e3440" />
+</svg>
