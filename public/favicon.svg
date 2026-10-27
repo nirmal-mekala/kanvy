@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- kanvy: two cards joined by an edge on the dotted canvas, in the
        app's Nord palette (nord0 canvas, nord6 card, nord8 tinted card). -->
+  <title>kanvy</title>
   <defs>
     <pattern id="dots" width="4" height="4" patternUnits="userSpaceOnUse">
       <circle cx="2" cy="2" r="0.55" fill="#4c566a" />
