@@ -192,3 +192,20 @@ svg[data-task-status="done"] {
 ) svg[data-task-status] {
   color: var(--color-ink);
 }
+
+/* Network save indicator dots (components/canvas/SaveIndicator.tsx) —
+   reuse the task palette so the meanings line up: queued is neutral,
+   in flight is in-progress blue, retrying is blocked red, landed is
+   done green. */
+.save-indicator__dot[data-state="queued"] {
+  background: var(--color-ink-soft);
+}
+.save-indicator__dot[data-state="in-flight"] {
+  background: var(--color-task-in-progress);
+}
+.save-indicator__dot[data-state="retrying"] {
+  background: var(--color-task-blocked);
+}
+.save-indicator__dot[data-state="resolved"] {
+  background: var(--color-task-done);
+}

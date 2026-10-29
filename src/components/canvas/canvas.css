@@ -144,6 +144,52 @@
   transform: translateX(var(--board-mode-toggle-travel));
 }
 
+/* Wraps the mode toggle so the save indicator can sit just above it
+   without taking a row of its own in the bottom bar. */
+.board__mode {
+  position: relative;
+  display: flex;
+}
+
+.save-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  width: max-content;
+  max-width: 76px;
+}
+
+.save-indicator__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.save-indicator__dot[data-state="in-flight"] {
+  animation: save-indicator-pulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes save-indicator-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+.save-indicator__overflow {
+  font-size: 0.6rem;
+  line-height: 6px;
+  color: var(--color-ink-soft);
+}
+
 .board__marquee {
   position: absolute;
   background: color-mix(in srgb, var(--color-ink) 10%, transparent);

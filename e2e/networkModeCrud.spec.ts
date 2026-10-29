@@ -759,6 +759,96 @@ test.describe('edits to a card whose create is still in flight (ctx/notes/261029
   })
 })
 
+test.describe('network save indicator', () => {
+  const dots = (page: Page, state: string) =>
+    page.locator(`.save-indicator__dot[data-state="${state}"]`)
+
+  // The dots sit above .board__mode's own box, so an element screenshot
+  // would crop them out.
+  async function shootIndicator(page: Page, path: string) {
+    const box = await page.locator('.board__mode').boundingBox()
+    if (!box) throw new Error('mode toggle not rendered')
+    await page.screenshot({
+      path,
+      clip: {
+        x: box.x - 20,
+        y: box.y - 40,
+        width: box.width + 40,
+        height: box.height + 44,
+      },
+    })
+  }
+
+  test('shows a held create as in flight, edits behind it as queued, then green dots that fade out', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      let release: () => void = () => {}
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      await page.route(`${baseUrl}/nodes`, async (route) => {
+        if (route.request().method() === 'POST') await held
+        await route.continue()
+      })
+
+      await page.keyboard.press('ControlOrMeta+n')
+      await expect(dots(page, 'in-flight')).toHaveCount(1)
+      await page.keyboard.type('queued', { delay: 150 })
+      await expect(dots(page, 'queued')).not.toHaveCount(0)
+      await shootIndicator(page, 'test-results/save-indicator-pending.png')
+
+      release()
+      await expect(dots(page, 'in-flight')).toHaveCount(0)
+      await expect(dots(page, 'queued')).toHaveCount(0)
+      await expect(dots(page, 'resolved')).not.toHaveCount(0)
+      await shootIndicator(page, 'test-results/save-indicator-resolved.png')
+      await expect(page.locator('.save-indicator__dot')).toHaveCount(0, {
+        timeout: 5000,
+      })
+    } finally {
+      await server.stop()
+    }
+  })
+
+  test('shows a failing save as retrying until it lands', async ({ page }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      let failing = true
+      await page.route(`${baseUrl}/nodes`, async (route) => {
+        if (failing && route.request().method() === 'POST') {
+          await route.fulfill({ status: 500, body: '{}' })
+          return
+        }
+        await route.continue()
+      })
+
+      await page.keyboard.press('ControlOrMeta+n')
+      await expect(dots(page, 'retrying')).toHaveCount(1)
+      failing = false
+      await expect(dots(page, 'retrying')).toHaveCount(0, { timeout: 15_000 })
+      await expect(dots(page, 'resolved')).not.toHaveCount(0)
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
 // Autosave is debounced (500ms), so an edit made just before a mode switch
 // is still waiting to be sent when the switch lands — it must still go
 // where it was made, never to the mode just switched into.

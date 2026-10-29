@@ -39,7 +39,7 @@
 // true chronological order — editing board B after board A makes A's undo
 // unavailable until A is edited again.
 
-import { MutationObserver } from '@tanstack/react-query'
+import { type MutationFilters, MutationObserver } from '@tanstack/react-query'
 import { atom, type Getter, getDefaultStore } from 'jotai'
 import { fetchBoard, saveBoard, saveBoardOverNetwork } from '../../api/boardApi'
 import { queryClient } from '../../api/queryClient'
@@ -223,10 +223,30 @@ const saveMutation = new MutationObserver(queryClient, {
     return saveBoard(pending.board)
   },
 })
+/**
+ * Selects this outbox's network saves in the mutation cache, wherever the
+ * app is now — a save stamped for the network still shows after switching
+ * to Local. Local saves are instant whole-document writes, not shown.
+ */
+export const networkSaveFilters: MutationFilters = {
+  mutationKey: ['board', 'save'],
+  predicate: (mutation) =>
+    (mutation.state.variables as PendingSave | undefined)?.target.mode ===
+    'network',
+}
+
+/**
+ * Whether the debounced saver is holding a network save it hasn't handed to
+ * `saveMutation` yet — the one queued save the mutation cache can't see.
+ * Read by the network save indicator (components/canvas/SaveIndicator.tsx).
+ */
+export const heldNetworkSaveAtom = atom(false)
+
 const saver = createDebouncedSaver<PendingSave>(
   undefined,
   (pending) => {
     queuedTarget = undefined
+    getDefaultStore().set(heldNetworkSaveAtom, false)
     // Failures are retried (and toasted) by the mutation itself, above, so
     // this promise only settles once the save has gone through.
     void saveMutation.mutate(pending)
@@ -274,6 +294,7 @@ function queueSave(get: Getter, pending: Omit<PendingSave, 'target'>): void {
       : { mode: 'local' }
   if (queuedTarget && !sameSaveTarget(queuedTarget, target)) saver.flush()
   queuedTarget = target
+  getDefaultStore().set(heldNetworkSaveAtom, target.mode === 'network')
   saver.save({ ...pending, target })
 }
 
