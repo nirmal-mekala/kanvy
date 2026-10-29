@@ -44,6 +44,7 @@ import { HelpPanel } from '../help-panel/HelpPanel'
 import { commonValue } from '../selection-menu/commonValue'
 import { SelectionMenu } from '../selection-menu/SelectionMenu'
 import { ModeToggle } from './ModeToggle'
+import { SaveIndicator } from './SaveIndicator'
 import { useBoardInteraction } from './useBoardInteraction'
 import { useCardCreation } from './useCardCreation'
 import { useCardEditing } from './useCardEditing'
@@ -610,7 +611,10 @@ export function Canvas() {
 
       <div className="board__bottom-bar">
         <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
-        <ModeToggle />
+        <div className="board__mode">
+          <SaveIndicator />
+          <ModeToggle />
+        </div>
         <div className="board__zoom" onPointerDown={(e) => e.stopPropagation()}>
           <button
             type="button"

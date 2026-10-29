@@ -17,7 +17,7 @@ input:focus-visible,
   outline-offset: -2px;
 }
 
-/* Only 5 cosmetic (non-essential) transitions/animations exist in this stylesheet —
+/* Only 6 cosmetic (non-essential) transitions/animations exist in this stylesheet —
    overridden here by matching selector + specificity (not `!important`,
    which Biome's `noImportantStyles` rule forbids), relying on cascade
    order since this block comes last. */
@@ -36,6 +36,11 @@ input:focus-visible,
 
   .board__mode-toggle__thumb {
     transition: none;
+  }
+
+  /* Solid blue still reads as "in flight" without the pulse. */
+  .save-indicator__dot[data-state="in-flight"] {
+    animation: none;
   }
 
   /* All three dots, static — still reads as "in progress". */
