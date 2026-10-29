@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as imageFile from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
 import type { Op } from '../state/ops'
+import { createIdRemapTable } from './networkIdRemap'
 import { applyOpsToNetwork } from './networkOps'
 
 const config: NetworkConfig = {
@@ -223,7 +224,8 @@ describe('applyOpsToNetwork', () => {
       expect(patchUrl).toBe('http://localhost:1996/nodes/server-n1')
     })
 
-    it("does not resolve an UpdateOp's target id across separate applyOpsToNetwork calls — the id-remap table is batch-scoped now (ctx/notes/260925-network-id-reconciliation.md): a later gesture is expected to already read the confirmed id from live app state (reconciled by state/networkReconcile.ts), not from ops built with a stale one", async () => {
+    it("resolves a later batch's UpdateOp through a shared table — an edit built under the client id while the create was still in flight (ctx/notes/261029-edits-to-unconfirmed-creates.md)", async () => {
+      const table = createIdRemapTable()
       const createFetch = vi
         .fn()
         .mockResolvedValue(jsonResponse({ id: 'server-b1' }))
@@ -238,8 +240,137 @@ describe('applyOpsToNetwork', () => {
         ],
         'do',
         createFetch,
+        table,
       )
 
+      const patchFetch = vi.fn().mockResolvedValue(jsonResponse({}))
+      await applyOpsToNetwork(
+        config,
+        [
+          {
+            kind: 'update',
+            entity: 'board',
+            id: 'client-b1',
+            before: { title: 'old' },
+            after: { title: 'new' },
+          },
+        ],
+        'do',
+        patchFetch,
+        table,
+      )
+      const [patchUrl] = patchFetch.mock.calls[0] as [string, RequestInit]
+      expect(patchUrl).toBe('http://localhost:1996/boards/server-b1')
+    })
+
+    it("resolves a later batch's create references (an edge to a node created in an earlier batch) through a shared table", async () => {
+      const table = createIdRemapTable()
+      await applyOpsToNetwork(
+        config,
+        [
+          {
+            kind: 'create',
+            entity: 'node',
+            value: { id: 'client-n1' } as never,
+          },
+        ],
+        'do',
+        vi.fn().mockResolvedValue(jsonResponse({ id: 'server-n1' })),
+        table,
+      )
+      const edgeFetch = vi.fn().mockResolvedValue(jsonResponse({ id: 'e' }))
+      await applyOpsToNetwork(
+        config,
+        [
+          {
+            kind: 'create',
+            entity: 'edge',
+            value: {
+              id: 'client-e1',
+              fromNodeId: 'client-n1',
+              toNodeId: 'other',
+            } as never,
+          },
+        ],
+        'do',
+        edgeFetch,
+        table,
+      )
+      const [, init] = edgeFetch.mock.calls[0] as [string, RequestInit]
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        fromNodeId: 'server-n1',
+      })
+    })
+
+    it('retrying a batch that failed partway never re-POSTs a create that already went through', async () => {
+      const table = createIdRemapTable()
+      const ops: Op[] = [
+        { kind: 'create', entity: 'node', value: { id: 'client-n1' } as never },
+        {
+          kind: 'image',
+          id: 'client-img',
+          before: undefined,
+          after: 'data:x',
+        },
+        {
+          kind: 'update',
+          entity: 'node',
+          id: 'client-n1',
+          before: { x: 0 },
+          after: { x: 5 },
+        },
+      ]
+      const firstTry = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ id: 'server-n1' }))
+        .mockResolvedValueOnce(jsonResponse({ id: 'server-img' }))
+        .mockResolvedValueOnce(jsonResponse({}, 500))
+      await expect(
+        applyOpsToNetwork(config, ops, 'do', firstTry, table),
+      ).rejects.toThrow(/500/)
+
+      const retry = vi.fn().mockResolvedValue(jsonResponse({}))
+      await applyOpsToNetwork(config, ops, 'do', retry, table)
+      expect(
+        retry.mock.calls.map(([url, init]) => [
+          (init as RequestInit).method,
+          url,
+        ]),
+      ).toEqual([['PATCH', 'http://localhost:1996/nodes/server-n1']])
+    })
+
+    it('counts a create as confirmed even when the server kept the client id', async () => {
+      const table = createIdRemapTable()
+      const op: Op = {
+        kind: 'create',
+        entity: 'node',
+        value: { id: 'n1' } as never,
+      }
+      await applyOpsToNetwork(
+        config,
+        [op],
+        'do',
+        vi.fn().mockResolvedValue(jsonResponse({ id: 'n1' })),
+        table,
+      )
+      const retry = vi.fn().mockResolvedValue(jsonResponse({ id: 'n1' }))
+      await applyOpsToNetwork(config, [op], 'do', retry, table)
+      expect(retry).not.toHaveBeenCalled()
+    })
+
+    it('defaults to a fresh table per call, so a call without one shares nothing with an earlier call', async () => {
+      await applyOpsToNetwork(
+        config,
+        [
+          {
+            kind: 'create',
+            entity: 'board',
+            value: { id: 'client-b1' } as never,
+          },
+        ],
+        'do',
+        vi.fn().mockResolvedValue(jsonResponse({ id: 'server-b1' })),
+      )
       const patchFetch = vi.fn().mockResolvedValue(jsonResponse({}))
       await applyOpsToNetwork(
         config,

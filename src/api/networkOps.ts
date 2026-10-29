@@ -8,14 +8,20 @@
 // own client-generated (nanoid) ids are never sent as the id to create
 // with — a REST backend (confirmed against json-server v1: `Service#create`
 // unconditionally does `{ ...data, id: randomId() }`) is free to assign
-// its own. Within one `applyOpsToNetwork` call, a batch-scoped table
-// (api/networkIdRemap.ts) resolves references among ops created together
-// in the same gesture (e.g. a new board's board-card node, sent before the
-// board's own create has resolved). The instant any create's real id is
-// known, it's also reconciled immediately into canonical app state
-// (state/networkReconcile.ts) — so a *later*, separate gesture's ops,
-// built from that already-reconciled state, never need any id resolution
-// at all by the time they reach this module.
+// its own. Every op's ids are resolved through an id-remap table
+// (api/networkIdRemap.ts) right before it's sent. That covers references
+// among ops created together in one gesture (e.g. a new board's board-card
+// node). With the session-lived table api/boardApi.ts passes in, it also
+// covers ops built under a client id while that entity's create was still
+// in flight (ctx/notes/261029-edits-to-unconfirmed-creates.md). The instant
+// any create's real id is known, it's also reconciled into canonical app
+// state (state/networkReconcile.ts), so ops built after that already carry
+// the server id.
+//
+// Retry-safe: a failed batch is re-sent whole (state/history/
+// boardHistoryAtom.ts retries its save mutation), so every op here must be
+// safe to apply twice. PATCHes are; a create the table has already recorded
+// is skipped rather than POSTed again.
 
 import { ensureDataUriUnderBytes } from '../cards/imageFile'
 import type { NetworkConfig } from '../state/atoms/networkSettings'
@@ -26,6 +32,7 @@ import type { Collection, EntityCreate, EntityPatch } from './dialects/types'
 import {
   createIdRemapTable,
   type IdRemapTable,
+  isConfirmed,
   recordRemap,
   resolveId,
   resolveValueReferences,
@@ -86,16 +93,18 @@ function withoutId(value: Record<string, unknown>): Record<string, unknown> {
  * mode) and is silently skipped here rather than treated as an error,
  * matching the design doc's explicit call to flag-not-build for it.
  */
-/** `originalId`/`createdId` differing means the server assigned its own id (the common case, see module comment) — recorded in the batch-scoped `idRemapTable` for the rest of this gesture, and reconciled immediately into canonical app state so no *later* gesture ever needs to resolve it. A no-op when they're already equal. */
+/** Records a successful create in `idRemapTable` (marking it confirmed, and resolving every op still to be sent that refers to it), and — when the server assigned its own id, the common case (see module comment) — reconciles that id into canonical app state. */
 function recordAndReconcile(
   idRemapTable: IdRemapTable,
   kind: EntityKind | 'image',
   originalId: string,
   createdId: unknown,
 ): void {
-  if (typeof createdId !== 'string' || createdId === originalId) return
+  if (typeof createdId !== 'string') return
   recordRemap(idRemapTable, kind, originalId, createdId)
-  reconcileNetworkEntityIdAtom(kind, originalId, createdId)
+  if (createdId !== originalId) {
+    reconcileNetworkEntityIdAtom(kind, originalId, createdId)
+  }
 }
 
 /**
@@ -137,6 +146,8 @@ async function applyCreate(
   op: CreateOp,
   fetchImpl: typeof fetch,
 ): Promise<void> {
+  // Already created by an earlier attempt at this same batch.
+  if (isConfirmed(idRemapTable, op.entity, op.value.id)) return
   const value = resolveValueReferences(
     idRemapTable,
     op.value as unknown as Record<string, unknown>,
@@ -216,6 +227,7 @@ async function applyImageOp(
     replay === 'undo' ? [op.after, op.before] : [op.before, op.after]
   const id = resolveId(idRemapTable, 'image', op.id)
   if (to === undefined) return
+  if (from === undefined && isConfirmed(idRemapTable, 'image', op.id)) return
   const dataUri = await fitImageToDialect(config, to)
   if (from !== undefined) {
     await patchEntity(config, 'images', id, { dataUri }, fetchImpl)
@@ -231,9 +243,10 @@ async function applyImageOp(
  * the same collection, and so each create's id is resolved and recorded
  * before any later-in-this-batch op that might reference it — see the
  * module comment) — one TanStack Query mutation per gesture (design doc
- * §5), even though it's several real HTTP requests underneath. The
- * id-remap table is scoped to this one call (see networkIdRemap.ts) — a
- * fresh, empty one every time, never shared across gestures. `replay`
+ * §5), even though it's several real HTTP requests underneath.
+ * `idRemapTable` defaults to a fresh one, scoped to this one call; the app's
+ * own saves pass a session-lived one instead (api/boardApi.ts — see the
+ * module comment). `replay`
  * says whether this is the gesture itself, its undo, or its redo
  * (state/ops.ts's `OpReplay`); an undo applies the ops in reverse order,
  * the same as `applyOps(…, 'before')` does locally.
@@ -243,8 +256,8 @@ export async function applyOpsToNetwork(
   ops: readonly Op[],
   replay: OpReplay = 'do',
   fetchImpl: typeof fetch = fetch,
+  idRemapTable: IdRemapTable = createIdRemapTable(),
 ): Promise<void> {
-  const idRemapTable = createIdRemapTable()
   const ordered = replay === 'undo' ? [...ops].reverse() : ops
   for (const op of ordered) {
     await applyOp(config, idRemapTable, op, replay, fetchImpl)

@@ -714,6 +714,51 @@ test.describe('id reconciliation regression (ctx/notes/260925-network-id-reconci
   })
 })
 
+test.describe('edits to a card whose create is still in flight (ctx/notes/261029-edits-to-unconfirmed-creates.md)', () => {
+  test('typing into a just-created card while its POST is slow is saved under the server id, with no error toast and no duplicate create', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000)
+    const server = await startJsonServer(baseDb(), JSON_SERVER_PORT)
+    try {
+      const baseUrl = `http://localhost:${server.port}`
+      await seedBoard(page, EMPTY_LOCAL_DOCUMENT, 'kanvy.board')
+      await page.goto('/')
+      await connectNetwork(page, baseUrl)
+      await navigateIntoSampleBoard(page)
+
+      // Hold every node create for 3s, long enough for several debounced
+      // edit batches to queue up behind it.
+      await page.route(`${baseUrl}/nodes`, async (route) => {
+        if (route.request().method() === 'POST') {
+          await new Promise((resolve) => setTimeout(resolve, 3000))
+        }
+        await route.continue()
+      })
+
+      await page.keyboard.press('ControlOrMeta+n')
+      const caption = page.locator('[data-testid="card"] .card__content')
+      await expect(caption).toBeFocused()
+      // Typed slowly enough to span more than one debounce window while
+      // the POST is still held.
+      await page.keyboard.type('typed before the id', { delay: 150 })
+
+      await expect
+        .poll(async () => (await getSampleBoardNode(page, baseUrl))?.content, {
+          timeout: 15_000,
+        })
+        .toBe('typed before the id')
+      await expect(page.locator('.toast')).toHaveCount(0)
+      const nodes = await getCollection(page, baseUrl, 'nodes')
+      expect(
+        nodes.filter((node) => node.boardId === SAMPLE_BOARD_ID),
+      ).toHaveLength(1)
+    } finally {
+      await server.stop()
+    }
+  })
+})
+
 // Autosave is debounced (500ms), so an edit made just before a mode switch
 // is still waiting to be sent when the switch lands — it must still go
 // where it was made, never to the mode just switched into.

@@ -166,8 +166,46 @@ void queryClient.prefetchQuery({
 // `mutationKey` labels every row in Devtools' Mutations tab; `pending.ops`
 // (visible by expanding a row's variables) is what actually identifies
 // each one as a real action, not just "a board got saved."
+//
+// Saves are an ordered outbox (ctx/notes/261029-edits-to-unconfirmed-
+// creates.md). They're never sent in parallel: `scope` makes each one wait
+// until every earlier save has finished, so an edit to a just-created node
+// can't reach the server before that node's own create has, and is sent
+// under the server's id (api/boardApi.ts's `confirmedIds`). A failed save
+// is never dropped either. It retries with capped exponential backoff for
+// as long as it takes, holding every later save behind it, because sending
+// those out of order is exactly what breaks a create's dependents.
+// Retrying a whole batch is safe: api/networkOps.ts skips a create that
+// already went through, and local mode rewrites the whole document anyway.
+const SAVE_RETRY_MAX_DELAY_MS = 30_000
+
+// One toast per run of failures, not one per retry: set on the first
+// failure, cleared once any save succeeds again.
+let saveFailing = false
+
 const saveMutation = new MutationObserver(queryClient, {
   mutationKey: ['board', 'save'],
+  scope: { id: 'board-save' },
+  // Local saves never touch the network, so they mustn't pause while the
+  // browser reports itself offline. A network save that fails offline just
+  // keeps retrying on the backoff.
+  networkMode: 'always',
+  retry: () => {
+    if (!saveFailing) {
+      saveFailing = true
+      // No `get` here: this runs inside TanStack Query, outside any atom.
+      getDefaultStore().set(
+        pushToastAtom,
+        "Couldn't save your changes. Retrying automatically.",
+      )
+    }
+    return true
+  },
+  retryDelay: (failureCount) =>
+    Math.min(1000 * 2 ** failureCount, SAVE_RETRY_MAX_DELAY_MS),
+  onSuccess: () => {
+    saveFailing = false
+  },
   // Mode-aware (network mode design doc §5): goes wherever the save's own
   // `target` says — the mode/config its edit was made in (see
   // `SaveTarget`), not whatever's current by the time the debounce fires.
@@ -189,22 +227,9 @@ const saver = createDebouncedSaver<PendingSave>(
   undefined,
   (pending) => {
     queuedTarget = undefined
-    saveMutation.mutate(pending).catch(() => {
-      // Surfaced via a toast (state/atoms/toasts.ts) rather than silently
-      // swallowed — now that saves route through the TanStack Query
-      // mutation layer's simulated flaky network (src/api/boardApi.ts's
-      // `VITE_MOCK_ERROR_RATE`), a real failure is something the dev-mode
-      // save path can actually exercise, not just a theoretical
-      // localStorage-quota edge case (that one — writeBoard's own catch —
-      // stays silent, spec §9/Q13's explicit out-of-scope-for-v0 call).
-      // No retry: this app doesn't currently configure one (React Query
-      // v5's mutation default is `retry: 0`), so the message doesn't
-      // claim it'll happen automatically.
-      getDefaultStore().set(
-        pushToastAtom,
-        'An error occurred during save; please try again.',
-      )
-    })
+    // Failures are retried (and toasted) by the mutation itself, above, so
+    // this promise only settles once the save has gone through.
+    void saveMutation.mutate(pending)
   },
   mergePendingSave,
 )

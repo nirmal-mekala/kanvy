@@ -7,16 +7,22 @@
 // network mode defers to the server: the response's `id` becomes that
 // entity's canonical id for every REST call from then on.
 //
-// This table is deliberately *batch-scoped*, not session-scoped
-// (ctx/notes/260925-network-id-reconciliation.md) — api/networkOps.ts
-// creates a fresh one per `applyOpsToNetwork` call, used only to resolve
-// references among ops created together in the same gesture (e.g. a new
-// board's board-card node, sent before the board's own create has
-// resolved). Once a create's real id is known, api/networkOps.ts
-// immediately reconciles it into canonical app state (state/
-// networkReconcile.ts) — the live board, undo history, current-board
-// tracking, the route, and selection — so nothing *outside* one in-flight
-// batch ever needs to resolve an id through a table like this one again.
+// Network saves share one table for the whole session (api/boardApi.ts's
+// `confirmedIds`), and every batch resolves its ids through it *at send
+// time* (ctx/notes/261029-edits-to-unconfirmed-creates.md). Saves run
+// strictly one after another (state/history/boardHistoryAtom.ts's scoped
+// save mutation), so by the time a batch is sent, every earlier create has
+// recorded its server id here — even if the batch's ops were built, under
+// the client id, while that create was still in flight. A retried batch
+// also checks it, so a create that already went through is never POSTed
+// twice.
+//
+// A confirmed id is also reconciled straight into canonical app state
+// (state/networkReconcile.ts — the live board, undo history, current-board
+// tracking, the route, and selection), so ops built *after* the create
+// resolved already carry the server id (ctx/notes/
+// 260925-network-id-reconciliation.md). This table covers what that
+// rewrite can't reach: ops already built and still waiting to be sent.
 
 import type { EntityKind } from '../state/ops'
 
@@ -33,15 +39,23 @@ export function createIdRemapTable(): IdRemapTable {
   }
 }
 
-/** Records that `oldId` (this app's own id) is now stored server-side as `newId`. A no-op when they're already equal — most backends' own generated ids won't collide with this, but nothing here assumes that. */
+/** Records that `oldId` (this app's own id) is now stored server-side as `newId` — even when they're equal, so `isConfirmed` still knows the create went through. */
 export function recordRemap(
   table: IdRemapTable,
   kind: RemapKind,
   oldId: string,
   newId: string,
 ): void {
-  if (oldId === newId) return
   table[kind].set(oldId, newId)
+}
+
+/** Whether `id`'s create has already succeeded — a retried batch skips it rather than POSTing a duplicate. */
+export function isConfirmed(
+  table: IdRemapTable,
+  kind: RemapKind,
+  id: string,
+): boolean {
+  return table[kind].has(id)
 }
 
 /** Resolves `id` through any recorded remap for `kind`, or returns it unchanged if none was ever recorded (the common case — most backends' generated ids are still discovered fresh each time, but once resolved, every later reference to the same entity resolves the same way). */

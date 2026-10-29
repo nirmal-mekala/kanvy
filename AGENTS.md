@@ -82,7 +82,13 @@ network settings (mode/base URL/auth token) are in-memory only, reset on
 reload. A network create's server-assigned id is reconciled directly into
 canonical app state (not a side table) the instant it's known — see
 `ctx/notes/260925-network-id-reconciliation.md` and `src/state/
-entityReconcile.ts`/`src/state/networkReconcile.ts`.
+entityReconcile.ts`/`src/state/networkReconcile.ts`. Saves are an ordered,
+retrying outbox: one at a time (a scoped TanStack mutation), never dropped
+(infinite capped backoff, later saves wait behind a failure), with ids
+resolved at send time through a session-lived confirmed-id table, so an
+edit made before its entity's create resolved still lands and a retry
+never re-POSTs a create — see
+`ctx/notes/261029-edits-to-unconfirmed-creates.md`.
 
 Network mode speaks more than one backend through **dialects**
 (`src/api/dialects/`): json-server and PostgREST presets, chosen from

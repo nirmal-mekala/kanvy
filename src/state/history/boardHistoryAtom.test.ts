@@ -166,3 +166,64 @@ describe('autosave across a mode switch', () => {
     ])
   })
 })
+
+// ctx/notes/261029-edits-to-unconfirmed-creates.md
+describe('network saves are an ordered, retrying outbox', () => {
+  async function networkState() {
+    const state = await freshState()
+    const toasts = await import('../atoms/toasts')
+    const store = getDefaultStore()
+    store.set(state.networkConfigAtom, CONFIG)
+    store.set(state.accessModeAtom, 'network')
+    return { ...state, ...toasts, store }
+  }
+
+  function sentCreates(): string[][] {
+    const calls = saveBoardOverNetworkMock.mock.calls as unknown as [
+      typeof CONFIG,
+      Op[],
+    ][]
+    return calls.map(([, ops]) => createdIds(ops))
+  }
+
+  it('holds a later save until the earlier one has finished, so it never races a create still in flight', async () => {
+    const { addNodeAtom, store } = await networkState()
+    let finishFirst = () => {}
+    saveBoardOverNetworkMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirst = resolve
+        }),
+    )
+
+    store.set(addNodeAtom, textNode('net-1'))
+    await vi.advanceTimersByTimeAsync(1000)
+    store.set(addNodeAtom, textNode('net-2'))
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(sentCreates()).toEqual([['net-1']])
+
+    finishFirst()
+    await vi.runAllTimersAsync()
+    expect(sentCreates()).toEqual([['net-1'], ['net-2']])
+  })
+
+  it('retries a failed save with backoff instead of dropping it, toasting once per run of failures, and keeps later saves queued behind it', async () => {
+    const { addNodeAtom, toastsAtom, store } = await networkState()
+    saveBoardOverNetworkMock
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockRejectedValueOnce(new Error('boom'))
+
+    store.set(addNodeAtom, textNode('net-1'))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(sentCreates()).toEqual([['net-1']])
+    store.set(addNodeAtom, textNode('net-2'))
+    // The first retry waits 1s after the failure.
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(sentCreates()).toEqual([['net-1'], ['net-1']])
+    expect(store.get(toastsAtom)).toHaveLength(1)
+
+    await vi.runAllTimersAsync()
+    expect(sentCreates()).toEqual([['net-1'], ['net-1'], ['net-1'], ['net-2']])
+    expect(store.get(toastsAtom)).toHaveLength(1)
+  })
+})
