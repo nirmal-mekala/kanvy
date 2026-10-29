@@ -5,6 +5,13 @@
 Written after the fact, describing a bug found and fixed in the same
 session — not a forward-looking design doc with open questions.
 
+**Superseded in part (261029):** the id-remap table is no longer only
+batch-scoped. The assumption below that a later gesture's ops are always
+built from already-reconciled state didn't hold (an edit queued while the
+create was still in flight), so saves now resolve ids at send time through
+a session-lived table, run strictly in order, and retry. See
+`ctx/notes/261029-edits-to-unconfirmed-creates.md`.
+
 ## The bug
 
 Reported: in Network mode, create a board, navigate into it, create a

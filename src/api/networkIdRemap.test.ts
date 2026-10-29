@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createIdRemapTable,
+  isConfirmed,
   recordRemap,
   resolveId,
   resolveValueReferences,
@@ -24,10 +25,15 @@ describe('resolveId', () => {
     expect(resolveId(table, 'edge', 'shared-id')).toBe('shared-id')
   })
 
-  it('is a no-op when the old and new id are the same', () => {
+  it('records an id the server kept unchanged, so its create still counts as confirmed', () => {
     const table = createIdRemapTable()
     recordRemap(table, 'image', 'img1', 'img1')
-    expect(table.image.size).toBe(0)
+    expect(resolveId(table, 'image', 'img1')).toBe('img1')
+    expect(isConfirmed(table, 'image', 'img1')).toBe(true)
+  })
+
+  it('treats an id with no recorded create as unconfirmed', () => {
+    expect(isConfirmed(createIdRemapTable(), 'node', 'n1')).toBe(false)
   })
 })
 

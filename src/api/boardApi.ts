@@ -22,6 +22,7 @@ import {
   loadBoard,
   writeBoard,
 } from '../state/persistence/storage'
+import { createIdRemapTable } from './networkIdRemap'
 import { applyOpsToNetwork } from './networkOps'
 
 function envNumber(value: string | undefined, fallback: number): number {
@@ -83,6 +84,15 @@ export function saveBoard(board: Board): Promise<void> {
   return withSimulatedNetwork(() => writeBoard(board))
 }
 
+// Every network create this session has completed, client id -> server id
+// (api/networkIdRemap.ts). It's shared across saves so a batch built under
+// a client id before its create resolved is still sent under the server
+// id, and so a retried batch never re-POSTs a create
+// (ctx/notes/261029-edits-to-unconfirmed-creates.md). Never cleared: client
+// ids are fresh nanoids, so an entry can't collide with a later one, even
+// after switching connections.
+const confirmedIds = createIdRemapTable()
+
 /**
  * Network mode's write-side counterpart to `saveBoard` (network mode
  * design doc §5) — maps `ops` onto real per-entity REST calls
@@ -96,5 +106,7 @@ export function saveBoardOverNetwork(
   ops: readonly Op[],
   replay: OpReplay,
 ): Promise<void> {
-  return withSimulatedNetwork(() => applyOpsToNetwork(config, ops, replay))
+  return withSimulatedNetwork(() =>
+    applyOpsToNetwork(config, ops, replay, fetch, confirmedIds),
+  )
 }
